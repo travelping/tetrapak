@@ -1,0 +1,1 @@
+-record(tep_project, {name, vsn, deps}).
