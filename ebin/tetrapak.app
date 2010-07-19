@@ -9,5 +9,6 @@
              %% templates
              tetrapak_tpl_tarball
     ]},
-  {applications, [kernel, stdlib]}
+  {applications, [kernel, stdlib]},
+  {registered, []}
 ]}.
