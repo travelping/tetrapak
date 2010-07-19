@@ -40,6 +40,8 @@ run_template(Dir, TemplateName, TemplateMod) ->
         {exit, ok} -> 
           case project_info(Dir, SandboxPath) of 
             {ok, Project} ->
+              tep_log:info("deleting non-otp stuff..."),
+              otp_clean_directory(SandboxPath),
               tep_log:info("applying template ~s", [TemplateName]),
               TemplateMod:create_package(Project, SandboxPath);
             Error -> Error
@@ -103,3 +105,13 @@ dir_to_appname(Dir) ->
     {match, [Appname]} -> Appname;
     nomatch -> nomatch 
   end.
+
+otp_clean_directory(Dir) ->
+  {ok, Files} = file:list_dir(Dir),
+  Delete = Files -- ["ebin", "priv", "include"],
+  lists:foreach(fun (F) ->
+        JP = filename:join(Dir, F),
+        tep_log:info("deleting ~s", [JP]),
+        tep_util:delete_any(JP)
+    end, Delete).
+

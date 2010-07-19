@@ -8,8 +8,13 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_util).
--export([find_module/1, run_proc/2, run_proc/3, with_temp_dir/1,
-         basename/1, copy_dir_contents/2, copy_dir_contents/3]).
+-export([f/1, f/2, find_module/1, run_proc/2, run_proc/3]).
+-export([basename/1, filename_rebase/3]).
+-export([with_temp_dir/1, dir_contents/2, delete_any/1,
+         copy_dir_contents/2, copy_dir_contents/3]).
+
+f(Str) -> f(Str,[]).
+f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
 
 find_module(Name) ->
   case catch Name:module_info() of
@@ -49,7 +54,7 @@ display_output(Port) ->
 
 temp_file_name() ->
   {A,B,C} = now(),
-  lists:flatten(io_lib:format("/tmp/tetrapak-tmp-~p-~p-~p", [A,B,C])).
+  f("/tmp/tetrapak-tmp-~p-~p-~p", [A,B,C]).
 
 copy_dir_contents(Dir, NewDir) ->
   copy_dir_contents(Dir, NewDir, ".*").
@@ -82,11 +87,15 @@ filename_rebase(FName, FromDir, ToDir) ->
       exit(bad_filename)
   end.
 
-recursive_delete(File) ->
+dir_contents(Dir, Mask) ->
+  AddL = fun (F, Acc) -> [F|Acc] end,
+  filelib:fold_files(Dir, Mask, true, AddL, []).
+
+delete_any(File) ->
   case filelib:is_dir(File) of
     true -> 
       {ok, DList} = file:list_dir(File),
-      lists:foreach(fun (F) -> recursive_delete(filename:join(File, F)) end, DList),
+      lists:foreach(fun (F) -> delete_any(filename:join(File, F)) end, DList),
       file:del_dir(File);
     false ->
       file:delete(File)
@@ -98,5 +107,5 @@ with_temp_dir(DoSomething) ->
   try DoSomething(Temp) 
   after 
     tep_log:info("deleting directory ~s", [Temp]),
-    recursive_delete(Temp)
+    delete_any(Temp)
   end.
