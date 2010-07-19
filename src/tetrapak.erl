@@ -70,8 +70,10 @@ project_info(OrigDir, Dir) ->
       case find_app_file(OrigDir, Ebin) of 
         {ok, Appfile} ->
           tep_log:info("found application resource file ~s", [Appfile]),
-          {ok, [Attrs]} = file:consult(Appfile),
-          {ok, app_to_project_info(Attrs)};
+          case file:consult(Appfile) of 
+            {ok, [Attrs]} -> {ok, app_to_project_info(Attrs)};
+            {error, E} -> {error, invalid_app_file, E}
+          end;
         Error ->
           Error
       end;
