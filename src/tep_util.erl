@@ -49,7 +49,7 @@ display_output(Port) ->
 
 temp_file_name() ->
   {A,B,C} = now(),
-  lists:flatten(io_lib:format("/tmp/epack-~p-~p-~p", [A,B,C])).
+  lists:flatten(io_lib:format("/tmp/tetrapak-tmp-~p-~p-~p", [A,B,C])).
 
 copy_dir_contents(Dir, NewDir) ->
   copy_dir_contents(Dir, NewDir, ".*").

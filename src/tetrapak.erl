@@ -21,7 +21,13 @@ create_package(Dir, Template) ->
       end;
     {error, _} -> {error, bad_template}
   end.
-  
+ 
+is_template(Name) ->
+  case find_template_mod(Name) of
+    {ok, _} -> true;
+    {error, _} -> false
+  end.
+
 find_template_mod(Name) when is_list(Name) ->
   MName = re:replace(Name, "-", "_", [{return, list}]), 
   tep_util:find_module(list_to_atom("tetrapak_tpl_" ++ MName));

@@ -1,0 +1,17 @@
+#!/usr/bin/env escript
+% vim: filetype=erlang
+
+main([Template]) ->
+  case tetrapak:is_template(Template) of
+    true ->
+      {ok, Cwd} = file:get_cwd(),
+      Result = tetrapak:create_package(Cwd, Template),
+      io:format("~p~n", [Result]);
+    false ->
+      io:format("Error: no such template: ~s~n", [Template])
+  end;
+main(_) ->
+  usage().
+
+usage() ->
+  io:format("Usage: tetrapak <template>~n").
