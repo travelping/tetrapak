@@ -110,7 +110,7 @@ dir_to_appname(Dir) ->
 
 otp_clean_directory(Dir) ->
   {ok, Files} = file:list_dir(Dir),
-  Delete = Files -- ["ebin", "priv", "include"],
+  Delete = Files -- ["ebin", "priv", "include", "bin"],
   lists:foreach(fun (F) ->
         JP = filename:join(Dir, F),
         tep_log:info("deleting ~s", [JP]),
