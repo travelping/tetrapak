@@ -54,10 +54,10 @@ run_template(Dir, TemplateName, TemplateMod) ->
 with_sandbox(DoSomething, Dir) ->
   Run = fun (SandboxPath) -> 
       tep_log:info("copying ~s to ~s", [Dir,SandboxPath]),
-      tep_util:copy_dir_contents(Dir, SandboxPath),
+      tep_file:copy(Dir, SandboxPath),
       DoSomething(SandboxPath)
   end,
-  tep_util:with_temp_dir(Run).
+  tep_file:with_temp_dir(Run).
 
 % FIXME: allow configuration 
 build_source(Dir) ->
@@ -102,7 +102,7 @@ find_app_file(OrigDir, Ebin) ->
   end.
 
 dir_to_appname(Dir) ->
-  Base = tep_util:basename(Dir),
+  Base = tep_file:basename(Dir),
   case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
     {match, [Appname]} -> Appname;
     nomatch -> nomatch 
@@ -114,6 +114,6 @@ otp_clean_directory(Dir) ->
   lists:foreach(fun (F) ->
         JP = filename:join(Dir, F),
         tep_log:info("deleting ~s", [JP]),
-        tep_util:delete_any(JP)
+        tep_file:delete(JP)
     end, Delete).
 

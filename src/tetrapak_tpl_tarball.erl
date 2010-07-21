@@ -14,10 +14,9 @@
 
 create_package(#tep_project{name = Name, vsn = Vsn}, Path) -> 
   PkgName = tep_util:f("~s-~s", [Name, Vsn]),
-  Files = tep_util:dir_contents(Path, ".*"),
   {ok, TarDesc} = erl_tar:open(PkgName ++ ".tar.gz", [write,compressed]), 
-  lists:foreach(fun (F) ->
-        erl_tar:add(TarDesc, F, tep_util:filename_rebase(F, Path, PkgName), [verbose])
-    end, Files),
+  tep_file:walk(fun (F, _) ->
+        erl_tar:add(TarDesc, F, tep_file:rebase_filename(F, Path, PkgName), [verbose])
+    end, [], Path),
   erl_tar:close(TarDesc).
 
