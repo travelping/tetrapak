@@ -61,7 +61,7 @@ with_sandbox(DoSomething, Dir) ->
 
 % FIXME: allow configuration 
 build_source(Dir) ->
-  tep_util:run_proc("make", ["-C", Dir, "clean", "all"]).
+  tep_util:run("make", ["-C", Dir, "clean", "all"]).
 
 project_info(OrigDir, Dir) ->
   Ebin = filename:join(Dir, "ebin"), 

@@ -9,7 +9,7 @@
 
 -module(tep_util).
 -export([f/1, f/2, match/2, find_module/1]). 
--export([run_proc/2, run_proc/3]).
+-export([run/2, run/3]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -26,10 +26,10 @@ find_module(Name) ->
     _ -> {ok, Name}
   end.
 
-run_proc(Prog, Args) ->
+run(Prog, Args) ->
   {ok, Cwd} = file:get_cwd(),
-  run_proc(Prog, Args, Cwd).
-run_proc(Prog, Args, Dir) ->
+  run(Prog, Args, Cwd).
+run(Prog, Args, Dir) ->
   tep_log:info("running ~s ~s", [Prog, string:join(Args, " ")]),
   case os:find_executable(Prog) of
     false -> {error, no_such_program};

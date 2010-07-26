@@ -11,6 +11,7 @@
 -export([basename/1, rebase_filename/3]).
 -export([temp_name/0, with_temp_dir/1, dir_contents/2]).
 -export([copy/2, copy/3, delete/1, delete/2, walk/3, walk/4]).
+-export([make_tarball/4]).
 
 basename(Filename) ->
   Abs = filename:absname(Filename),
@@ -117,3 +118,11 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
         [Next|Rest] -> walk(Fun, Next, Fun(Path, Acc), Rest, DirOpt)
       end
   end.
+
+make_tarball(Outfile, Root, Dir, Mask) ->
+  Files = lists:map(fun filename:absname/1, dir_contents(Dir, Mask)),
+  XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
+  XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
+  tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar", 
+                       "--numeric-owner", "--owner=root", "--group=root", "--gzip",
+                       "--totals", "--touch", "--absolute-names", "--transform", XForm | Files]).
