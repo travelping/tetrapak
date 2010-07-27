@@ -10,6 +10,7 @@
 -module(tep_util).
 -export([f/1, f/2, match/2, find_module/1]). 
 -export([run/2, run/3]).
+-export([varsubst/2]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -55,3 +56,25 @@ display_output(Port) ->
     {Port, closed} ->
       {exit, error}
   end.
+
+varsubst(Text, Variables) ->
+  BinText = iolist_to_binary(Text),
+  case re:run(BinText, "@@(\\w+)@@", [global, {capture, all, index}, unicode]) of
+    nomatch -> BinText;
+    {match, Matches} ->
+      vs_replace(Matches, 0, BinText, <<>>, Variables)
+  end.
+
+vs_replace([], _Offset, TextRest, Result, _Vars) -> <<Result/bytes, TextRest/bytes>>;
+vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
+  VDLen = VStart - Start, BStart = Start - Offset,
+  <<Before:BStart/bytes, _:VDLen/bytes, Var:VLen/bytes, _:VDLen/bytes, After/bytes>> = Text,
+  NewResult = case proplists:get_value(binary_to_list(Var), Vars) of
+    undefined ->
+      tep_log:warn("varsubst: undefined variable ~s", [Var]),
+      <<Result/bytes, Before/bytes>>;
+    Value ->
+      PP = list_to_binary(f("~s", [Value])),
+      <<Result/bytes, Before/bytes, PP/bytes>>
+  end,
+  vs_replace(RM, Offset + Start + Len, After, NewResult, Vars).

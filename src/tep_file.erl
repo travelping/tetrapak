@@ -8,10 +8,13 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_file).
--export([basename/1, rebase_filename/3]).
--export([temp_name/0, with_temp_dir/1, dir_contents/2]).
+-export([size/1, basename/1, rebase_filename/3]).
+-export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1, 
+         dir_contents/1, dir_contents/2, dir_contents/3]).
 -export([copy/2, copy/3, delete/1, delete/2, walk/3, walk/4]).
--export([make_tarball/4]).
+-export([make_tarball/4, varsubst/3]).
+
+-include_lib("kernel/include/file.hrl").
 
 basename(Filename) ->
   Abs = filename:absname(Filename),
@@ -19,6 +22,10 @@ basename(Filename) ->
     "." -> filename:dirname(Abs);
     Other -> Other
   end.
+
+size(Filename) ->
+  {ok, #file_info{size = Size}} = file:read_file_info(Filename), 
+  Size.
 
 rebase_filename(FName, FromDir, ToDir) ->
   FromDirPath = filename:split(FromDir),
@@ -31,9 +38,11 @@ rebase_filename(FName, FromDir, ToDir) ->
       exit(bad_filename)
   end.
 
-temp_name() ->
+temp_name() -> temp_name("/tmp").
+temp_name(Dir) ->
   {A,B,C} = now(),
-  tep_util:f("/tmp/tetrapak-tmp-~p-~p-~p", [A,B,C]).
+  Pid = re:replace(erlang:pid_to_list(self()), "<|>", "", [global, {return, list}]),
+  filename:join(Dir, tep_util:f("tetrapak-tmp-~p-~p-~p-~s", [A,B,C,Pid])).
 
 with_temp_dir(DoSomething) ->
   Temp = temp_name(),
@@ -44,14 +53,19 @@ with_temp_dir(DoSomething) ->
     delete(Temp)
   end.
 
-dir_contents(Dir, Mask) ->
+dir_contents(Dir) -> dir_contents(Dir, ".*").
+dir_contents(Dir, Mask) -> dir_contents(Dir, Mask, no_dir).
+dir_contents(Dir, Mask, DirOpt) ->
   AddL = fun (F, Acc) -> 
       case tep_util:match(Mask, F) of
         true -> [F|Acc];
         false -> Acc
       end
   end,
-  walk(AddL, [], Dir).
+  lists:reverse(walk(AddL, [], Dir, DirOpt)).
+
+mkdir(Path) ->
+  filelib:ensure_dir(filename:join(Path, ".")).
 
 dir_empty(Dir) ->
   case file:list_dir(Dir) of
@@ -66,7 +80,6 @@ copy(Mask, From, To) ->
       case tep_util:match(Mask, F) of
        true ->
          T = rebase_filename(F, From, To),
-         tep_log:debug("copy ~s -> ~s", [F, T]),
          ok = filelib:ensure_dir(T),  
          case file:copy(F, T) of 
            {ok, _} -> ok;
@@ -84,7 +97,6 @@ delete(Mask, Filename) ->
 delete_if_match(Mask, Path) ->
   case tep_util:match(Mask, Path) of
     true -> 
-      tep_log:debug("delete ~s", [Path]),
       case filelib:is_dir(Path) of
         true -> file:del_dir(Path);
         false -> file:delete(Path)
@@ -94,8 +106,8 @@ delete_if_match(Mask, Path) ->
 
 walk(Fun, AccIn, Path) -> walk(Fun, AccIn, Path, no_dir).
 walk(Fun, AccIn, Path, DirOpt) when (DirOpt == no_dir) or
-                                     (DirOpt == dir_first) or
-                                     (DirOpt == dir_last) ->
+                                    (DirOpt == dir_first) or
+                                    (DirOpt == dir_last) ->
   walk(Fun, {walk, Path}, AccIn, [], DirOpt).
 walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
   case {Walk, filelib:is_dir(Path)} of 
@@ -120,9 +132,18 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
   end.
 
 make_tarball(Outfile, Root, Dir, Mask) ->
-  Files = lists:map(fun filename:absname/1, dir_contents(Dir, Mask)),
+  Files = lists:map(fun filename:absname/1, dir_contents(Dir, Mask, dir_first)),
   XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
   XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
   tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar", 
-                       "--numeric-owner", "--owner=root", "--group=root", "--gzip",
-                       "--totals", "--touch", "--absolute-names", "--transform", XForm | Files]).
+                       "--numeric-owner", "--owner=root", "--group=root", "--gzip", 
+                       "--no-recursion", "--totals", "--touch", "--absolute-names", 
+                       "--preserve-permissions", "--preserve-order",
+                       "--transform", XForm | Files]).
+
+varsubst(Variables, Infile, Outfile) ->
+  tep_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),
+  {ok, Content} = file:read_file(Infile),
+  NewContent = tep_util:varsubst(Content, Variables),
+  tep_log:debug("~p", [NewContent]),
+  file:write_file(Outfile, NewContent).

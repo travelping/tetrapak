@@ -33,7 +33,11 @@ find_template_mod(Name) when is_list(Name) ->
   tep_util:find_module(list_to_atom("tetrapak_tpl_" ++ MName));
 find_template_mod(Name) when is_atom(Name) ->
   find_template_mod(atom_to_list(Name)).
-  
+
+template_dir(Module) ->
+  "tetrapak_tpl_" ++ Name = atom_to_list(Module),
+  filename:join([code:priv_dir(tetrapak), "templates", Name]).
+
 run_template(Dir, TemplateName, TemplateMod) ->
   Build = fun(SandboxPath) ->   
       case build_source(SandboxPath) of
@@ -113,7 +117,7 @@ otp_clean_directory(Dir) ->
   Delete = Files -- ["ebin", "priv", "include", "bin"],
   lists:foreach(fun (F) ->
         JP = filename:join(Dir, F),
-        tep_log:info("deleting ~s", [JP]),
+        tep_log:debug("deleting ~s", [JP]),
         tep_file:delete(JP)
     end, Delete).
 

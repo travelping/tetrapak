@@ -1,0 +1,6 @@
+Package: @@appname@@
+Version: @@version@@
+Architecture: all
+Depends: erlang
+Description:
+

@@ -10,7 +10,7 @@
 -module(tep_log).
 -export([output/1,output/2,info/1,info/2,debug/1,debug/2,warn/1,warn/2]).
 
--define(DEBUG, false).
+-define(DEBUG, true).
 
 output(Fmt) -> output(Fmt, []).
 output(Fmt, Args) -> io:format(Fmt, Args).
