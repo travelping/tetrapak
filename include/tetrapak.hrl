@@ -1,1 +1,1 @@
--record(tep_project, {name, vsn, deps}).
+-record(tep_project, {name, vsn, deps, desc}).

@@ -88,7 +88,8 @@ project_info(OrigDir, Dir) ->
 app_to_project_info({application,Name,Attrs}) ->
   #tep_project{name = Name,
                vsn  = proplists:get_value(vsn,Attrs),
-               deps = proplists:get_value(applications, Attrs) -- [stdlib,kernel]
+               deps = proplists:get_value(applications, Attrs, []) -- [stdlib,kernel],
+               desc = proplists:get_value(description, Attrs, "")
               }.
 
 find_app_file(OrigDir, Ebin) -> 
