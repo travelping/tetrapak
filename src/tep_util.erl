@@ -59,7 +59,7 @@ display_output(Port) ->
 
 varsubst(Text, Variables) ->
   BinText = iolist_to_binary(Text),
-  case re:run(BinText, "@@(\\w+)@@", [global, {capture, all, index}, unicode]) of
+  case re:run(BinText, "@@(\\S+)@@", [global, {capture, all, index}, unicode]) of
     nomatch -> BinText;
     {match, Matches} ->
       vs_replace(Matches, 0, BinText, <<>>, Variables)
@@ -77,4 +77,4 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
       PP = list_to_binary(f("~s", [Value])),
       <<Result/bytes, Before/bytes, PP/bytes>>
   end,
-  vs_replace(RM, Offset + Start + Len, After, NewResult, Vars).
+  vs_replace(RM, Offset + BStart + Len, After, NewResult, Vars).
