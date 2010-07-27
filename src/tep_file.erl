@@ -80,9 +80,11 @@ copy(Mask, From, To) ->
       case tep_util:match(Mask, F) of
        true ->
          T = rebase_filename(F, From, To),
-         ok = filelib:ensure_dir(T),  
+         ok = filelib:ensure_dir(T), 
          case file:copy(F, T) of 
-           {ok, _} -> ok;
+           {ok, _} -> 
+             {ok, #file_info{mode = Mode}} = file:read_file_info(F),
+             file:change_mode(T, Mode);
            {error, Reason} -> throw({file_copy_error, Reason})
          end;
        false -> nomatch

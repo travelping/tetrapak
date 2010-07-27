@@ -28,8 +28,7 @@ make_deb(#tep_project{name = Name, vsn = Vsn}, PkgDir, SBPath) ->
   tep_file:walk(fun (P, _) ->
         File = tep_file:rebase_filename(P, SBPath, ""),
         Target = filename:join([DataDir, file_target(PkgName, File) ++ File]),
-        filelib:ensure_dir(Target),
-        file:copy(P, Target)
+        tep_file:copy(P, Target)
     end, [], SBPath),
   tep_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
   
