@@ -19,6 +19,7 @@ create_package(Project, SBPath) ->
   tep_file:with_temp_dir(fun (PkgDir) -> make_deb(Project, PkgDir, SBPath) end).
 
 make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps}, PkgDir, SBPath) ->
+  Pkg = tep_util:f("~s-~s", [Name, Vsn]),
   PkgName = tep_util:f("erlang-~s", [Name]),
   tep_log:debug("creating debian-binary"),  
   file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
@@ -27,14 +28,14 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps}, PkgDir,
   DataDir = filename:join(PkgDir, "data"), tep_file:mkdir(DataDir),
   tep_file:walk(fun (P, _) ->
         File = tep_file:rebase_filename(P, SBPath, ""),
-        Target = filename:join([DataDir, file_target(PkgName, File) ++ File]),
+        Target = filename:join([DataDir, file_target(Pkg, File) ++ File]),
         tep_file:copy(P, Target)
     end, [], SBPath),
   tep_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
   
   tep_log:debug("creating control.tar.gz"),
   ControlDir = filename:join(PkgDir, "control"), 
-  DepString = lists:map(fun (S) -> tep_util:f(",erlang-~s", [S]) end, Deps),
+  DepString = lists:map(fun (S) -> tep_util:f(", erlang-~s", [S]) end, Deps),
   tep_file:copy(tetrapak:template_dir(?MODULE), ControlDir),
   tep_file:walk(fun (P, _) ->
         tep_file:varsubst([{"name", PkgName}, {"version", Vsn}, 
