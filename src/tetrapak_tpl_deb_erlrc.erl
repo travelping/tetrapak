@@ -9,6 +9,8 @@
 
 -module(tetrapak_tpl_deb_erlrc).
 -export([create_package/2]).
+-include("tetrapak.hrl").
 
-create_package(ProjectInfo, SBPath) ->
-  tetrapak_tpl_deb:create_package(ProjectInfo, SBPath, tetrapak:template_dir(?MODULE)).
+create_package(Project, Job) ->
+  TemplateD = tetrapak:template_dir(?MODULE),
+  tetrapak_tpl_deb:create_package(Project, Job#tep_job{template_dir = TemplateD}).

@@ -10,9 +10,10 @@
 -module(tep_file).
 -export([size/1, basename/1, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1, 
-         dir_contents/1, dir_contents/2, dir_contents/3]).
+         dir_contents/1, dir_contents/2, dir_contents/3,
+         wildcard/2]).
 -export([copy/2, copy/3, delete/1, delete/2, walk/3, walk/4]).
--export([make_tarball/4, varsubst/3]).
+-export([make_tarball/4, make_tarball_from_files/4, varsubst/3]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -62,17 +63,17 @@ dir_contents(Dir, Mask, DirOpt) ->
         false -> Acc
       end
   end,
-  lists:reverse(walk(AddL, [], Dir, DirOpt)).
+  case filelib:is_dir(Dir) of
+    true -> lists:reverse(walk(AddL, [], Dir, DirOpt));
+    false -> []
+  end.
+
+wildcard(Dir, Wildcard) ->
+  Files = filelib:wildcard(Wildcard, Dir),
+  lists:map(fun filename:absname/1, Files).
 
 mkdir(Path) ->
   filelib:ensure_dir(filename:join(Path, ".")).
-
-dir_empty(Dir) ->
-  case file:list_dir(Dir) of
-    {ok, []} -> true;
-    {ok, _} -> false;
-    Error -> Error
-  end.
 
 copy(From, To) -> copy(".*", From, To).
 copy(Mask, From, To) ->
@@ -114,18 +115,14 @@ walk(Fun, AccIn, Path, DirOpt) when (DirOpt == no_dir) or
 walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
   case {Walk, filelib:is_dir(Path)} of 
     {walk, true} ->
-      case {Queue, dir_empty(Path)} of
-        {[], true} -> Fun(Path, Acc);
-        {_, _} -> 
-          {ok, List} = file:list_dir(Path), 
-          AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
-          [Next|Rest] = case DirOpt of
-            no_dir -> AddPaths ++ Queue;
-            dir_first -> [{nowalk, Path}|AddPaths] ++ Queue;
-            dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
-          end,
-          walk(Fun, Next, Acc, Rest, DirOpt)
-      end;
+      {ok, List} = file:list_dir(Path), 
+      AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
+      [Next|Rest] = case DirOpt of
+        no_dir -> AddPaths ++ Queue;
+        dir_first -> [{nowalk, Path}|AddPaths] ++ Queue;
+        dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
+      end,
+      walk(Fun, Next, Acc, Rest, DirOpt);
     {_, _} -> 
       case Queue of 
         [] -> Fun(Path,Acc);
@@ -134,14 +131,17 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
   end.
 
 make_tarball(Outfile, Root, Dir, Mask) ->
-  Files = lists:map(fun filename:absname/1, dir_contents(Dir, Mask, dir_first)),
+  Files = dir_contents(Dir, Mask, dir_first),
+  make_tarball_from_files(Outfile, Root, Dir, Files).
+
+make_tarball_from_files(Outfile, Root, Dir, Files) ->
   XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
   XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
   tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar", 
                        "--numeric-owner", "--owner=root", "--group=root", "--gzip", 
                        "--no-recursion", "--totals", "--touch", "--absolute-names", 
                        "--preserve-permissions", "--preserve-order",
-                       "--transform", XForm | Files]).
+                       "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
 
 varsubst(Variables, Infile, Outfile) ->
   tep_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),

@@ -9,32 +9,32 @@
 
 -module(tetrapak_tpl_deb).
 -export([create_package/2]).
--export([create_package/3]).
 
 -include("tetrapak.hrl").
 
 file_target(_Pkg, "/bin" ++ _) -> "usr/";
 file_target(Pkg, _Path)        -> "usr/lib/erlang/lib/" ++ Pkg.
 
-create_package(Project, SBPath) ->
-  create_package(Project, SBPath, tetrapak:template_dir(?MODULE)).
-create_package(Project, SBPath, TemplateDir) ->
-  tep_file:with_temp_dir(fun (PkgDir) -> make_deb(Project, PkgDir, SBPath, TemplateDir) end).
+create_package(Project, Job) ->
+  tep_file:with_temp_dir(fun (PkgDir) -> make_deb(Project, Job, PkgDir) end).
 
-make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps}, 
-         PkgDir, SBPath, TemplateDir) ->
+make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
+         #tep_job{files = PackageFiles, source_dir = SourceDir,
+                  output_dir = OutDir, template_dir = TemplateDir},
+         PkgDir) ->
   Pkg = tep_util:f("~s-~s", [Name, Vsn]),
   PkgName = tep_util:f("erlang-~s", [Name]),
+
   tep_log:debug("creating debian-binary"),  
   file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
   
   tep_log:debug("creating data.tar.gz"),  
   DataDir = filename:join(PkgDir, "data"), tep_file:mkdir(DataDir),
-  tep_file:walk(fun (P, _) ->
-        File = tep_file:rebase_filename(P, SBPath, ""),
+  lists:foreach(fun (P) ->
+        File = tep_file:rebase_filename(P, SourceDir, ""),
         Target = filename:join([DataDir, file_target(Pkg, File) ++ File]),
         tep_file:copy(P, Target)
-    end, [], SBPath),
+    end, PackageFiles),
   tep_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
   
   tep_log:debug("creating control.tar.gz"),
@@ -48,7 +48,7 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
     end, [], ControlDir),
   tep_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
 
-  DebFile = PkgName ++ "-" ++ Vsn ++ ".deb",
+  DebFile = filename:join(OutDir, PkgName ++ "-" ++ Vsn ++ ".deb"),
   make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]).
 
 make_ar(Outfile, Dir, Entries) ->

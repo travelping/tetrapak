@@ -13,13 +13,17 @@
 -include("tetrapak.hrl").
 
 create_package(Dir, Template) ->
+  {ok, OutDir} = file:get_cwd(),
+  create_package(Dir, Template, OutDir).
+create_package(Dir, Template, OutDir) ->
   case find_template_mod(Template) of
     {ok, TMod} ->
       case filelib:is_dir(Dir) of
-        true -> run_template(Dir, Template, TMod);
+        true -> run_template(TMod, Dir, OutDir);
         false -> {error, bad_dir}
       end;
-    {error, _} -> {error, bad_template}
+    {error, _} -> 
+      {error, bad_template}
   end.
  
 is_template(Name) ->
@@ -38,43 +42,41 @@ template_dir(Module) ->
   "tetrapak_tpl_" ++ Name = atom_to_list(Module),
   filename:join([code:priv_dir(tetrapak), "templates", Name]).
 
-run_template(Dir, TemplateName, TemplateMod) ->
-  Build = fun(SandboxPath) ->   
-      case build_source(SandboxPath) of
-        {exit, ok} -> 
-          case project_info(Dir, SandboxPath) of 
-            {ok, Project} ->
-              tep_log:info("deleting non-otp stuff..."),
-              otp_clean_directory(SandboxPath),
-              tep_log:info("applying template ~s", [TemplateName]),
-              TemplateMod:create_package(Project, SandboxPath);
-            Error -> Error
-          end;
+run_template(TemplateMod, InDir, OutDir) ->
+  case build_source(InDir) of
+    {exit, ok} -> 
+      case project_info(InDir) of 
+        {ok, Project} ->
+          Job = #tep_job{source_dir = InDir, 
+                         template = TemplateMod,
+                         template_dir = template_dir(TemplateMod),
+                         files = otp_related_files(InDir),
+                         output_dir = OutDir},
+          TemplateMod:create_package(Project, Job);
         Error -> Error
-      end
-  end,
-  with_sandbox(Build, Dir).
-
-with_sandbox(DoSomething, Dir) ->
-  Run = fun (SandboxPath) -> 
-      tep_log:info("copying ~s to ~s", [Dir,SandboxPath]),
-      tep_file:copy(Dir, SandboxPath),
-      DoSomething(SandboxPath)
-  end,
-  tep_file:with_temp_dir(Run).
+      end;
+    Error -> Error
+  end.
 
 % FIXME: allow configuration 
 build_source(Dir) ->
-  tep_util:run("make", ["-C", Dir, "clean", "all"]).
+  tep_util:run("make", ["-C", Dir]).
 
-project_info(OrigDir, Dir) ->
+otp_related_files(D) ->
+  tep_file:wildcard(D, "ebin/*.beam") ++
+  tep_file:wildcard(D, "ebin/*.app") ++
+  tep_file:wildcard(D, "ebin/*.appup") ++
+  tep_file:wildcard(D, "include/*.hrl") ++
+  tep_file:dir_contents(filename:join(D, "priv")).
+
+project_info(Dir) ->
   Ebin = filename:join(Dir, "ebin"), 
   case filelib:is_dir(Ebin) of
     true ->
-      case find_app_file(OrigDir, Ebin) of 
+      case find_app_file(Dir, Ebin) of
         {ok, Appfile} ->
           tep_log:info("found application resource file ~s", [Appfile]),
-          case file:consult(Appfile) of 
+          case file:consult(Appfile) of
             {ok, [Attrs]} -> {ok, app_to_project_info(Attrs)};
             {error, E} -> {error, invalid_app_file, E}
           end;
@@ -89,10 +91,9 @@ app_to_project_info({application,Name,Attrs}) ->
   #tep_project{name = Name,
                vsn  = proplists:get_value(vsn,Attrs),
                deps = proplists:get_value(applications, Attrs, []) -- [stdlib,kernel],
-               desc = proplists:get_value(description, Attrs, "")
-              }.
+               desc = proplists:get_value(description, Attrs, "")}.
 
-find_app_file(OrigDir, Ebin) -> 
+find_app_file(OrigDir, Ebin) ->
   Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
   case {Candidates, dir_to_appname(OrigDir)} of
     {[], _} -> {error, no_app_file};
@@ -112,13 +113,3 @@ dir_to_appname(Dir) ->
     {match, [Appname]} -> Appname;
     nomatch -> nomatch 
   end.
-
-otp_clean_directory(Dir) ->
-  {ok, Files} = file:list_dir(Dir),
-  Delete = Files -- ["ebin", "priv", "include", "bin"],
-  lists:foreach(fun (F) ->
-        JP = filename:join(Dir, F),
-        tep_log:debug("deleting ~s", [JP]),
-        tep_file:delete(JP)
-    end, Delete).
-
