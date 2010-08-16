@@ -67,6 +67,7 @@ otp_related_files(D) ->
   tep_file:wildcard(D, "ebin/*.app") ++
   tep_file:wildcard(D, "ebin/*.appup") ++
   tep_file:wildcard(D, "include/*.hrl") ++
+  tep_file:dir_contents(filename:join(D, "bin")) ++
   tep_file:dir_contents(filename:join(D, "priv")).
 
 project_info(Dir) ->
