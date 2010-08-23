@@ -11,6 +11,7 @@
 -export([f/1, f/2, match/2, find_module/1]). 
 -export([run/2, run/3]).
 -export([varsubst/2]).
+-export([parse_cmdline/3]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -78,3 +79,59 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
       <<Result/bytes, Before/bytes, PP/bytes>>
   end,
   vs_replace(RM, Offset + BStart + Len, After, NewResult, Vars).
+
+
+%% ------------------------------------------------------------ 
+%% -- getopt-style option parsing
+
+%% pc(["a", "--publish", "foo"], [{option, publish, ["--publish"], false}], [{arg, template}]),
+%% ==> [{publish, "foo"}, {template, "a"}]
+
+parse_cmdline(Args, OptionDesc, ArgDesc) ->
+  parse_options(Args, OptionDesc, ArgDesc, false, []).
+
+parse_options([], _OptDesc, _ArgDesc, _NextIsArg, Result) -> 
+  {ok, Result};
+parse_options([Arg | Rest], OptDesc, ArgDesc, NextIsArg, Result) ->
+  case Arg of
+    "--" ++ _Name when not NextIsArg ->
+      {Val, TheRest} = parse_option(Arg, Rest, OptDesc),
+      parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, [Val|Result]);
+    "-"  ++ _Name when not NextIsArg ->
+      {Val, TheRest} = parse_option(Arg, Rest, OptDesc),
+      parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, [Val|Result]);
+    "--" ->
+      parse_options(Rest, OptDesc, ArgDesc, true, Result);
+    _ ->
+      case ArgDesc of
+        [{arg, Name} | ArgDescRest] ->
+          parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, [{Name, Arg} | Result]);
+        [] ->
+          io:format("error: superfluous argument: ~p~n", [Arg]),
+          throw({error, {superfluous_argument, Arg}})
+      end
+  end.
+
+parse_option(Option, Rest, OptDesc) ->
+  case find_option(Option, OptDesc) of
+    {option_arg, Name, _Flags, _Default} ->
+      case Rest of
+        [Value | TheRest] -> 
+          {{Name, Value}, TheRest};
+        [] ->
+          io:format("error: option ~s requires an argument~n", [Option]),
+          throw({error, {missing_option_arg, Name}})
+      end;
+    {flag, Name, _Flags, _Default} ->
+      {{Name, true}, Rest};
+    undefined ->
+      io:format("error: unknown option ~s~n", [Option]),
+      throw({error, {unknown_option, Option}})
+  end.
+
+find_option(_Option, []) -> undefined;
+find_option(Option, [Opt = {_, _Name, Flags, _Default} | Rest]) ->
+  case lists:member(Option, Flags) of
+    false -> find_option(Option, Rest);
+    true -> Opt
+  end. 

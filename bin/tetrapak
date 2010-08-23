@@ -1,17 +1,35 @@
 #!/usr/bin/env escript
 % vim: filetype=erlang
 
-main([Template]) ->
+main([]) -> usage();
+main(Args) ->
+  ArgDesc    = [{arg, template}],
+  OptionDesc = [{option_arg, publish, ["--publish", "-p"], false},
+                {flag,       help,    ["--help", "-h"],    false}],
+  case (catch tep_util:parse_cmdline(Args, OptionDesc, ArgDesc)) of
+    {ok, Options} ->
+      case proplists:get_bool(help, Options) of
+        true -> usage();
+        false -> run(proplists:get_value(template, Options), Options)
+      end;
+    _ -> 
+      usage()
+  end.
+
+run(Template, _Options) ->
   case tetrapak:is_template(Template) of
     true ->
       {ok, Cwd} = file:get_cwd(),
       Result = tetrapak:create_package(Cwd, Template),
       io:format("~p~n", [Result]);
     false ->
-      io:format("Error: no such template: ~s~n", [Template])
-  end;
-main(_) ->
-  usage().
+      io:format("error: no such template: ~s~n", [Template])
+  end.
 
 usage() ->
-  io:format("Usage: tetrapak <template>~n").
+  io:format(
+"Usage: tetrapak [ options ] <template>
+
+Recognized Options:
+   --publish <repo_name>     attempt to publish resulting package to
+                             the given named repository~n").
