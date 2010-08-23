@@ -31,7 +31,7 @@ run(Prog, Args) ->
   {ok, Cwd} = file:get_cwd(),
   run(Prog, Args, Cwd).
 run(Prog, Args, Dir) ->
-  tep_log:info("running ~s ~s", [Prog, string:join(Args, " ")]),
+  tep_log:debug("running command ~s ~s", [Prog, string:join(Args, " ")]),
   case os:find_executable(Prog) of
     false -> {error, no_such_program};
     Cmd ->
