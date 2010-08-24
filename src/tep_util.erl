@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_util).
--export([f/1, f/2, match/2, find_module/1]). 
+-export([f/1, f/2, match/2, set_prop/3, find_module/1]). 
 -export([run/2, run/3]).
 -export([varsubst/2]).
 -export([parse_cmdline/3]).
@@ -26,6 +26,17 @@ find_module(Name) ->
   case catch Name:module_info() of
     {'EXIT', _} -> {error, bad_module};
     _ -> {ok, Name}
+  end.
+
+set_prop(SetKey, SetValue, Alist) -> 
+  F = fun ({Key, Value}, {Found, Res}) ->
+      if (Key == SetKey) -> {true,  [{Key, SetValue} | Res]};
+         true            -> {Found, [{Key, Value} | Res]}
+      end
+  end,
+  {Found, NewAlist} = lists:foldl(F, {false, []}, Alist),
+  if Found -> NewAlist;
+     true  -> [{SetKey, SetValue} | NewAlist]
   end.
 
 run(Prog, Args) ->
@@ -84,28 +95,23 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
 %% ------------------------------------------------------------ 
 %% -- getopt-style option parsing
 
-%% pc(["a", "--publish", "foo"], [{option, publish, ["--publish"], false}], [{arg, template}]),
-%% ==> [{publish, "foo"}, {template, "a"}]
-
 parse_cmdline(Args, OptionDesc, ArgDesc) ->
-  parse_options(Args, OptionDesc, ArgDesc, false, []).
+  Defaults = [{Key, Value} || {_Type, Key, _Flags, Value} <- OptionDesc], 
+  parse_options(Args, OptionDesc, ArgDesc, false, Defaults).
 
 parse_options([], _OptDesc, _ArgDesc, _NextIsArg, Result) -> 
   {ok, Result};
 parse_options([Arg | Rest], OptDesc, ArgDesc, NextIsArg, Result) ->
   case Arg of
-    "--" ++ _Name when not NextIsArg ->
-      {Val, TheRest} = parse_option(Arg, Rest, OptDesc),
-      parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, [Val|Result]);
-    "-"  ++ _Name when not NextIsArg ->
-      {Val, TheRest} = parse_option(Arg, Rest, OptDesc),
-      parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, [Val|Result]);
     "--" ->
       parse_options(Rest, OptDesc, ArgDesc, true, Result);
+    "-"  ++ _Name when not NextIsArg ->
+      {{Key, Val}, TheRest} = parse_option(Arg, Rest, OptDesc),
+      parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, set_prop(Key, Val, Result));
     _ ->
       case ArgDesc of
         [{arg, Name} | ArgDescRest] ->
-          parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, [{Name, Arg} | Result]);
+          parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, set_prop(Name, Arg, Result));
         [] ->
           io:format("error: superfluous argument: ~p~n", [Arg]),
           throw({error, {superfluous_argument, Arg}})
