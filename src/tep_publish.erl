@@ -25,8 +25,13 @@ publish(Package, RepoName, Job) when is_record(Job, tep_job) ->
             [Repo#tep_repository.name, TemplatePkgType]),
           false
       end,
-      if PubOK -> do_publish(Package, RepoCB, Repo);
-        true  -> {error, repo_type_mismatch}
+      case PubOK of 
+        true ->
+          tep_log:info("publishing ~s to repository ~s", 
+            [Package, Repo#tep_repository.name]),
+          do_publish(Package, RepoCB, Repo);
+        false ->
+          {error, repo_type_mismatch}
       end;
     {error, not_found} ->
       tep_log:warn("repository ~s not found", [RepoName]),
