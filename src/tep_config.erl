@@ -40,7 +40,10 @@ repo_def_to_record({repository, Name, Props}) ->
       #tep_repository{name = Name, type = Type, options = Props}
   end.
 
-repository(Name) ->
+repository(Name) when is_list(Name) ->
+  MName = re:replace(Name, "-", "_", [{return, list}]),
+  repository(list_to_atom(MName));
+repository(Name) when is_atom(Name) ->
   Repos = repositories(),
   case lists:keyfind(Name, 2, Repos) of
     false -> {error, not_found};
