@@ -31,5 +31,6 @@ usage() ->
 "Usage: tetrapak [ options ] <template>
 
 Recognized Options:
-   --publish <repo_name>     attempt to publish resulting package to
-                             the given named repository~n").
+   -p, --publish <repo_name>   attempt to publish resulting package to
+                               the given named repository
+   -h, --help                  print this help~n").
