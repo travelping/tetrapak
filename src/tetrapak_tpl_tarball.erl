@@ -18,4 +18,5 @@ create_package(#tep_project{name = Name, vsn = Vsn},
                #tep_job{output_dir = OutDir, source_dir = Source, files = Files}) ->
   PkgName = tep_util:f("~s-~s", [Name, Vsn]),
   Tarball = filename:join(OutDir, PkgName ++ ".tar.gz"), 
-  tep_file:make_tarball_from_files(Tarball, PkgName, Source, Files).
+  tep_file:make_tarball_from_files(Tarball, PkgName, Source, Files),
+  {ok, Tarball}.

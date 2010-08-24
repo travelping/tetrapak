@@ -57,7 +57,8 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
   tep_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
 
   DebFile = filename:join(OutDir, PkgName ++ "-" ++ Vsn ++ ".deb"),
-  make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]).
+  make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
+  {ok, DebFile}.
 
 make_ar(Outfile, Dir, Entries) ->
   {ok, ArFile} = file:open(Outfile, [write]),

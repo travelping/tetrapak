@@ -16,7 +16,7 @@ publish(Package, RepoName, Job) when is_record(Job, tep_job) ->
   case tep_config:repository(RepoName) of
     {ok, Repo} ->
       TemplatePkgType = (Job#tep_job.template):pkg_type(),
-      RepoCB = find_repo_mod(Repo),
+      {ok, RepoCB} = find_repo_mod(Repo),
       PubOK = case RepoCB:accept_pkg_type() of
         any -> true;
         TemplatePkgType -> true;
@@ -27,7 +27,7 @@ publish(Package, RepoName, Job) when is_record(Job, tep_job) ->
       end,
       case PubOK of 
         true ->
-          tep_log:info("publishing ~s to repository ~s", 
+          tep_log:info("publishing ~s to repo ~s", 
             [Package, Repo#tep_repository.name]),
           do_publish(Package, RepoCB, Repo);
         false ->

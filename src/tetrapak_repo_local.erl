@@ -17,4 +17,7 @@ accept_pkg_type() -> any.
 publish(PackageFile, #tep_repository{options = Props}) ->
   Path = proplists:get_value(path, Props),
   Target = filename:join(Path, filename:basename(PackageFile)), 
-  tep_file:copy(PackageFile, Target).
+  case filelib:is_dir(Path) of
+    true -> tep_file:copy(PackageFile, Target);
+    false -> tep_log:warn("local repository ~s is not a directory", [Path])
+  end.

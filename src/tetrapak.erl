@@ -12,6 +12,20 @@
 
 -include("tetrapak.hrl").
 
+run(Dir, Template, Options) ->
+  case create_package(Dir, Template) of
+    {ok, PkgFile, Job} ->
+      tep_log:info("finished packaging, package is at ~s", [PkgFile]),
+      case proplists:get_value(publish, Options) of
+        false -> PkgFile;
+        RepoName -> 
+          tep_publish:publish(PkgFile, RepoName, Job)
+      end;
+    {error, Reason} -> 
+      tep_log:warn("erred while packaging: ~p", [Reason]),
+      oops
+  end.
+
 create_package(Dir, Template) ->
   {ok, OutDir} = file:get_cwd(),
   create_package(Dir, Template, OutDir).
@@ -52,7 +66,10 @@ run_template(TemplateMod, InDir, OutDir) ->
                          template_dir = template_dir(TemplateMod),
                          files = otp_related_files(InDir),
                          output_dir = OutDir},
-          TemplateMod:create_package(Project, Job);
+          case TemplateMod:create_package(Project, Job) of
+            {ok, File} -> {ok, File, Job};
+            {error, Err} -> {error, Err}
+          end;
         Error -> Error
       end;
     Error -> Error

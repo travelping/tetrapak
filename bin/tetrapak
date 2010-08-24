@@ -18,12 +18,11 @@ main(Args) ->
       usage()
   end.
 
-run(Template, _Options) ->
+run(Template, Options) ->
   case tetrapak:is_template(Template) of
     true ->
       {ok, Cwd} = file:get_cwd(),
-      Result = tetrapak:create_package(Cwd, Template),
-      io:format("~p~n", [Result]);
+      tetrapak:run(Cwd, Template, Options);
     false ->
       io:format("error: no such template: ~s~n", [Template])
   end.
