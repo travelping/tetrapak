@@ -1,6 +1,8 @@
 #!/usr/bin/env escript
 % vim: filetype=erlang
 
+-include_lib("tetrapak/include/tetrapak.hrl").
+
 main([]) -> usage();
 main(Args) ->
   ArgDesc    = [{arg, template}],
@@ -26,6 +28,17 @@ run(Template, _Options) ->
       io:format("error: no such template: ~s~n", [Template])
   end.
 
+list_repos() ->
+  Repos = tep_config:repositories(),
+  case Repos of
+    [] -> io:format("No repositories configured.~n");
+    _  ->
+      io:format("Available Repositories:~n"),
+      lists:foreach(fun (#tep_repository{name = Name, type = Type}) ->
+            io:format("   * ~s (~s) ~n", [Name, Type])
+        end, Repos)
+  end.
+
 usage() ->
   io:format(
 "Usage: tetrapak [ options ] <template>
@@ -33,4 +46,5 @@ usage() ->
 Recognized Options:
    -p, --publish <repo_name>   attempt to publish resulting package to
                                the given named repository
-   -h, --help                  print this help~n").
+   -h, --help                  print this help~n~n"),
+  list_repos().
