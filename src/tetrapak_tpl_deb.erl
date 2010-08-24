@@ -8,15 +8,23 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak_tpl_deb).
--export([create_package/2]).
+-export([pkg_type/0, create_package/2]).
 
 -include("tetrapak.hrl").
 
-file_target(_Pkg, "/bin" ++ _) -> "usr/";
-file_target(Pkg, _Path)        -> "usr/lib/erlang/lib/" ++ Pkg.
+%% ------------------------------------------------------------ 
+%% -- API
+
+pkg_type() -> debian.
 
 create_package(Project, Job) ->
   tep_file:with_temp_dir(fun (PkgDir) -> make_deb(Project, Job, PkgDir) end).
+
+%% ------------------------------------------------------------ 
+%% -- Implementation
+
+file_target(_Pkg, "/bin" ++ _) -> "usr/";
+file_target(Pkg, _Path)        -> "usr/lib/erlang/lib/" ++ Pkg.
 
 make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
          #tep_job{files = PackageFiles, source_dir = SourceDir,

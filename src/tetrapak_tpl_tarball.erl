@@ -8,9 +8,11 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak_tpl_tarball).
--export([create_package/2]).
+-export([pkg_type/0, create_package/2]).
 
 -include("tetrapak.hrl").
+
+pkg_type() -> tarball.
 
 create_package(#tep_project{name = Name, vsn = Vsn},
                #tep_job{output_dir = OutDir, source_dir = Source, files = Files}) ->
