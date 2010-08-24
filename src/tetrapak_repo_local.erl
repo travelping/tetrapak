@@ -18,6 +18,10 @@ publish(PackageFile, #tep_repository{options = Props}) ->
   Path = proplists:get_value(path, Props),
   Target = filename:join(Path, filename:basename(PackageFile)), 
   case filelib:is_dir(Path) of
-    true -> tep_file:copy(PackageFile, Target);
-    false -> tep_log:warn("local repository ~s is not a directory", [Path])
+    true -> 
+      tep_file:copy(PackageFile, Target),
+      ok;
+    false -> 
+      tep_log:warn("local repository ~s is not a directory", [Path]),
+      {error, repo_path_invalid}
   end.

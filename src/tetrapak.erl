@@ -19,7 +19,14 @@ run(Dir, Template, Options) ->
       case proplists:get_value(publish, Options) of
         false -> PkgFile;
         RepoName -> 
-          tep_publish:publish(PkgFile, RepoName, Job)
+          case tep_publish:publish(PkgFile, RepoName, Job) of
+            ok -> 
+              tep_log:info("finished publishing, deleting package ~s", [PkgFile]),
+              tep_file:delete(PkgFile);
+            {error, Reason} -> 
+              tep_log:warn("erred while publishing: ~p", [Reason]),
+              oops
+          end
       end;
     {error, Reason} -> 
       tep_log:warn("erred while packaging: ~p", [Reason]),
