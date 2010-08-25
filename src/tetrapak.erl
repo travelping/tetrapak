@@ -40,7 +40,8 @@ create_package(Dir, Template, OutDir) ->
   case find_template_mod(Template) of
     {ok, TMod} ->
       case filelib:is_dir(Dir) of
-        true -> run_template(TMod, Dir, OutDir);
+        true -> 
+          run_template(Template, TMod, Dir, OutDir);
         false -> {error, bad_dir}
       end;
     {error, _} -> 
@@ -63,11 +64,12 @@ template_dir(Module) ->
   "tetrapak_tpl_" ++ Name = atom_to_list(Module),
   filename:join([code:priv_dir(tetrapak), "templates", Name]).
 
-run_template(TemplateMod, InDir, OutDir) ->
+run_template(TName, TemplateMod, InDir, OutDir) ->
   case build_source(InDir) of
     {exit, ok} -> 
       case project_info(InDir) of 
         {ok, Project} ->
+          tep_log:info("applying template ~s", [TName]),
           Job = #tep_job{source_dir = InDir, 
                          template = TemplateMod,
                          template_dir = template_dir(TemplateMod),
@@ -84,6 +86,7 @@ run_template(TemplateMod, InDir, OutDir) ->
 
 % FIXME: allow configuration 
 build_source(Dir) ->
+  tep_log:info("building project in ~s", [Dir]),
   tep_util:run("make", ["-C", Dir]).
 
 otp_related_files(D) ->
@@ -100,7 +103,7 @@ project_info(Dir) ->
     true ->
       case find_app_file(Dir, Ebin) of
         {ok, Appfile} ->
-          tep_log:info("found application resource file ~s", [Appfile]),
+          tep_log:debug("found application resource file ~s", [Appfile]),
           case file:consult(Appfile) of
             {ok, [Attrs]} -> {ok, app_to_project_info(Attrs)};
             {error, E} -> {error, invalid_app_file, E}

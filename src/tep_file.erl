@@ -50,7 +50,7 @@ with_temp_dir(DoSomething) ->
   file:make_dir(Temp),
   try DoSomething(Temp) 
   after 
-    tep_log:info("deleting directory ~s", [Temp]),
+    tep_log:debug("deleting directory ~s", [Temp]),
     delete(Temp)
   end.
 
