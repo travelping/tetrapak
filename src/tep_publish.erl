@@ -38,8 +38,8 @@ publish(Package, RepoName, Job) when is_record(Job, tep_job) ->
       {error, repo_not_found}
   end.
 
-find_repo_mod(#tep_repository{name = Name}) when is_atom(Name) ->
-  SName = atom_to_list(Name),
+find_repo_mod(#tep_repository{type = Type}) when is_atom(Type) ->
+  SName = atom_to_list(Type),
   tep_util:find_module(list_to_atom("tetrapak_repo_" ++ SName)).
 
 do_publish(Package, RepoCB, Repo) ->

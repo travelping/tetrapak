@@ -14,8 +14,8 @@
 
 accept_pkg_type() -> any.
 
-publish(PackageFile, #tep_repository{options = Props}) ->
-  Path = proplists:get_value(path, Props),
+publish(PackageFile, Repo) ->
+  Path = tep_config:repo_prop(path, Repo),
   Target = filename:join(Path, filename:basename(PackageFile)), 
   case filelib:is_dir(Path) of
     true -> 

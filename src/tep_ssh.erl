@@ -8,12 +8,15 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_ssh).
--export([login/3, run/2, ls/2, scp/3, close/1]).
+-export([login/3, close/1]).
+-export([run/2, ls/2, scp/3, file_info/2, is_dir/2]).
 
 %% internal
 -export([init/1]).
 -define(TIMEOUT, 200).
 -define(EXEC_TIMEOUT, 200).
+
+-include_lib("kernel/include/file.hrl").
 
 %% ------------------------------------------------------------ 
 %% -- API
@@ -42,6 +45,14 @@ ls(Session, RemoteDir) ->
   call(Session, sftp, {ls, RemoteDir}).
 scp(Session, Local, Remote) ->
   call(Session, sftp, {scp, Local, Remote}).
+file_info(Session, Path) ->
+  call(Session, sftp, {file_info, Path}).
+
+is_dir(Session, RemotePath) ->
+  case file_info(Session, RemotePath) of 
+    {error, _} -> false;
+    {ok, #file_info{type = Type}} -> Type == directory
+  end.
 
 close(SessionPid) ->
   SessionPid ! terminate.
@@ -96,6 +107,10 @@ do_sftp_cmd(Conn, {scp, Local, Remote}) ->
       tep_log:warn("ssh_scp: cannot open remote file ~p for writing, ~p", [Remote, Error]),
       {error, Error}
   end;
+
+do_sftp_cmd(Conn, {file_info, Path}) ->
+  tep_log:debug("ssh: file_info ~p", [Path]),
+  ssh_sftp:read_file_info(Conn, Path, 1000);
 
 do_sftp_cmd(_Conn, Cmd) ->
   tep_log:warn("ssh: unknown sftp command: ~p", [Cmd]),
