@@ -13,7 +13,7 @@
 -include("tetrapak.hrl").
 
 run(Dir, Template, Options) ->
-  case create_package(Dir, Template) of
+  try create_package(Dir, Template) of
     {ok, PkgFile, Job} ->
       tep_log:info("finished packaging, package is at ~s", [PkgFile]),
       case proplists:get_value(publish, Options) of
@@ -24,14 +24,14 @@ run(Dir, Template, Options) ->
               tep_log:info("finished publishing, deleting package ~s", [PkgFile]),
               tep_file:delete(PkgFile);
             {error, Reason} -> 
-              tep_log:warn("erred while publishing: ~p", [Reason]),
-              oops
+              tep_log:warn("erred while publishing: ~p", [Reason])
           end
       end;
     {error, Reason} -> 
-      tep_log:warn("erred while packaging: ~p", [Reason]),
-      oops
-  end.
+      tep_log:warn("erred while packaging: ~p", [Reason])
+   catch 
+     throw:{error, _} -> oops
+   end.
 
 create_package(Dir, Template) ->
   {ok, OutDir} = file:get_cwd(),
@@ -82,7 +82,7 @@ run_template(TName, TemplateMod, InDir, OutDir) ->
           end;
         Error -> Error
       end;
-    Error -> Error
+    _Error -> {error, build_failed}
   end.
 
 % FIXME: allow configuration 
@@ -122,4 +122,3 @@ check_modules(#tep_project{modules = Mods}, Dir) ->
       throw({error, app_file_modules});
      true -> ok
   end.
-           
