@@ -67,7 +67,7 @@ template_dir(Module) ->
 run_template(TName, TemplateMod, InDir, OutDir) ->
   case build_source(InDir) of
     {exit, ok} -> 
-      case project_info(InDir) of 
+      case tep_config:project_info(InDir) of 
         {ok, Project} ->
           tep_log:info("applying template ~s", [TName]),
           Job = #tep_job{source_dir = InDir, 
@@ -96,48 +96,3 @@ otp_related_files(D) ->
   tep_file:wildcard(D, "include/*.hrl") ++
   tep_file:dir_contents(filename:join(D, "bin")) ++
   tep_file:dir_contents(filename:join(D, "priv")).
-
-project_info(Dir) ->
-  Ebin = filename:join(Dir, "ebin"), 
-  case filelib:is_dir(Ebin) of
-    true ->
-      case find_app_file(Dir, Ebin) of
-        {ok, Appfile} ->
-          tep_log:debug("found application resource file ~s", [Appfile]),
-          case file:consult(Appfile) of
-            {ok, [Attrs]} -> {ok, app_to_project_info(Attrs)};
-            {error, E} -> {error, invalid_app_file, E}
-          end;
-        Error ->
-          Error
-      end;
-    false ->
-      {error, no_ebin_dir}
-  end.
-
-app_to_project_info({application,Name,Attrs}) ->
-  #tep_project{name = Name,
-               vsn  = proplists:get_value(vsn,Attrs),
-               deps = proplists:get_value(applications, Attrs, []) -- [stdlib,kernel],
-               desc = proplists:get_value(description, Attrs, "")}.
-
-find_app_file(OrigDir, Ebin) ->
-  Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
-  case {Candidates, dir_to_appname(OrigDir)} of
-    {[], _} -> {error, no_app_file};
-    {Files, nomatch} -> 
-      tep_log:warn("project directory name not OTP-compliant"),
-      {ok, hd(Files)};
-    {Files, Appname} ->
-      case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
-        [] -> {ok, hd(Files)};
-        [File|_] -> {ok, File} 
-      end
-  end.
-
-dir_to_appname(Dir) ->
-  Base = tep_file:basename(Dir),
-  case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
-    {match, [Appname]} -> Appname;
-    nomatch -> nomatch 
-  end.

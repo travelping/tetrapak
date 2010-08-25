@@ -9,6 +9,7 @@
 
 -module(tep_config).
 -export([repositories/0, repository/1, list_repos/0, repo_prop/2]).
+-export([project_info/1]).
 
 -include("tetrapak.hrl").
 
@@ -68,4 +69,62 @@ repo_prop(#tep_repository{name = Name, options = Props}, Key) ->
         [Key, Name]),
       throw({error, repo_prop_missing});
     Val -> Val
+  end.
+
+%% ------------------------------------------------------------ 
+%% -- Repository specs
+
+project_info(Dir) ->
+  Ebin = filename:join(Dir, "ebin"), 
+  case filelib:is_dir(Ebin) of
+    true ->
+      case find_app_file(Dir, Ebin) of
+        {ok, Appfile} ->
+          tep_log:debug("found application resource file ~s", [Appfile]),
+          case file:consult(Appfile) of
+            {ok, [Attrs]} -> {ok, app_to_project_info(Appfile, Attrs)};
+            {error, E} -> {error, invalid_app_file, E}
+          end;
+        Error ->
+          Error
+      end;
+    false ->
+      {error, no_ebin_dir}
+  end.
+
+app_to_project_info(File, {application,Name,Attrs}) ->
+  #tep_project{name = Name,
+               vsn  = app_attr(File, vsn, Attrs),
+               deps = app_attr(File, applications, Attrs) -- [stdlib,kernel],
+               desc = proplists:get_value(description, Attrs, ""),
+               modules = app_attr(File, modules, Attrs)}.
+
+app_attr(File, Key, Attrs) ->
+  case proplists:get_value(Key, Attrs) of
+    undefined ->
+      tep_log:warn("required property ~s missing in app file ~s",
+        [Key, File]),
+      throw({error, application_prop_missing});
+    Val -> Val
+  end.
+
+find_app_file(OrigDir, Ebin) ->
+  Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
+  case {Candidates, dir_to_appname(OrigDir)} of
+    {[], _} -> {error, no_app_file};
+    {Files, nomatch} -> 
+      tep_log:warn("project directory name not OTP-compliant"),
+      {ok, hd(Files)};
+    {Files, Appname} ->
+      case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
+        [] -> {ok, hd(Files)};
+        [File|_] -> {ok, File} 
+      end
+  end.
+
+dir_to_appname(Dir) ->
+  Base = tep_file:basename(Dir),
+  case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
+    {match, [Appname]} -> Appname;
+    nomatch -> nomatch 
   end.
