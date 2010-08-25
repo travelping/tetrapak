@@ -50,7 +50,6 @@ repository(Name) when is_atom(Name) ->
     Repo ->  {ok, Repo}
   end.
 
-<<<<<<< HEAD
 list_repos() ->
   Repos = tep_config:repositories(),
   case Repos of
@@ -62,7 +61,6 @@ list_repos() ->
         end, Repos)
   end.
 
-=======
 repo_prop(#tep_repository{name = Name, options = Props}, Key) ->
   case proplists:get_value(Key, Props) of
     undefined ->
@@ -71,4 +69,3 @@ repo_prop(#tep_repository{name = Name, options = Props}, Key) ->
       throw({error, repo_prop_missing});
     Val -> Val
   end.
->>>>>>> upload-feature
