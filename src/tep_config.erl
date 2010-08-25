@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_config).
--export([repositories/0, repository/1, list_repos/0]).
+-export([repositories/0, repository/1, list_repos/0, repo_prop/2]).
 
 -include("tetrapak.hrl").
 
@@ -50,6 +50,7 @@ repository(Name) when is_atom(Name) ->
     Repo ->  {ok, Repo}
   end.
 
+<<<<<<< HEAD
 list_repos() ->
   Repos = tep_config:repositories(),
   case Repos of
@@ -61,3 +62,13 @@ list_repos() ->
         end, Repos)
   end.
 
+=======
+repo_prop(#tep_repository{name = Name, options = Props}, Key) ->
+  case proplists:get_value(Key, Props) of
+    undefined ->
+      tep_log:warn("required option ~s missing in repository definition of '~s'",
+        [Key, Name]),
+      throw({error, repo_prop_missing});
+    Val -> Val
+  end.
+>>>>>>> upload-feature
