@@ -1,10 +1,11 @@
 #!/usr/bin/env escript
 % vim: filetype=erlang
 
--include_lib("tetrapak/include/tetrapak.hrl").
-
-main([]) -> usage();
+main([]) -> 
+  ensure_code_path(),
+  usage();
 main(Args) ->
+  ensure_code_path(),
   ArgDesc    = [{arg, template}],
   OptionDesc = [{option_arg, publish, ["--publish", "-p"], false},
                 {flag,       help,    ["--help", "-h"],    false}],
@@ -27,17 +28,6 @@ run(Template, Options) ->
       io:format("error: no such template: ~s~n", [Template])
   end.
 
-list_repos() ->
-  Repos = tep_config:repositories(),
-  case Repos of
-    [] -> io:format("No repositories configured.~n");
-    _  ->
-      io:format("Available Repositories:~n"),
-      lists:foreach(fun (#tep_repository{name = Name, type = Type}) ->
-            io:format("   * ~s (~s) ~n", [Name, Type])
-        end, Repos)
-  end.
-
 usage() ->
   io:format(
 "Usage: tetrapak [ options ] <template>
@@ -46,4 +36,13 @@ Recognized Options:
    -p, --publish <repo_name>   attempt to publish resulting package to
                                the given named repository
    -h, --help                  print this help~n~n"),
-  list_repos().
+  tep_config:list_repos().
+
+ensure_code_path() ->
+  RealPath = case file:read_link(?FILE) of
+    {ok, R} -> R;
+    {error, einval} -> ?FILE;
+    {error, enotsup} -> ?FILE
+  end,
+  Root = filename:absname(filename:dirname(filename:dirname(RealPath))),
+  code:add_patha(filename:join(Root, "ebin")).

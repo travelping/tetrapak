@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_config).
--export([repositories/0, repository/1]).
+-export([repositories/0, repository/1, list_repos/0]).
 
 -include("tetrapak.hrl").
 
@@ -49,3 +49,15 @@ repository(Name) when is_atom(Name) ->
     false -> {error, not_found};
     Repo ->  {ok, Repo}
   end.
+
+list_repos() ->
+  Repos = tep_config:repositories(),
+  case Repos of
+    [] -> io:format("No repositories configured.~n");
+    _  ->
+      io:format("Available Repositories:~n"),
+      lists:foreach(fun (#tep_repository{name = Name, type = Type}) ->
+            io:format("   * ~s (~s) ~n", [Name, Type])
+        end, Repos)
+  end.
+
