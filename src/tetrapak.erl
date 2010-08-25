@@ -69,6 +69,7 @@ run_template(TName, TemplateMod, InDir, OutDir) ->
     {exit, ok} -> 
       case tep_config:project_info(InDir) of 
         {ok, Project} ->
+          check_modules(Project, InDir),
           tep_log:info("applying template ~s", [TName]),
           Job = #tep_job{source_dir = InDir, 
                          template = TemplateMod,
@@ -96,3 +97,29 @@ otp_related_files(D) ->
   tep_file:wildcard(D, "include/*.hrl") ++
   tep_file:dir_contents(filename:join(D, "bin")) ++
   tep_file:dir_contents(filename:join(D, "priv")).
+
+check_modules(#tep_project{modules = Mods}, Dir) ->
+  Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),
+  ShouldFiles = lists:map(fun (M) -> atom_to_list(M) ++ ".beam" end, Mods),
+  BeamToMod = fun (L) ->
+      lists:map(fun (F) -> lists:sublist(F, length(F) - 5) end, L)
+  end,
+  Error1 = case ShouldFiles -- Files of
+    [] -> false;
+    OnlyApp ->
+      tep_log:warn("modules listed in app file but not present in ebin/: ~s",
+        [string:join(BeamToMod(OnlyApp), ", ")]),
+      true
+  end,
+  Error2 = case Files -- ShouldFiles of
+    [] -> false;
+    OnlyEbin ->
+      tep_log:warn("modules present in ebin/ but not listed in app file: ~s",
+        [string:join(BeamToMod(OnlyEbin), ", ")]),
+      true
+  end,
+  if Error1 or Error2 -> 
+      throw({error, app_file_modules});
+     true -> ok
+  end.
+           
