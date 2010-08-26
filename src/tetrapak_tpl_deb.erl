@@ -56,7 +56,9 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
     end, [], ControlDir),
   tep_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
 
-  DebFile = filename:join(OutDir, PkgName ++ "-" ++ Vsn ++ ".deb"),
+  Arch = "all",
+  GoodName = re:replace(PkgName, "_", "-", [{return, list}]),
+  DebFile = filename:join(OutDir, tep_util:f("~s_~s_~s.deb", [GoodName, Vsn, Arch])),
   make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
   {ok, DebFile}.
 
