@@ -32,6 +32,8 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
          PkgDir) ->
   Pkg = tep_util:f("~s-~s", [Name, Vsn]),
   PkgName = tep_util:f("erlang-~s", [Name]),
+  Arch = "all",
+  DebianName = no_underscores(PkgName),  
 
   tep_log:debug("creating debian-binary"),  
   file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
@@ -47,18 +49,16 @@ make_deb(#tep_project{name = Name, vsn = Vsn, desc = Desc, deps = Deps},
   
   tep_log:debug("creating control.tar.gz"),
   ControlDir = filename:join(PkgDir, "control"), 
-  DepString = lists:map(fun (S) -> tep_util:f(", erlang-~s", [S]) end, Deps),
+  DepString = lists:map(fun (S) -> no_underscores(tep_util:f(", erlang-~s", [S])) end, Deps),
   tep_file:copy(TemplateDir, ControlDir),
   tep_file:walk(fun (P, _) ->
-        tep_file:varsubst([{"name", PkgName}, {"version", Vsn}, 
+        tep_file:varsubst([{"name", DebianName}, {"version", Vsn}, 
                            {"appname", Name}, {"appdeps", DepString}, {"desc", Desc}],
                           P, P)
     end, [], ControlDir),
   tep_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
 
-  Arch = "all",
-  GoodName = re:replace(PkgName, "_", "-", [{return, list}]),
-  DebFile = filename:join(OutDir, tep_util:f("~s_~s_~s.deb", [GoodName, Vsn, Arch])),
+  DebFile = filename:join(OutDir, tep_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
   make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
   {ok, DebFile}.
 
@@ -84,3 +84,5 @@ make_ar(Outfile, Dir, Entries) ->
   after
     file:close(Outfile)
   end.
+
+no_underscores(S) -> re:replace(S, "_", "-", [{return, list}]).
