@@ -57,7 +57,7 @@ is_dir(Session, RemotePath) ->
   end.
 
 close(SessionPid) ->
-  SessionPid ! terminate.
+  call(SessionPid, terminate, []).
 
 %% ------------------------------------------------------------ 
 %% -- Implementation
@@ -81,9 +81,10 @@ session_loop(CM, SFTP) ->
       Return = do_sftp_cmd(SFTP, Cmd), 
       From ! {self(), finish, sftp, Return},
       session_loop(CM, SFTP);
-    terminate -> 
+    {From, terminate, _} ->
       tep_log:debug("ssh: closing session"),
-      ssh:close(CM);
+      Ret = ssh:close(CM),
+      From ! {self(), finish, terminate, Ret};
     Msg ->
       tep_log:warn("ssh: session got unknown: ~p", [Msg]),
       session_loop(CM, SFTP)
