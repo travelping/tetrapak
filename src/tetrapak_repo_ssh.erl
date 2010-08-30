@@ -27,8 +27,11 @@ publish(PackageFile, Repo = #tep_repository{options = Props}) ->
   end,
   {ok, SSH} = tep_ssh:login(Host, Port, UserCfg),
   Target = filename:join(Path, filename:basename(PackageFile)), 
+  TargetTmp = Target ++ ".upload-tmp",
   case tep_ssh:is_dir(SSH,Path) of
-    true -> tep_ssh:scp(SSH, PackageFile, Target);
+    true ->
+      tep_ssh:scp(SSH, PackageFile, TargetTmp),
+      tep_ssh:mv(SSH, TargetTmp, Target);
     false -> tep_log:warn("remote repository path ~s is not a directory", [Path])
   end,
   tep_ssh:close(SSH),

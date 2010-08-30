@@ -9,7 +9,7 @@
 
 -module(tep_ssh).
 -export([login/3, close/1]).
--export([run/2, ls/2, scp/3, file_info/2, is_dir/2]).
+-export([run/2, ls/2, scp/3, mv/3, file_info/2, is_dir/2]).
 
 %% internal
 -export([init/1]).
@@ -45,6 +45,8 @@ ls(Session, RemoteDir) ->
   call(Session, sftp, {ls, RemoteDir}).
 scp(Session, Local, Remote) ->
   call(Session, sftp, {scp, Local, Remote}).
+mv(Session, From, To) ->
+  call(Session, sftp, {mv, From, To}).
 file_info(Session, Path) ->
   call(Session, sftp, {file_info, Path}).
 
@@ -109,8 +111,12 @@ do_sftp_cmd(Conn, {scp, Local, Remote}) ->
   end;
 
 do_sftp_cmd(Conn, {file_info, Path}) ->
-  tep_log:debug("ssh: file_info ~p", [Path]),
+  tep_log:debug("ssh: sftp file_info ~p", [Path]),
   ssh_sftp:read_file_info(Conn, Path, 1000);
+
+do_sftp_cmd(Conn, {mv, From, To}) ->
+  tep_log:debug("ssh: sftp mv ~p -> ~p", [From, To]),
+  ssh_sftp:rename(Conn, From, To);
 
 do_sftp_cmd(_Conn, Cmd) ->
   tep_log:warn("ssh: unknown sftp command: ~p", [Cmd]),
