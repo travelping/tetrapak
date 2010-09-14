@@ -82,7 +82,7 @@ project_info(Dir) ->
         {ok, Appfile} ->
           tep_log:debug("found application resource file ~s", [Appfile]),
           case file:consult(Appfile) of
-            {ok, [Attrs]} -> {ok, app_to_project_info(Appfile, Attrs)};
+            {ok, [Attrs]} -> {ok, app_to_project_info(Appfile, Dir, Attrs)};
             {error, E} -> {error, invalid_app_file, E}
           end;
         Error ->
@@ -92,8 +92,10 @@ project_info(Dir) ->
       {error, no_ebin_dir}
   end.
 
-app_to_project_info(File, {application,Name,Attrs}) ->
+app_to_project_info(File, Dir, {application,Name,Attrs}) ->
   #tep_project{name = Name,
+               app_file = File,
+               directory = Dir,
                vsn  = app_attr(File, vsn, Attrs),
                deps = app_attr(File, applications, Attrs) -- [stdlib,kernel],
                desc = proplists:get_value(description, Attrs, ""),

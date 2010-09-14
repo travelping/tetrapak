@@ -7,8 +7,12 @@ main([]) ->
 main(Args) ->
   ensure_code_path(),
   ArgDesc    = [{arg, template}],
-  OptionDesc = [{option_arg, publish, ["--publish", "-p"], false},
-                {flag,       help,    ["--help", "-h"],    false}],
+  {ok, Cwd}  = file:get_cwd(),
+  OptionDesc = [{option_arg, publish,    ["--publish", "-p"],    false},
+                {option_arg, outdir,     ["--outdir", "-o"],     Cwd},
+                {flag,       help,       ["--help", "-h"],       false},
+                {flag,       inc_vsn,    ["--inc-vsn"],          false},
+                {flag,       dont_build, ["--dont-build", "-B"], false}],
   case (catch tep_util:parse_cmdline(Args, OptionDesc, ArgDesc)) of
     {ok, Options} ->
       case proplists:get_bool(help, Options) of
@@ -35,6 +39,9 @@ usage() ->
 Recognized Options:
    -p, --publish <repo_name>   attempt to publish resulting package to
                                the given named repository
+   --inc-vsn                   increase version in app file
+   -o, --outdir <dir>          place output package in <dir>
+   -B, --dont-build            skip build
    -h, --help                  print this help~n~n"),
   tep_config:list_repos().
 
