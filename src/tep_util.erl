@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_util).
--export([f/1, f/2, match/2, set_prop/3, find_module/1]). 
+-export([f/1, f/2, match/2, set_prop/3, find_module/1]).
 -export([run/2, run/3]).
 -export([varsubst/2]).
 -export([parse_cmdline/3]).
@@ -16,7 +16,7 @@
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
 
-match(Re, String) -> 
+match(Re, String) ->
   case re:run(String, Re, [{capture, none}]) of
     match -> true;
     nomatch -> false
@@ -28,7 +28,7 @@ find_module(Name) ->
     _ -> {ok, Name}
   end.
 
-set_prop(SetKey, SetValue, Alist) -> 
+set_prop(SetKey, SetValue, Alist) ->
   F = fun ({Key, Value}, {Found, Res}) ->
       if (Key == SetKey) -> {true,  [{Key, SetValue} | Res]};
          true            -> {Found, [{Key, Value} | Res]}
@@ -47,11 +47,11 @@ run(Prog, Args, Dir) ->
   case os:find_executable(Prog) of
     false -> {error, no_such_program};
     Cmd ->
-      Port = erlang:open_port({spawn_executable, Cmd}, 
+      Port = erlang:open_port({spawn_executable, Cmd},
                               [{cd, Dir}, in, exit_status, stderr_to_stdout,
                                {args, Args}, {line, 400}]),
       display_output(Port)
-  end. 
+  end.
 
 display_output(Port) ->
   receive
@@ -61,7 +61,7 @@ display_output(Port) ->
           noeol -> "~s"
         end, [Line]),
       display_output(Port);
-    {Port, {exit_status, 0}} -> 
+    {Port, {exit_status, 0}} ->
       {exit, ok};
     {Port, {exit_status, _}} ->
       {exit, error};
@@ -92,15 +92,22 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
   vs_replace(RM, Offset + BStart + Len, After, NewResult, Vars).
 
 
-%% ------------------------------------------------------------ 
+%% ------------------------------------------------------------
 %% -- getopt-style option parsing
 
 parse_cmdline(Args, OptionDesc, ArgDesc) ->
-  Defaults = [{Key, Value} || {_Type, Key, _Flags, Value} <- OptionDesc], 
-  parse_options(Args, OptionDesc, ArgDesc, false, Defaults).
+  Defaults = [{Key, Value} || {_Type, Key, _Flags, Value} <- OptionDesc],
+  case parse_options(Args, OptionDesc, ArgDesc, false, Defaults) of
+      {Result, []} ->
+          {ok, Result};
+      {_Result, Missing} ->
+          MissingNames = lists:map(fun ({arg, Name}) -> f("~s", [Name]) end, Missing),
+          io:format("error: missing arguments: ~s~n", [string:join(MissingNames, ", ")]),
+          {error, {missing, MissingNames}}
+  end.
 
-parse_options([], _OptDesc, _ArgDesc, _NextIsArg, Result) -> 
-  {ok, Result};
+parse_options([], _OptDesc, ArgDesc, _NextIsArg, Result) ->
+  {Result, ArgDesc};
 parse_options([Arg | Rest], OptDesc, ArgDesc, NextIsArg, Result) ->
   case Arg of
     "--" ->
@@ -122,7 +129,7 @@ parse_option(Option, Rest, OptDesc) ->
   case find_option(Option, OptDesc) of
     {option_arg, Name, _Flags, _Default} ->
       case Rest of
-        [Value | TheRest] -> 
+        [Value | TheRest] ->
           {{Name, Value}, TheRest};
         [] ->
           io:format("error: option ~s requires an argument~n", [Option]),
@@ -140,4 +147,4 @@ find_option(Option, [Opt = {_, _Name, Flags, _Default} | Rest]) ->
   case lists:member(Option, Flags) of
     false -> find_option(Option, Rest);
     true -> Opt
-  end. 
+  end.
