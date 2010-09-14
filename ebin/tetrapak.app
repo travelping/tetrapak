@@ -1,7 +1,7 @@
 % vim: filetype=erlang
 {application, tetrapak,
  [{description, "Erlang application packaging tool"},
-  {vsn, "0.2.2"},
+  {vsn, "0.2.3"},
   {modules, [tetrapak,
              tep_util,
              tep_log,
