@@ -15,15 +15,11 @@ set -e
 # the debian-policy package
 
 case "$1" in
-	  upgrade)
-      erlrc-upgrade @@appname@@ @@version@@ $2 
-		;; 
-
     remove)
-      rm -f /etc/erlrc.d/applications/@@appname@@  
+      rm -f /etc/erlrc.d/applications/@@appname@@
     ;;
 
-    purge|failed-upgrade|abort-install|abort-upgrade|disappear)
+    upgrade|purge|failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;
 
     *)

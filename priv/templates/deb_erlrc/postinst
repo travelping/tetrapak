@@ -14,12 +14,18 @@ set -e
 # the debian-policy package
 
 case "$1" in
-    configure|abort-remove)
-      mkdir -p /etc/erlrc.d/applications
-      touch /etc/erlrc.d/applications/@@appname@@
-      erlrc-start @@appname@@ @@version@@ 
+    configure)
+      if test -z "$2"; then
+        # we're new
+        mkdir -p /etc/erlrc.d/applications
+        touch /etc/erlrc.d/applications/@@appname@@
+        erlrc-start @@appname@@ @@version@@
+      else
+        # we're already installed
+        erlrc-upgrade @@appname@@ "$2" @@version@@
+      fi
     ;;
-	
+
     abort-upgrade|abort-deconfigure)
     ;;
 
