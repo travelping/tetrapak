@@ -30,7 +30,7 @@ run(Dir, Template, Options) ->
     {error, Reason} ->
       tep_log:warn("erred while packaging: ~p", [Reason])
    catch
-       throw:{error, Reason} -> tep_log:error("oops: ~s", [Reason])
+       throw:{error, Reason} -> tep_log:warn("oops: ~s", [Reason])
    end.
 
 run_packaging(InDir, Template, Options) ->
