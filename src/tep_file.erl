@@ -8,8 +8,8 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_file).
--export([size/1, basename/1, rebase_filename/3]).
--export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1, 
+-export([size/1, filter_useless/1, basename/1, rebase_filename/3]).
+-export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
 -export([copy/2, copy/3, delete/1, delete/2, walk/3, walk/4]).
@@ -25,19 +25,27 @@ basename(Filename) ->
   end.
 
 size(Filename) ->
-  {ok, #file_info{size = Size}} = file:read_file_info(Filename), 
+  {ok, #file_info{size = Size}} = file:read_file_info(Filename),
   Size.
 
 rebase_filename(FName, FromDir, ToDir) ->
   FromDirPath = filename:split(FromDir),
-  FPath = filename:split(FName), 
+  FPath = filename:split(FName),
   case lists:prefix(FromDirPath, FPath) of
-    true -> 
+    true ->
       RP = FPath -- FromDirPath,
       filename:join([ToDir|RP]);
     false ->
       exit(bad_filename)
   end.
+
+filter_useless(Files) ->
+    FilenameUseful = fun (F) ->
+                        Name = basename(F),
+                        (not tep_util:match(".*~$", Name)) andalso
+                        (not tep_util:match("^\\..*", Name))
+                     end,
+    lists:filter(FilenameUseful, Files).
 
 temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
@@ -48,8 +56,8 @@ temp_name(Dir) ->
 with_temp_dir(DoSomething) ->
   Temp = temp_name(),
   file:make_dir(Temp),
-  try DoSomething(Temp) 
-  after 
+  try DoSomething(Temp)
+  after
     tep_log:debug("deleting directory ~s", [Temp]),
     delete(Temp)
   end.
@@ -57,7 +65,7 @@ with_temp_dir(DoSomething) ->
 dir_contents(Dir) -> dir_contents(Dir, ".*").
 dir_contents(Dir, Mask) -> dir_contents(Dir, Mask, no_dir).
 dir_contents(Dir, Mask, DirOpt) ->
-  AddL = fun (F, Acc) -> 
+  AddL = fun (F, Acc) ->
       case tep_util:match(Mask, F) of
         true -> [F|Acc];
         false -> Acc
@@ -77,13 +85,13 @@ mkdir(Path) ->
 
 copy(From, To) -> copy(".*", From, To).
 copy(Mask, From, To) ->
-  CP = fun (F, _) -> 
+  CP = fun (F, _) ->
       case tep_util:match(Mask, F) of
        true ->
          T = rebase_filename(F, From, To),
-         ok = filelib:ensure_dir(T), 
-         case file:copy(F, T) of 
-           {ok, _} -> 
+         ok = filelib:ensure_dir(T),
+         case file:copy(F, T) of
+           {ok, _} ->
              {ok, #file_info{mode = Mode}} = file:read_file_info(F),
              file:change_mode(T, Mode);
            {error, Reason} -> throw({file_copy_error, Reason})
@@ -94,12 +102,12 @@ copy(Mask, From, To) ->
  walk(CP, [], From, no_dir).
 
 delete(Filename) -> delete(".*", Filename).
-delete(Mask, Filename) -> 
+delete(Mask, Filename) ->
   walk(fun (F, _) -> delete_if_match(Mask, F) end, [], Filename, dir_last).
 
 delete_if_match(Mask, Path) ->
   case tep_util:match(Mask, Path) of
-    true -> 
+    true ->
       case filelib:is_dir(Path) of
         true -> file:del_dir(Path);
         false -> file:delete(Path)
@@ -113,9 +121,9 @@ walk(Fun, AccIn, Path, DirOpt) when (DirOpt == no_dir) or
                                     (DirOpt == dir_last) ->
   walk(Fun, {walk, Path}, AccIn, [], DirOpt).
 walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
-  case {Walk, filelib:is_dir(Path)} of 
+  case {Walk, filelib:is_dir(Path)} of
     {walk, true} ->
-      {ok, List} = file:list_dir(Path), 
+      {ok, List} = file:list_dir(Path),
       AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
       [Next|Rest] = case DirOpt of
         no_dir -> AddPaths ++ Queue;
@@ -123,8 +131,8 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
         dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
       end,
       walk(Fun, Next, Acc, Rest, DirOpt);
-    {_, _} -> 
-      case Queue of 
+    {_, _} ->
+      case Queue of
         [] -> Fun(Path,Acc);
         [Next|Rest] -> walk(Fun, Next, Fun(Path, Acc), Rest, DirOpt)
       end
@@ -137,9 +145,9 @@ make_tarball(Outfile, Root, Dir, Mask) ->
 make_tarball_from_files(Outfile, Root, Dir, Files) ->
   XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
   XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
-  tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar", 
-                       "--numeric-owner", "--owner=root", "--group=root", "--gzip", 
-                       "--no-recursion", "--totals", "--touch", "--absolute-names", 
+  tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
+                       "--numeric-owner", "--owner=root", "--group=root", "--gzip",
+                       "--no-recursion", "--totals", "--touch", "--absolute-names",
                        "--preserve-permissions", "--preserve-order",
                        "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
 

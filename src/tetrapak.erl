@@ -132,8 +132,8 @@ otp_related_files(D) ->
   tep_file:wildcard(D, "ebin/*.app") ++
   tep_file:wildcard(D, "ebin/*.appup") ++
   tep_file:wildcard(D, "include/*.hrl") ++
-  tep_file:dir_contents(filename:join(D, "bin")) ++
-  tep_file:dir_contents(filename:join(D, "priv")).
+  tep_file:filter_useless(tep_file:dir_contents(filename:join(D, "bin"))) ++
+  tep_file:filter_useless(tep_file:dir_contents(filename:join(D, "priv"))).
 
 check_modules(#tep_project{modules = Mods}, Dir) ->
   Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),
