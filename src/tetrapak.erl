@@ -14,21 +14,21 @@
 
 run(Dir, Template, Options) ->
   try run_packaging(Dir, Template, Options) of
-    {ok, PkgFile, Job} ->
-      tep_log:info("finished packaging, package is at ~s", [PkgFile]),
-      case proplists:get_value(publish, Options) of
-        false -> PkgFile;
-        RepoName ->
-          case tep_publish:publish(PkgFile, RepoName, Job) of
-            ok ->
-              tep_log:info("finished publishing, deleting package ~s", [PkgFile]),
-              tep_file:delete(PkgFile);
-            {error, Reason} ->
-              tep_log:warn("erred while publishing: ~p", [Reason])
-          end
-      end;
-    {error, Reason} ->
-      tep_log:warn("erred while packaging: ~p", [Reason])
+      {ok, PkgFile, Job} ->
+          tep_log:info("finished packaging, package is at ~s", [PkgFile]),
+          case proplists:get_value(publish, Options) of
+              false -> PkgFile;
+              RepoName ->
+                  case tep_publish:publish(PkgFile, RepoName, Job) of
+                      ok ->
+                          tep_log:info("finished publishing, deleting package ~s", [PkgFile]),
+                          tep_file:delete(PkgFile);
+                      {error, Reason} ->
+                          tep_log:warn("erred while publishing: ~p", [Reason])
+                  end
+          end;
+      {error, Reason} ->
+          tep_log:warn("erred while packaging: ~p", [Reason])
    catch
        throw:{error, Reason} -> tep_log:warn("oops: ~s", [Reason])
    end.
@@ -136,26 +136,40 @@ otp_related_files(D) ->
   tep_file:filter_useless(tep_file:dir_contents(filename:join(D, "priv"))).
 
 check_modules(#tep_project{modules = Mods}, Dir) ->
-  Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),
-  ShouldFiles = lists:map(fun (M) -> atom_to_list(M) ++ ".beam" end, Mods),
-  BeamToMod = fun (L) ->
-      lists:map(fun (F) -> lists:sublist(F, length(F) - 5) end, L)
-  end,
-  Error1 = case ShouldFiles -- Files of
-    [] -> false;
-    OnlyApp ->
-      tep_log:warn("modules listed in app file but not present in ebin/: ~s",
-        [string:join(BeamToMod(OnlyApp), ", ")]),
-      true
-  end,
-  Error2 = case Files -- ShouldFiles of
-    [] -> false;
-    OnlyEbin ->
-      tep_log:warn("modules present in ebin/ but not listed in app file: ~s",
-        [string:join(BeamToMod(OnlyEbin), ", ")]),
-      true
-  end,
-  if Error1 or Error2 ->
-      throw({error, app_file_modules});
-     true -> ok
-  end.
+    Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),
+    {ShouldFiles, Dupli} = find_duplicates(lists:map(fun (M) -> atom_to_list(M) ++ ".beam" end, Mods)),
+    BeamToMod = fun (List) -> lists:map(fun (F) -> lists:sublist(F, length(F) - 5) end, List) end,
+
+    E1 = case length(Dupli) of
+             0 -> false;
+             _ ->
+                 tep_log:warn("duplicate modules in app file: ~s",
+                              [string:join(BeamToMod(Dupli), ", ")]),
+                 true
+         end,
+    E2 = case ShouldFiles -- Files of
+             [] -> false;
+             OnlyApp ->
+                 tep_log:warn("modules listed in app file but not present in ebin/: ~s",
+                              [string:join(BeamToMod(OnlyApp), ", ")]),
+                 true
+         end,
+    E3 = case Files -- ShouldFiles of
+             [] -> false;
+             OnlyEbin ->
+                 tep_log:warn("modules present in ebin/ but not listed in app file: ~s",
+                              [string:join(BeamToMod(OnlyEbin), ", ")]),
+                 true
+         end,
+
+    if (E1 or E2 or E3) -> throw({error, app_file_modules});
+       true -> ok
+    end.
+
+find_duplicates(List) -> find_duplicates(List, sets:new(), sets:new()).
+find_duplicates([], Seen, Dupli) -> {sets:to_list(Seen), sets:to_list(Dupli)};
+find_duplicates([Head|Tail], Seen, Dupli) ->
+    case sets:is_element(Head, Seen) of
+        true  -> find_duplicates(Tail, Seen, sets:add_element(Head, Dupli));
+        false -> find_duplicates(Tail, sets:add_element(Head, Seen), Dupli)
+    end.
