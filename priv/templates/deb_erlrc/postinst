@@ -20,9 +20,6 @@ case "$1" in
         mkdir -p /etc/erlrc.d/applications
         touch /etc/erlrc.d/applications/@@appname@@
         erlrc-start @@appname@@ @@version@@
-      else
-        # we're already installed
-        erlrc-upgrade @@appname@@ "$2" @@version@@
       fi
     ;;
 

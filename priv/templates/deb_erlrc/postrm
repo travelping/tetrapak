@@ -19,7 +19,11 @@ case "$1" in
       rm -f /etc/erlrc.d/applications/@@appname@@
     ;;
 
-    upgrade|purge|failed-upgrade|abort-install|abort-upgrade|disappear)
+    upgrade)
+      erlrc-upgrade @@appname@@ @@version@@ "$2"
+    ;;
+
+    purge|failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;
 
     *)

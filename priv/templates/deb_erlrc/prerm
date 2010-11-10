@@ -17,7 +17,7 @@ case "$1" in
       erlrc-stop @@appname@@ @@version@@ 
     ;;
 
-		upgrade|deconfigure|failed-upgrade)
+    upgrade|deconfigure|failed-upgrade)
     ;;
 
     *)
