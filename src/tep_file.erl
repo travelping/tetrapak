@@ -8,11 +8,11 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_file).
--export([size/1, filter_useless/1, basename/1, rebase_filename/3]).
+-export([size/1, md5sum/1, is_useless/1, filter_useless/1, basename/1, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
--export([copy/2, copy/3, delete/1, delete/2, walk/3, walk/4]).
+-export([copy/2, delete/1, delete/2, walk/3, walk/4]).
 -export([make_tarball/4, make_tarball_from_files/4, varsubst/3]).
 
 -include_lib("kernel/include/file.hrl").
@@ -34,18 +34,22 @@ rebase_filename(FName, FromDir, ToDir) ->
   case lists:prefix(FromDirPath, FPath) of
     true ->
       RP = FPath -- FromDirPath,
-      filename:join([ToDir|RP]);
+      Joined = filename:join([ToDir|RP]),
+      case ToDir of
+          "" -> tl(Joined);
+          _  -> Joined
+      end;
     false ->
       exit(bad_filename)
   end.
 
+is_useless(Filename) ->
+    Name = basename(Filename),
+    tep_util:match(".*~$", Name) or tep_util:match("^\\..*", Name)
+    or tep_util:match("^.*/\\.git/.*$", Filename).
+
 filter_useless(Files) ->
-    FilenameUseful = fun (F) ->
-                        Name = basename(F),
-                        (not tep_util:match(".*~$", Name)) andalso
-                        (not tep_util:match("^\\..*", Name))
-                     end,
-    lists:filter(FilenameUseful, Files).
+    lists:filter(fun is_useless/1, Files).
 
 temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
@@ -83,10 +87,9 @@ wildcard(Dir, Wildcard) ->
 mkdir(Path) ->
   filelib:ensure_dir(filename:join(Path, ".")).
 
-copy(From, To) -> copy(".*", From, To).
-copy(Mask, From, To) ->
+copy(From, To) ->
   CP = fun (F, _) ->
-      case tep_util:match(Mask, F) of
+      case not is_useless(F) of
        true ->
          T = rebase_filename(F, From, To),
          ok = filelib:ensure_dir(T),
@@ -157,3 +160,30 @@ varsubst(Variables, Infile, Outfile) ->
   NewContent = tep_util:varsubst(Content, Variables),
   tep_log:debug("~p", [NewContent]),
   file:write_file(Outfile, NewContent).
+
+md5sum(File) ->
+    case file:open(File, [binary,raw,read]) of
+        {ok, P} ->
+           Digest = md5_loop(P, erlang:md5_init()),
+           bin_to_hex(binary_to_list(Digest));
+        Error   -> Error
+    end.
+
+md5_loop(P, C) ->
+    case file:read(P, 150) of
+        {ok, Bin} ->
+            md5_loop(P, erlang:md5_update(C, Bin));
+        eof ->
+            file:close(P),
+            erlang:md5_final(C)
+    end.
+
+bin_to_hex([H|T]) ->
+    H1 = nibble2hex(H bsr 4),
+    H2 = nibble2hex(H band 15),
+    [H1, H2 | bin_to_hex(T)];
+bin_to_hex([]) ->
+    [].
+
+nibble2hex(X) when X < 10 -> X + $0;
+nibble2hex(X)             -> X - 10 + $a.

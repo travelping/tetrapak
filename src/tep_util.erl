@@ -16,6 +16,8 @@
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
 
+match(Fun, String) when is_function(Fun) ->
+    Fun(String);
 match(Re, String) ->
   case re:run(String, Re, [{capture, none}]) of
     match -> true;
@@ -71,7 +73,7 @@ display_output(Port) ->
 
 varsubst(Text, Variables) ->
   BinText = iolist_to_binary(Text),
-  case re:run(BinText, "@@(\\S+)@@", [global, {capture, all, index}, unicode]) of
+  case re:run(BinText, "@@([^@ ]+)@@", [global, {capture, all, index}, unicode]) of
     nomatch -> BinText;
     {match, Matches} ->
       vs_replace(Matches, 0, BinText, <<>>, Variables)
