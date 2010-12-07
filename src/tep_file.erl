@@ -45,11 +45,10 @@ rebase_filename(FName, FromDir, ToDir) ->
 
 is_useless(Filename) ->
     Name = basename(Filename),
-    tep_util:match(".*~$", Name) or tep_util:match("^\\..*", Name)
-    or tep_util:match("^.*/\\.git/.*$", Filename).
+    tep_util:match(".*~$", Name) or tep_util:match("^\\..*", Name) or tep_util:match("^.*/\\.git/.*$", Filename).
 
 filter_useless(Files) ->
-    lists:filter(fun is_useless/1, Files).
+    lists:filter(fun (X) -> not is_useless(X) end, Files).
 
 temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
