@@ -17,7 +17,7 @@ INCLUDE_DIR = $(CURDIR)/include
 .PHONY: all clean doc shell 
 
 all:
-	$(ERL) -noinput -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
+	$(ERL) -pa $(EBIN_DIR) -noinput -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
 
 clean:
 	rm -f $(EBIN_DIR)/*.beam

@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_util).
--export([f/1, f/2, match/2, set_prop/3, find_module/1]).
+-export([f/1, f/2, match/2, set_prop/3, find_module/1, mfile_to_mod/1]).
 -export([run/2, run/3]).
 -export([varsubst/2]).
 -export([parse_cmdline/3]).
@@ -29,6 +29,9 @@ find_module(Name) ->
     {'EXIT', _} -> {error, bad_module};
     _ -> {ok, Name}
   end.
+
+mfile_to_mod(Mfile) ->
+    list_to_atom(filename:rootname(filename:basename(Mfile))).
 
 set_prop(SetKey, SetValue, Alist) ->
   F = fun ({Key, Value}, {Found, Res}) ->

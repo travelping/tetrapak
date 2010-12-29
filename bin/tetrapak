@@ -1,49 +1,51 @@
 #!/usr/bin/env escript
 % vim: filetype=erlang
 
-main([]) -> 
-  ensure_code_path(),
-  usage();
-main(Args) ->
-  ensure_code_path(),
-  ArgDesc    = [{arg, template}],
-  {ok, Cwd}  = file:get_cwd(),
-  OptionDesc = [{option_arg, publish,    ["--publish", "-p"],    false},
-                {option_arg, outdir,     ["--outdir", "-o"],     Cwd},
-                {flag,       help,       ["--help", "-h"],       false},
-                {flag,       inc_vsn,    ["--inc-vsn"],          false},
-                {flag,       dont_build, ["--dont-build", "-B"], false}],
-  case (catch tep_util:parse_cmdline(Args, OptionDesc, ArgDesc)) of
-    {ok, Options} ->
-      case proplists:get_bool(help, Options) of
-        true -> usage();
-        false -> run(proplists:get_value(template, Options), Options)
-      end;
-    _ -> 
-      usage()
-  end.
+main([]) ->
+    ensure_code_path(),
+    usage(server()),
+    halt(1);
+main([[$- | _] | _ ]) ->
+    ensure_code_path(),
+    io:format(standard_error, "Error: options should be specified after <command>~n", []),
+    usage(server()),
+    halt(1);
+main([Command | _Args]) ->
+    ensure_code_path(),
+    Server = server(),
+    case tetrapak:run(Server, Command) of
+        {error, unknown_pass} ->
+            io:format(standard_error, "Error: no such command: ~s~n", [Command]),
+            usage(Server),
+            halt(1);
+        {error, {fail, PassName, Message}} ->
+            io:format(standard_error, "Error in pass '~s': ~s~n", [PassName, Message]),
+            halt(101);
+        {error, Other} ->
+            io:format(standard_error, "Error: ~p~n", [Other]),
+            halt(101);
+        ok ->
+            io:format(standard_error, "All done...\n", []),
+            halt(0)
+    end.
 
-run(Template, Options) ->
-  case tetrapak:is_template(Template) of
-    true ->
-      {ok, Cwd} = file:get_cwd(),
-      tetrapak:run(Cwd, Template, Options);
-    false ->
-      io:format("error: no such template: ~s~n", [Template])
-  end.
+server() ->
+    {ok, Cwd} = file:get_cwd(),
+    {ok, S} = tetrapak:start(Cwd),
+    S.
 
-usage() ->
-  io:format(
-"Usage: tetrapak [ options ] <template>
+usage(Server) ->
+  io:format(standard_error,
+            "Usage: tetrapak <command> [ options ]~n~n"
+            "Available Passes~n~s",
+            [tablist(tetrapak:all_commands(Server))]).
 
-Recognized Options:
-   -p, --publish <repo_name>   attempt to publish resulting package to
-                               the given named repository
-   --inc-vsn                   increase version in app file
-   -o, --outdir <dir>          place output package in <dir>
-   -B, --dont-build            skip build
-   -h, --help                  print this help~n~n"),
-  tep_config:list_repos().
+tablist(Lis) ->
+    MaxWidth = lists:foldl(fun ({K, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),
+    lists:foldr(fun ({Name, Desc}, Acc) ->
+                   Space = lists:duplicate(MaxWidth - iolist_size(Name), $ ),
+                   ["  " ++ Name  ++ "    " ++ Space ++ Desc ++ "\n" | Acc]
+                end, [], lists:keysort(1, Lis)).
 
 ensure_code_path() ->
   RealPath = case file:read_link(?FILE) of

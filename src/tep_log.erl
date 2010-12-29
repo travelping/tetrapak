@@ -10,20 +10,23 @@
 -module(tep_log).
 -export([output/1,output/2,info/1,info/2,debug/1,debug/2,warn/1,warn/2]).
 
-output(Fmt) -> output(Fmt, []).
-output(Fmt, Args) -> io:format(Fmt, Args).
+output(Fmt)       -> output(Fmt, []).
+output(Fmt, Args) -> lprintf("", Fmt, Args).
 
-info(Fmt) -> info(Fmt, []).
-info(Fmt, Args) -> io:format("== " ++ Fmt ++ "~n", Args).
+info(Fmt)         -> info(Fmt, []).
+info(Fmt, Args)   -> lprintf("==", Fmt, Args).
+
+warn(Fmt)         -> warn(Fmt, []).
+warn(Fmt, Args)   -> lprintf("!!", Fmt, Args).
 
 debug(Fmt) -> debug(Fmt, []).
 debug(Fmt, Args) -> 
-  case os:getenv("DEBUG") of
-    false -> ok;
-    Value when (Value /= "") and (Value /= "false") and (Value /= "0") -> 
-      io:format("-- " ++ Fmt ++ "~n", Args);
-    _ -> ok
-  end.
+    case os:getenv("DEBUG") of
+        false -> ok;
+        Value when (Value /= "") and (Value /= "false") and (Value /= "0") -> 
+            lprintf("--", Fmt, Args);
+        _ -> ok
+    end.
 
-warn(Fmt) -> warn(Fmt, []).
-warn(Fmt, Args) -> io:format("!! " ++ Fmt ++ "~n", Args).
+lprintf(Pre, Fmt, Args) ->
+    io:format(standard_error, "~11s ~s " ++ Fmt ++ "~n", [io_lib:write(self()), Pre | Args]).

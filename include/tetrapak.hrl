@@ -2,3 +2,11 @@
 -record(tep_job, {template, files, template_dir, source_dir, output_dir}).
 
 -record(tep_repository, {name, type, options}).
+
+%% used for pass options
+-record(option, {
+    name             :: atom(),
+    type             :: atom(),
+    default          :: term(),
+    required = false :: term()
+}).
