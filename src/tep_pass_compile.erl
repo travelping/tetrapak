@@ -9,19 +9,24 @@
 
 -module(tep_pass_compile).
 -behaviour(tep_pass).
--pass_name(compile). 
 
 -include("tetrapak.hrl").
 
--export([pass_options/0, pass_run/2]).
+-export([pass_options/1, pass_run/3]).
+
+-passinfo({build, [{erlang, "Build Erlang modules"}]}).
+-passinfo({clean, [{erlang, "Delete compiled Erlang modules"}]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options() -> [].
+pass_options(_Group) -> [].
 
-pass_run(#tep_project{directory = Dir}, Options) ->
+pass_run({build, erlang}, #tep_project{directory = Dir}, _Options) ->
     file:set_cwd(Dir),
     case make:all() of
-       up_to_date -> ok;
-       error -> tep_pass:fail("emake failed")
-    end.
+        up_to_date -> ok;
+        error -> tep_pass:fail("emake failed")
+    end;
+
+pass_run({clean, erlang}, _Project, _Options) ->
+    tep_pass:fail("not implemented").

@@ -9,42 +9,33 @@
 
 -module(tep_pass_sanity).
 -behaviour(tep_pass).
--pass_name(sanity).
 
 -include("tetrapak.hrl").
 
--export([pass_options/0, pass_run/2]).
+-export([pass_options/1, pass_run/3]).
+
+-passinfo({sanity, [
+    {xref,       "Check inter-module calls"},
+    {appmodules, "Check app file module list"}
+]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options() ->
-    [#option{name = xref,
-             type = bool,
-             default = true},
-     #option{name = app_modules,
-             type = bool,
-             default = true}
-    ].
+pass_options(sanity) -> [].
 
-pass_run(Project, Options) ->
-    tep_pass:require(compile),
+pass_run({sanity, xref}, Project, _Options) ->
+    tep_pass:require("build:erlang"),
+    run_xref(Project);
 
-    case proplists:get_value(xref, Options) of
-        true  -> run_xref(Project);
-        false -> tep_log:debug("skipping XREF check...");
-        undefined -> ok
-    end,
-
-    case proplists:get_value(app_modules, Options) of
-        true  -> check_modules(Project);
-        false -> tep_log:debug("skipping app_modules check...");
-        undefined -> ok 
-    end.
+pass_run({sanity, appmodules}, Project, _Options) ->
+    tep_pass:require("build:erlang"),
+    check_modules(Project).
 
 %% ------------------------------------------------------------
 %% -- Implementation
 run_xref(_Project) ->
-    tep_pass:fail("XREF not_implemented").
+    %tep_pass:fail("XREF not_implemented").
+    ok.
 
 check_modules(#tep_project{modules = Mods, directory = Dir}) ->
     Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),

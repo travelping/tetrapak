@@ -10,3 +10,16 @@
     default          :: term(),
     required = false :: term()
 }).
+
+-record(pass, {
+    name             :: atom(),
+    group            :: atom(),
+    module           :: atom(),
+    fullname         :: string(),
+    description = "" :: string()
+}).
+
+-record(pass_group, {
+    name    :: atom(),
+    members :: list()
+}).

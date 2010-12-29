@@ -9,31 +9,28 @@
 
 -module(tep_pass_package).
 -behaviour(tep_pass).
--pass_name(package).
 
 -include("tetrapak.hrl").
 
--export([pass_options/0, pass_run/2]).
+-export([pass_options/1, pass_run/3]).
+
+-passinfo({pkg, [
+    {deb, "Create a binary debian package"}
+]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options() ->
-    [#option{name = template,
-             type = string,
-             required = true},
-     #option{name = outdir,  
-             type = directory}
-    ].
+pass_options(pkg) ->
+    [#option{name = outdir, type = directory}].
 
-pass_run(Project, Options) ->
-    tep_pass:require([compile, sanity]),
+pass_run({pkg, Template}, Project, Options) ->
+    tep_pass:require_all([build, sanity]),
 
     OutDir = case proplists:get_value(outdir, Options) of
                  undefined -> dist_dir(Project);
                  Dir       -> filename:absname(Dir)
              end,
-    Template = proplists:get_value(template, Options),
-    
+
     InDir = Project#tep_project.directory,
     case find_template_mod(Template) of
         {ok, TMod} ->
@@ -55,9 +52,6 @@ pass_run(Project, Options) ->
 
 %% ------------------------------------------------------------
 %% -- Implementation
-find_template_mod(Name) when is_list(Name) ->
-    MName = re:replace(Name, "-", "_", [{return, list}]),
-    tep_util:find_module(list_to_atom("tetrapak_tpl_" ++ MName));
 find_template_mod(Name) when is_atom(Name) ->
     find_template_mod(atom_to_list(Name)).
 

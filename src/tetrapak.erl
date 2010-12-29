@@ -58,12 +58,11 @@ init([Project]) ->
     {ok, State}.
 
 handle_call(all_commands, _From, State = #tpk{passmap = PDict}) ->
-   % Dict  = dict:to_list(PDict),
-   % CList = lists:foldl(fun ({Group, Passes}, Pl) ->
-   %                        PNames = [{Group ++ ":" ++ PName, "..."} || {PName, _} <- dict:to_list(Passes)],
-   %                        PNames ++ Pl
-   %                     end, [], Dict),
-    CList = [{PName, "..."}  || {PName, _} <- dict:to_list(PDict)],
+    Dict  = dict:to_list(PDict),
+    CList = lists:foldl(fun ({_Group, Passes}, Pl) ->
+                           PNames = [{Pass#pass.fullname, Pass#pass.description} || {_, Pass} <- dict:to_list(Passes)],
+                           PNames ++ Pl
+                        end, [], Dict),
     {reply, CList, State};
 
 handle_call({run_command, PassCmd, Options}, _From, State = #tpk{project = Project, passmap = PMap}) ->

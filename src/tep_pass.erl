@@ -12,7 +12,7 @@
 
 %% pass behaviour functions
 -export([behaviour_info/1]).
--export([fail/1, fail/2, require/1]).
+-export([fail/1, fail/2, require/1, require_all/1]).
 %% scheduler_api
 -export([start_sched/2, run/2]).
 %% scheduler gen_server
@@ -26,11 +26,11 @@ behaviour_info(exports) ->
     [{pass_options, 0}, {pass_run, 2}].
 
 %% ------------------------------------------------------------
-%% -- manager
+%% -- scheduler
 -record(sched, {
-    done    = sets:new() :: set(),
-    running = sets:new() :: set(),
-    waiting = []       :: list({pid(), [atom()]}),
+    done    = gb_sets:new() :: set(),
+    running = gb_sets:new() :: set(),
+    waiting = []       :: list({pid(), [string()]}),
     project            :: tuple(),
     caller             :: pid(),
     map                :: dict(),
@@ -41,7 +41,7 @@ start_sched(PassMap, Project) ->
     gen_server:start(?MODULE, [PassMap, Project], []).
 
 run(Sched, PassName) ->
-    case gen_server:call(Sched, {run_pass, PassName}) of
+    case gen_server:call(Sched, {run_passes, [PassName]}) of
         {ok, done} ->
             ok;
         {error, Error} ->
@@ -49,64 +49,45 @@ run(Sched, PassName) ->
     end.
 
 init([PassMap, Project]) ->
-    State = #sched{map = PassMap,
-                   project = Project},
+    State = #sched{map = PassMap, project = Project},
     {ok, State}.
 
-handle_call({run_pass, PassName}, Caller, State = #sched{caller = undefined}) ->
-    tep_log:debug("sched: run_pass ~p", [PassName]),
-    case do_start_worker(PassName, State) of
-        {error, unknown_pass} ->
-            {reply, {error, unknown_pass}, State};
-        {ok, NewState} ->
+handle_call({run_passes, PassNames}, Caller, State = #sched{caller = undefined}) ->
+    tep_log:debug("sched: run_passes ~p", [PassNames]),
+    case lookup_all(PassNames, State#sched.map) of
+        {error, Error} ->
+            {reply, {error, Error}, State};
+        Names ->
+            NewState = lists:foldl(fun do_start_pass/2, State, Names),
             {noreply, NewState#sched{caller = Caller}}
     end;
-handle_call({run_pass, _Name}, _Caller, State = #sched{caller = _SomePid}) ->
-    {reply, {error, already_called}, State};
 
 handle_call({wait_for, PassNames}, WorkerPid, State = #sched{waiting = Waiting}) ->
-    NeedStart = lists:filter(fun (Name) -> not is_active(Name, State) end, PassNames),
-    case NeedStart of
-        [] ->
-            {reply, go_on, State};
-        _  ->
-            try
-                NewState =
-                   lists:foldl(fun (Name, SubST) ->
-                                   case do_start_worker(Name, SubST) of
-                                       {ok, NewSubState} ->
-                                           NewSubState;
-                                       {error, _Error} ->
-                                           throw({start_error, SubST})
-                                   end
-                               end,
-                               State, NeedStart),
-                NewWaiting = [{WorkerPid, PassNames} | Waiting],
-                tep_log:debug("waiting ~p ==> ~p", [Waiting, NewWaiting]),
-                {noreply, NewState#sched{waiting = NewWaiting}}
-            catch
-                throw:{start_error, State} ->
-                    tep_log:debug("sched: start_error"),
-                    {reply, start_error, State}
+    case lookup_all(PassNames, State#sched.map) of
+        {error, _Error} ->
+            {stop, start_error, State};
+        Required ->
+            case lists:filter(fun (P) -> not is_done(P, State) end, Required) of
+                []        -> {reply, go_on, State};
+                NotDone ->
+                    NeedStart  = lists:filter(fun (P) -> not is_running(P, State) end, NotDone),
+                    NewState   = lists:foldl(fun do_start_pass/2, State, NeedStart),
+                    NewWaiting = [{WorkerPid, NotDone} | Waiting],
+                    {noreply, NewState#sched{waiting = NewWaiting}}
             end
     end;
 
 handle_call({done, PassName}, WorkerPid, State = #sched{waiting = Waiting, done = DoneList}) ->
     tep_log:info("pass '~s' finished", [PassName]),
-    NewWaiting = lists:foldl(fun (Tup, Acc) ->
-                                 do_mgr_done(PassName, WorkerPid, Tup, Acc)
-                             end,
-                             [], Waiting),
-    tep_log:debug("waiting ~p ==> ~p", [Waiting, NewWaiting]),
-    case NewWaiting of
+    case lists:foldl(fun (Tup, Acc) -> do_mgr_done(PassName, WorkerPid, Tup, Acc) end, [], Waiting) of
         [] ->
             gen_server:reply(WorkerPid, ok),
             gen_server:reply(State#sched.caller, {ok, done}),
             {stop, normal, State};
-        _  ->
+        NewWaiting ->
             NewState = State#sched{waiting = NewWaiting,
-                                   running = sets:del_element(PassName, State#sched.running),
-                                   done    = sets:add_element(PassName, DoneList)},
+                                   running = gb_sets:del_element(PassName, State#sched.running),
+                                   done    = gb_sets:add_element(PassName, DoneList)},
             {noreply, NewState}
     end;
 
@@ -118,9 +99,6 @@ handle_call({fail, PassName, Message}, _WorkerPid, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-is_active(PassName, #sched{running = Running, done = Done}) ->
-    sets:is_element(PassName, Done) orelse sets:is_element(PassName, Running).
-
 do_mgr_done(PassName, {DonePid, _Ctok}, {Worker, WaitFor}, Acc) ->
     % remove PassName from the waiting-for list
     % of any worker, unblocking the worker if possible
@@ -128,24 +106,24 @@ do_mgr_done(PassName, {DonePid, _Ctok}, {Worker, WaitFor}, Acc) ->
         {DonePid, _Ctok2} ->
             Acc;
         _ ->
-            NewWaiting = lists:delete(PassName, WaitFor),
+            NewWaiting = lists:keydelete(PassName, #pass.fullname, WaitFor),
             case NewWaiting of
-                [] -> gen_server:reply(Worker, go_on);
-                _  -> ok
+                []   -> gen_server:reply(Worker, go_on);
+                List -> ok
             end,
             [{Worker, NewWaiting} | Acc]
     end.
 
-do_start_worker(PassName, State = #sched{map = Map, project = Project}) ->
-    case dict:find(PassName, Map) of
-        error ->
-            {error, unknown_pass};
-        {ok, PassMod} ->
-            Sched = self(),
-            Pid   = spawn_link(fun () -> init_worker(Sched, PassName, PassMod, Project, []) end),
-            tep_log:debug("sched: spawned worker ~p", [Pid]),
-            {ok, State#sched{running = sets:add_element(PassName, State#sched.running)}}
-    end.
+do_start_pass(Pass = #pass{}, State = #sched{project = Project, running = Running}) ->
+    spawn_worker(Pass, Project, []),
+    NewRunning = gb_sets:add_element(Pass#pass.fullname, Running),
+    State#sched{running = NewRunning}.
+
+is_done(#pass{fullname = Name}, State) ->
+    gb_sets:is_element(Name, State#sched.done).
+
+is_running(#pass{fullname = Name}, State) ->
+    gb_sets:is_element(Name, State#sched.running).
 
 %% unused callbacks
 handle_cast(_Msg, State) ->
@@ -157,29 +135,33 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% ------------------------------------------------------------
 %% -- worker API
-init_worker(Scheduler, PassName, PassModule, Project, Options) ->
-    tep_log:debug("worker: pass ~s starting", [PassName]),
+spawn_worker(Pass, Project, Options) ->
+    Sched = self(),
+    spawn_link(fun () -> init_worker(Pass, Sched, Project, Options) end).
+
+init_worker(Pass = #pass{fullname = Name, module = PassModule}, Scheduler, Project, Options) ->
+    tep_log:debug("worker: pass ~s starting", [Name]),
     put('$__tep_pass_scheduler', Scheduler),
     try
-        PassModule:pass_run(Project, Options),
-        tep_log:debug("worker: pass ~s finished", [PassName]),
-        gen_server:call(Scheduler, {done, PassName})
+        PassModule:pass_run({Pass#pass.group, Pass#pass.name}, Project, Options),
+        gen_server:call(Scheduler, {done, Name})
     catch
         throw:{'$tep_pass_fail', Message} ->
-            gen_server:call(Scheduler, {fail, PassName, Message});
+            gen_server:call(Scheduler, {fail, Name, Message});
         exit:{normal, _} ->
-            tep_log:debug("worker: exit:normal", []);
+            tep_log:debug("worker: '~s' exit:normal", [Name]);
         Class:Reason ->
-            tep_log:warn("pass ~s crashed: ~p:~p ~p", [PassName, Class, Reason, erlang:get_stacktrace()]),
-            gen_server:call(Scheduler, {fail, PassName, "crashed"})
+            tep_log:warn("pass ~s crashed: ~p:~p ~p", [Name, Class, Reason, erlang:get_stacktrace()]),
+            gen_server:call(Scheduler, {fail, Name, "crashed"})
     end.
 
-require(Pass) when is_atom(Pass) ->
-    require([Pass]);
-require(Passes) when is_list(Passes) ->
-    require(get('$__tep_pass_scheduler'), Passes).
+require(Pass) ->
+    require_all([Pass]).
 
-require(Scheduler, Passes) ->
+require_all(Passes) when is_list(Passes) ->
+    do_require(get('$__tep_pass_scheduler'), Passes).
+
+do_require(Scheduler, Passes) ->
     Plist = lists:map(fun str/1, Passes),
     tep_log:debug("worker: require ~p", [Plist]),
     gen_server:call(Scheduler, {wait_for, Plist}).
@@ -198,8 +180,8 @@ find_passes(Directories) ->
                    tep_log:debug("checking for pass modules in ~s", [Dir]),
                    tep_file:walk(fun (File, ModAcc) ->
                                     case is_pass_module(File) of
-                                        false          -> ModAcc;
-                                        {Name, Module} -> dict:store(Name, Module, ModAcc)
+                                        false              -> ModAcc;
+                                        {Module, PassDefs} -> store_passdefs(Module, PassDefs, ModAcc)
                                     end
                                   end, OuterModAcc, Dir)
                 end, dict:new(), Directories).
@@ -214,9 +196,9 @@ is_pass_module(Mfile) ->
 
             if
                 IsPass ->
-                    case proplists:get_value(pass_name, Attributes) of
-                        undefined -> {ModuleName, ModuleName};
-                        Name      -> {atom_to_list(lists:last(Name)), ModuleName}
+                    case proplists:get_value(passinfo, Attributes) of
+                        undefined -> false;
+                        InfoList  -> {ModuleName, lists:flatten(InfoList)}
                     end;
                 true ->
                     false
@@ -225,5 +207,64 @@ is_pass_module(Mfile) ->
             false
     end.
 
+store_passdefs(Module, List, Universe) ->
+    Store = fun ({GroupName, Passes}, OuterAcc) ->
+               lists:foldl(fun ({PassName, Desc}, Acc) ->
+                              FullName = atom_to_list(GroupName)
+                                         ++ ":" ++ atom_to_list(PassName),
+                              Pass   = #pass{name   = PassName,
+                                             group  = GroupName,
+                                             module = Module,
+                                             fullname = FullName,
+                                             description = Desc},
+                              PDict  = dict:from_list([{str(PassName), Pass}]),
+                              Insert = fun (Existing) ->
+                                          dict:merge(fun (_Old, New) -> New end, Existing, PDict)
+                                       end,
+                              dict:update(str(GroupName), Insert, PDict, Acc)
+                           end, OuterAcc, Passes)
+            end,
+    lists:foldl(Store, Universe, List).
+
+lookup(Name, Universe) ->
+    case re:split(Name, ":", [{return, list}]) of
+        [Group] ->
+            case dict:find(Group, Universe) of
+                {ok, PassDict} ->
+                    {ok, #pass_group{name    = list_to_existing_atom(Group),
+                                     members = lists:map(fun ({_K, Pass}) -> Pass end, dict:to_list(PassDict))}};
+                error ->
+                    {error, unknown_group}
+            end;
+        [Group, PassName] ->
+            case dict:find(Group, Universe) of
+                {ok, PassDict} ->
+                    case dict:find(PassName, PassDict) of
+                        error      -> {error, unknown_pass};
+                        Ok         -> Ok
+                    end;
+                error ->
+                    {error, unknown_group}
+            end
+    end.
+
+
+lookup_all(Names, Universe) ->
+    try
+        lists:foldl(fun (Name, Acc) ->
+                        case lookup(Name, Universe) of
+                            {ok, #pass_group{members = Members}} ->
+                                Members ++ Acc;
+                            {ok, Pass} ->
+                                [Pass | Acc];
+                            {error, E} ->
+                                throw({lookup_error, E})
+                        end
+                    end, [], Names)
+    catch
+        throw:{lookup_error, E} ->
+            {error, E}
+    end.
+
 str(Atom) when is_atom(Atom) -> atom_to_list(Atom);
-str(Lis) -> Lis.
+str(Lis)                     -> Lis.
