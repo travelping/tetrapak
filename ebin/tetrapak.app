@@ -9,16 +9,23 @@
              tep_ssh,
              tep_config,
              tep_publish,
+             tep_pass,
 
              %% templates
              tetrapak_tpl_tarball,
              tetrapak_tpl_deb,
              tetrapak_tpl_deb_erlrc,
 
+             %% passes
+             tep_pass_compile,
+             tep_pass_check,
+             tep_pass_package,
+             tep_pass_edoc,
+
              %% repos
              tetrapak_repo_local,
              tetrapak_repo_ssh
     ]},
-  {applications, [kernel, stdlib, crypto, ssh]},
+  {applications, [kernel, stdlib, crypto, ssh, edoc, tools]},
   {registered, []}
 ]}.
