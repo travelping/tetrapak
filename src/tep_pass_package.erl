@@ -14,9 +14,8 @@
 
 -export([pass_options/1, pass_run/3]).
 
--passinfo({pkg, [
-    {deb, "Create a binary debian package"}
-]}).
+-passinfo({pkg,   [{deb,  "Create a binary debian package"}]}).
+-passinfo({clean, [{dist, "Delete packages"}]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
@@ -32,28 +31,26 @@ pass_run({pkg, Template}, Project, Options) ->
              end,
 
     InDir = Project#tep_project.directory,
-    case find_template_mod(Template) of
-        {ok, TMod} ->
-            tep_log:info("applying packaging template ~s", [Template]),
-            Job = #tep_job{source_dir = InDir,
-                           template = TMod,
-                           template_dir = template_dir(TMod),
-                           files = otp_related_files(InDir),
-                           output_dir = OutDir},
-            case TMod:create_package(Project, Job) of  
-                {ok, File} -> 
-                    tep_log:info("packaging done, package is at: ~s", File);
-                {error, Error} -> 
-                    tep_pass:fail("packaging failed with error: ~p", [Error])
-            end;
-        {error, _} ->
-            tep_pass:fail("template ~s not found", [Template]) 
-    end.
+    TMod  = template_mod(Template),
+    Job = #tep_job{source_dir = InDir,
+                   template = TMod,
+                   template_dir = template_dir(TMod),
+                   files = otp_related_files(InDir),
+                   output_dir = OutDir},
+    case TMod:create_package(Project, Job) of
+        {ok, File} ->
+            tep_log:info("packaging done, package is at: ~s", [File]);
+        {error, Error} ->
+            tep_pass:fail("packaging failed with error: ~p", [Error])
+    end;
+
+pass_run({clean, dist}, Project, _Options) ->
+    Outdir = dist_dir(Project),
+    tep_file:delete(Outdir).
 
 %% ------------------------------------------------------------
 %% -- Implementation
-find_template_mod(Name) when is_atom(Name) ->
-    find_template_mod(atom_to_list(Name)).
+template_mod(deb) -> tetrapak_tpl_deb.
 
 template_dir(Module) ->
     "tetrapak_tpl_" ++ Name = atom_to_list(Module),
@@ -66,9 +63,9 @@ dist_dir(#tep_project{directory = Dir}) ->
         false ->
             case filelib:is_regular(Dist) of
                 true  -> tep_pass:fail("package output directory ~s is a regular file", [Dist]);
-                false -> 
+                false ->
                     file:make_dir(Dist),
-                    Dist 
+                    Dist
             end
     end.
 

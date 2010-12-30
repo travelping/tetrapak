@@ -154,7 +154,7 @@ make_tarball_from_files(Outfile, Root, Dir, Files) ->
   XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
   tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
                        "--numeric-owner", "--owner=root", "--group=root", "--gzip",
-                       "--no-recursion", "--totals", "--touch", "--absolute-names",
+                       "--no-recursion", "--touch", "--absolute-names",
                        "--preserve-permissions", "--preserve-order",
                        "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
 
