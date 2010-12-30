@@ -103,19 +103,24 @@ copy(From, To) ->
  end,
  walk(CP, [], From, no_dir).
 
-delete(Filename) -> delete(".*", Filename).
+delete(Filename) ->
+    delete(".*", Filename).
 delete(Mask, Filename) ->
-  walk(fun (F, _) -> delete_if_match(Mask, F) end, [], Filename, dir_last).
+    walk(fun (F, _) -> delete_if_match(Mask, F) end, [], Filename, dir_last).
 
 delete_if_match(Mask, Path) ->
-  case tep_util:match(Mask, Path) of
-    true ->
-      case filelib:is_dir(Path) of
-        true -> file:del_dir(Path);
-        false -> file:delete(Path)
-      end;
-    false -> nomatch
-  end.
+    case tep_util:match(Mask, filename:basename(Path)) of
+        true ->
+            case filelib:is_dir(Path) of
+                true  ->
+                    tep_log:debug("rmdir ~s", [Path]),
+                    file:del_dir(Path);
+                false ->
+                    tep_log:debug("rm ~s", [Path]),
+                    file:delete(Path)
+            end;
+        false -> nomatch
+    end.
 
 walk(Fun, AccIn, Path) -> walk(Fun, AccIn, Path, no_dir).
 walk(Fun, AccIn, Path, DirOpt) when (DirOpt == no_dir) or

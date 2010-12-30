@@ -29,7 +29,5 @@ pass_run({build, erlang}, #tep_project{directory = Dir}, _Options) ->
     end;
 
 pass_run({clean, erlang}, #tep_project{directory = Dir}, _Options) ->
-    lists:foreach(fun (File) ->
-                      tep_log:debug("rm ~s", [File]),
-                      file:delete(File)
-                  end, tep_file:wildcard(filename:join(Dir, "ebin"), "*.beam")).
+    EbinDir = filename:join(Dir, "ebin"),
+    tep_file:delete("\\.beam$", EbinDir).
