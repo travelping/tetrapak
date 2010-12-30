@@ -14,7 +14,7 @@
 -export([behaviour_info/1]).
 -export([fail/1, fail/2, require/1, require_all/1]).
 %% scheduler_api
--export([start_sched/2, run/2]).
+-export([run_passes/3]).
 %% scheduler gen_server
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 %% misc
@@ -33,15 +33,14 @@ behaviour_info(exports) ->
     waiting = []       :: list({pid(), [string()]}),
     project            :: tuple(),
     caller             :: pid(),
+    want    = []       :: list(string()),
     map                :: dict(),
     config             :: dict()
 }).
 
-start_sched(PassMap, Project) ->
-    gen_server:start(?MODULE, [PassMap, Project], []).
-
-run(Sched, PassName) ->
-    case gen_server:call(Sched, {run_passes, [PassName]}) of
+run_passes(PassMap, Project, PassNames) ->
+    {ok, Sched} = gen_server:start(?MODULE, [PassMap, Project], []),
+    case gen_server:call(Sched, {run_passes, PassNames}) of
         {ok, done} ->
             ok;
         {error, Error} ->
@@ -59,7 +58,7 @@ handle_call({run_passes, PassNames}, Caller, State = #sched{caller = undefined})
             {reply, {error, Error}, State};
         Names ->
             NewState = lists:foldl(fun do_start_pass/2, State, Names),
-            {noreply, NewState#sched{caller = Caller}}
+            {noreply, NewState#sched{caller = Caller, want = Names}}
     end;
 
 handle_call({wait_for, PassNames}, WorkerPid, State = #sched{waiting = Waiting}) ->
@@ -68,7 +67,8 @@ handle_call({wait_for, PassNames}, WorkerPid, State = #sched{waiting = Waiting})
             {stop, start_error, State};
         Required ->
             case lists:filter(fun (P) -> not is_done(P, State) end, Required) of
-                []        -> {reply, go_on, State};
+                []      ->
+                    {reply, go_on, State};
                 NotDone ->
                     NeedStart  = lists:filter(fun (P) -> not is_running(P, State) end, NotDone),
                     NewState   = lists:foldl(fun do_start_pass/2, State, NeedStart),
@@ -77,17 +77,21 @@ handle_call({wait_for, PassNames}, WorkerPid, State = #sched{waiting = Waiting})
             end
     end;
 
-handle_call({done, PassName}, WorkerPid, State = #sched{waiting = Waiting, done = DoneList}) ->
+handle_call({done, PassName}, WorkerPid, State = #sched{waiting = Waiting}) ->
     tep_log:info("pass '~s' finished", [PassName]),
-    case lists:foldl(fun (Tup, Acc) -> do_mgr_done(PassName, WorkerPid, Tup, Acc) end, [], Waiting) of
-        [] ->
-            gen_server:reply(WorkerPid, ok),
+    gen_server:reply(WorkerPid, ok),
+
+    NewWaiting = lists:foldl(fun (Tup, Acc) -> do_mgr_done(PassName, WorkerPid, Tup, Acc) end, [], Waiting),
+    NewState = State#sched{waiting = NewWaiting,
+                           running = gb_sets:del_element(PassName, State#sched.running),
+                           done    = gb_sets:add_element(PassName, State#sched.done)},
+
+    case lists:all(fun (PName) -> is_done(PName, NewState) end, State#sched.want) of
+        true  ->
+            %% all requested passes are done, return
             gen_server:reply(State#sched.caller, {ok, done}),
             {stop, normal, State};
-        NewWaiting ->
-            NewState = State#sched{waiting = NewWaiting,
-                                   running = gb_sets:del_element(PassName, State#sched.running),
-                                   done    = gb_sets:add_element(PassName, DoneList)},
+        false ->
             {noreply, NewState}
     end;
 
@@ -108,8 +112,8 @@ do_mgr_done(PassName, {DonePid, _Ctok}, {Worker, WaitFor}, Acc) ->
         _ ->
             NewWaiting = lists:keydelete(PassName, #pass.fullname, WaitFor),
             case NewWaiting of
-                []   -> gen_server:reply(Worker, go_on);
-                List -> ok
+                []    -> gen_server:reply(Worker, go_on);
+                _List -> ok
             end,
             [{Worker, NewWaiting} | Acc]
     end.
@@ -120,6 +124,8 @@ do_start_pass(Pass = #pass{}, State = #sched{project = Project, running = Runnin
     State#sched{running = NewRunning}.
 
 is_done(#pass{fullname = Name}, State) ->
+    is_done(Name, State);
+is_done(Name, State) ->
     gb_sets:is_element(Name, State#sched.done).
 
 is_running(#pass{fullname = Name}, State) ->

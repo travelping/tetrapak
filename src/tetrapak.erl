@@ -66,8 +66,7 @@ handle_call(all_commands, _From, State = #tpk{passmap = PDict}) ->
     {reply, CList, State};
 
 handle_call({run_command, PassCmd, Options}, _From, State = #tpk{project = Project, passmap = PMap}) ->
-    {ok, Sched} = tep_pass:start_sched(PMap, Project),
-    Reply = tep_pass:run(Sched, PassCmd),
+    Reply = tep_pass:run_passes(PMap, Project, [PassCmd]),
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->
