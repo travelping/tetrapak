@@ -25,18 +25,24 @@ pass_options(sanity) -> [].
 
 pass_run({sanity, xref}, Project, _Options) ->
     tep_pass:require("build:erlang"),
-    run_xref(Project);
-
+    EbinDir = filename:join(Project#tep_project.directory, "ebin"),
+    case xref:d(EbinDir) of
+        {error, Module, Reason} ->
+            tep_pass:fail("xref error in ~p: ~p", [Module, Reason]);
+        Result ->
+            case proplists:get_value(undefined, Result) of
+                []    -> ok;
+                Undef ->
+                    Listing = lists:foldl(fun ({M,F,A}, Acc) -> tep_util:f("~s~n    ~s:~s/~b", [Acc, M, F, A]) end, "", Undef),
+                    tep_pass:fail("Undefined functions:~s", [Listing])
+            end
+    end;
 pass_run({sanity, appmodules}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     check_modules(Project).
 
 %% ------------------------------------------------------------
 %% -- Implementation
-run_xref(_Project) ->
-    %tep_pass:fail("XREF not_implemented").
-    ok.
-
 check_modules(#tep_project{modules = Mods, directory = Dir}) ->
     Files = filelib:wildcard("*.beam", filename:join(Dir, "ebin")),
     {ShouldFiles, Dupli} = duplicates(lists:map(fun (M) -> atom_to_list(M) ++ ".beam" end, Mods)),
@@ -45,17 +51,17 @@ check_modules(#tep_project{modules = Mods, directory = Dir}) ->
     case length(Dupli) of
         0 -> ok;
         _ ->
-            tep_pass:fail("duplicate modules in app file: ~s", [string:join(BeamToMod(Dupli), ", ")])
+            tep_pass:fail("duplicate modules in app file:~n   ~s", [string:join(BeamToMod(Dupli), ", ")])
     end,
     case ShouldFiles -- Files of
         [] -> ok;
         OnlyApp ->
-            tep_pass:fail("modules listed in app file but not present in ebin/: ~s", [string:join(BeamToMod(OnlyApp), ", ")])
+            tep_pass:fail("modules listed in app file but not present in ebin/:~n   ~s", [string:join(BeamToMod(OnlyApp), ", ")])
     end,
     case Files -- ShouldFiles of
         [] -> ok;
         OnlyEbin ->
-            tep_pass:fail("modules present in ebin/ but not listed in app file: ~s", [string:join(BeamToMod(OnlyEbin), ", ")])
+            tep_pass:fail("modules present in ebin/ but not listed in app file:~n   ~s", [string:join(BeamToMod(OnlyEbin), ", ")])
     end.
 
 duplicates(List) -> duplicates(List, sets:new(), sets:new()).
