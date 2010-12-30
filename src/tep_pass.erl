@@ -40,7 +40,7 @@ behaviour_info(exports) ->
 
 run_passes(PassMap, Project, PassNames) ->
     {ok, Sched} = gen_server:start(?MODULE, [PassMap, Project], []),
-    case gen_server:call(Sched, {run_passes, PassNames}) of
+    case gen_server:call(Sched, {run_passes, PassNames}, infinity) of
         {ok, done} ->
             ok;
         {error, Error} ->
@@ -170,7 +170,7 @@ require_all(Passes) when is_list(Passes) ->
 do_require(Scheduler, Passes) ->
     Plist = lists:map(fun str/1, Passes),
     tep_log:debug("worker: require ~p", [Plist]),
-    gen_server:call(Scheduler, {wait_for, Plist}).
+    gen_server:call(Scheduler, {wait_for, Plist}, infinity).
 
 fail(Reason) ->
     fail(Reason, []).
