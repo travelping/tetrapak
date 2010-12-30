@@ -24,7 +24,7 @@ pass_options(pkg) ->
     [#option{name = outdir, type = directory}].
 
 pass_run({pkg, Template}, Project, Options) ->
-    tep_pass:require_all([build, sanity]),
+    tep_pass:require_all([build, check]),
 
     OutDir = case proplists:get_value(outdir, Options) of
                  undefined -> dist_dir(Project);

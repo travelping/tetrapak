@@ -7,23 +7,23 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass_sanity).
+-module(tep_pass_check).
 -behaviour(tep_pass).
 
 -include("tetrapak.hrl").
 
 -export([pass_options/1, pass_run/3]).
 
--passinfo({sanity, [
+-passinfo({check, [
     {xref,       "Check inter-module calls"},
     {appmodules, "Check app file module list"}
 ]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options(sanity) -> [].
+pass_options(check) -> [].
 
-pass_run({sanity, xref}, Project, _Options) ->
+pass_run({check, xref}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     EbinDir = filename:join(Project#tep_project.directory, "ebin"),
     case xref:d(EbinDir) of
@@ -37,7 +37,7 @@ pass_run({sanity, xref}, Project, _Options) ->
                     tep_pass:fail("Undefined functions:~s", [Listing])
             end
     end;
-pass_run({sanity, appmodules}, Project, _Options) ->
+pass_run({check, appmodules}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     check_modules(Project).
 
