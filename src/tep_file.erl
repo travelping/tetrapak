@@ -80,8 +80,8 @@ dir_contents(Dir, Mask, DirOpt) ->
   end.
 
 wildcard(Dir, Wildcard) ->
-  Files = filelib:wildcard(Wildcard, Dir),
-  lists:map(fun filename:absname/1, Files).
+  WC = filename:join(filename:absname(Dir), Wildcard),
+  filelib:wildcard(WC).
 
 mkdir(Path) ->
   filelib:ensure_dir(filename:join(Path, ".")).

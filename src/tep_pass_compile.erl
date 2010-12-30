@@ -28,5 +28,8 @@ pass_run({build, erlang}, #tep_project{directory = Dir}, _Options) ->
         error -> tep_pass:fail("emake failed")
     end;
 
-pass_run({clean, erlang}, _Project, _Options) ->
-    tep_pass:fail("not implemented").
+pass_run({clean, erlang}, #tep_project{directory = Dir}, _Options) ->
+    lists:foreach(fun (File) ->
+                      tep_log:debug("rm ~s", [File]),
+                      file:delete(File)
+                  end, tep_file:wildcard(filename:join(Dir, "ebin"), "*.beam")).
