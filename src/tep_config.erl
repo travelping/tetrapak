@@ -8,57 +8,11 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_config).
--export([repositories/0, repository/1, list_repos/0, repo_prop/2]).
 -export([project_info/1]).
 -export([project_config/1, read_ini_file/1]).
 -export([get_string/3]).
 
 -include("tetrapak.hrl").
-
-%% ------------------------------------------------------------
-%% -- Repository specs
-repositories() ->
-    File = home_config_path("repositories"),
-    [repo_def_to_record(T) || T <- tep_util:consult(File, "repository configuration")].
-
-repo_def_to_record({repository, Name, Props}) ->
-  case proplists:get_value(type, Props) of
-    undefined ->
-      tep_log:warn("repository ~s has no type defined", [Name]),
-      throw({error, repo_def_invalid});
-    Type ->
-      #tep_repository{name = Name, type = Type, options = Props}
-  end.
-
-repository(Name) when is_list(Name) ->
-  MName = re:replace(Name, "-", "_", [{return, list}]),
-  repository(list_to_atom(MName));
-repository(Name) when is_atom(Name) ->
-  Repos = repositories(),
-  case lists:keyfind(Name, 2, Repos) of
-    false -> {error, not_found};
-    Repo ->  {ok, Repo}
-  end.
-
-list_repos() ->
-  Repos = tep_config:repositories(),
-  case Repos of
-    [] -> io:format("No repositories configured.~n");
-    _  ->
-      io:format("Available Repositories:~n"),
-      lists:foreach(fun (#tep_repository{name = Name, type = Type}) ->
-            io:format("   * ~s (~s) ~n", [Name, Type])
-        end, Repos)
-  end.
-
-repo_prop(#tep_repository{name = Name, options = Props}, Key) ->
-  case proplists:get_value(Key, Props) of
-    undefined ->
-      tep_log:warn("required option ~s missing in repository definition of '~s'",
-        [Key, Name]),
-      throw({error, repo_prop_missing});
-    Val -> Val
-  end.
 
 %% ------------------------------------------------------------
 %% -- Project info

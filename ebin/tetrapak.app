@@ -6,9 +6,7 @@
              tep_util,
              tep_log,
              tep_file,
-             tep_ssh,
              tep_config,
-             tep_publish,
              tep_pass,
 
              %% templates
@@ -20,11 +18,7 @@
              tep_pass_compile,
              tep_pass_check,
              tep_pass_package,
-             tep_pass_edoc,
-
-             %% repos
-             tetrapak_repo_local,
-             tetrapak_repo_ssh
+             tep_pass_edoc
     ]},
   {applications, [kernel, stdlib, crypto, ssh, edoc, tools]},
   {registered, []}

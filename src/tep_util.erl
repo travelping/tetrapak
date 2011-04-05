@@ -12,7 +12,6 @@
 -export([run/2, run/3]).
 -export([varsubst/2]).
 -export([parse_cmdline/3]).
--export([consult/2]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -96,18 +95,6 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
       <<Result/bytes, Before/bytes, PP/bytes>>
   end,
   vs_replace(RM, Offset + BStart + Len, After, NewResult, Vars).
-
-consult(File, Purpose) ->
-    case file:consult(File) of
-        {ok, Terms}     -> Terms;
-        {error, enoent} ->
-            tep_log:debug("no ~s in ~s", [Purpose, File]),
-            [];
-        {error, Error}  ->
-            tep_log:warn("could not read ~s in ~s: ~s",
-                         [Purpose, File, file:format_error(Error)]),
-            []
-    end.
 
 %% ------------------------------------------------------------
 %% -- getopt-style option parsing
