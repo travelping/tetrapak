@@ -50,23 +50,25 @@ run(Server, PassCmd, Options) ->
 
 %% ------------------------------------------------------------
 %% -- gen_server callbacks
--record(tpk, {passmap, project}).
+-record(tpk, {passmap, config, project}).
 
 init([Project]) ->
-    Map = tep_pass:find_passes(),
-    State = #tpk{project = Project, passmap = Map},
+    Passes = tep_pass:find_passes(),
+    Config = tep_config:project_config(Project),
+    State  = #tpk{project = Project, config = Config, passmap = Passes},
     {ok, State}.
 
 handle_call(all_commands, _From, State = #tpk{passmap = PDict}) ->
     Dict  = dict:to_list(PDict),
     CList = lists:foldl(fun ({_Group, Passes}, Pl) ->
-                           PNames = [{Pass#pass.fullname, Pass#pass.description} || {_, Pass} <- dict:to_list(Passes)],
+                           PNames = [{Pass#pass.fullname, Pass#pass.description} 
+                                     || {_, Pass} <- dict:to_list(Passes)],
                            PNames ++ Pl
                         end, [], Dict),
     {reply, CList, State};
 
 handle_call({run_command, PassCmd, Options}, _From, State = #tpk{project = Project, passmap = PMap}) ->
-    Reply = tep_pass:run_passes(PMap, Project, [PassCmd]),
+    Reply = tep_pass:run_passes(PMap, Project, State#tpk.config, [PassCmd]),
     {reply, Reply, State};
 
 handle_call(_Request, _From, State) ->

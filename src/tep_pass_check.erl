@@ -12,7 +12,7 @@
 
 -include("tetrapak.hrl").
 
--export([pass_options/1, pass_run/3]).
+-export([pass_run/3]).
 
 -passinfo({check, [
     {xref,       "Check inter-module calls"},
@@ -21,8 +21,6 @@
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options(check) -> [].
-
 pass_run({check, xref}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     EbinDir = filename:join(Project#tep_project.directory, "ebin"),

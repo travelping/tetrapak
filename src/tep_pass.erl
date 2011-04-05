@@ -14,7 +14,7 @@
 -export([behaviour_info/1]).
 -export([fail/1, fail/2, require/1, require_all/1]).
 %% scheduler_api
--export([run_passes/3]).
+-export([run_passes/4]).
 %% scheduler gen_server
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
 %% misc
@@ -23,7 +23,16 @@
 %% ------------------------------------------------------------
 %% -- tep_pass API
 behaviour_info(exports) ->
-    [{pass_options, 0}, {pass_run, 2}].
+    [{options, 1}, {pass_run, 2}].
+
+run_passes(PassMap, Project, Config, PassNames) ->
+    {ok, Sched} = gen_server:start(?MODULE, [PassMap, Project, Config], []),
+    case gen_server:call(Sched, {run_passes, PassNames}, infinity) of
+        {ok, done} ->
+            ok;
+        {error, Error} ->
+            {error, Error}
+    end.
 
 %% ------------------------------------------------------------
 %% -- scheduler
@@ -38,17 +47,8 @@ behaviour_info(exports) ->
     config             :: dict()
 }).
 
-run_passes(PassMap, Project, PassNames) ->
-    {ok, Sched} = gen_server:start(?MODULE, [PassMap, Project], []),
-    case gen_server:call(Sched, {run_passes, PassNames}, infinity) of
-        {ok, done} ->
-            ok;
-        {error, Error} ->
-            {error, Error}
-    end.
-
-init([PassMap, Project]) ->
-    State = #sched{map = PassMap, project = Project},
+init([PassMap, Project, Config]) ->
+    State = #sched{map = PassMap, project = Project, config = Config},
     {ok, State}.
 
 handle_call({run_passes, PassNames}, Caller, State = #sched{caller = undefined}) ->
@@ -100,9 +100,6 @@ handle_call({fail, PassName, Message}, _WorkerPid, State) ->
     gen_server:reply(State#sched.caller, {error, {fail, PassName, Message}}),
     {stop, normal, State}.
 
-terminate(_Reason, _State) ->
-    ok.
-
 do_mgr_done(PassName, {DonePid, _Ctok}, {Worker, WaitFor}, Acc) ->
     % remove PassName from the waiting-for list
     % of any worker, unblocking the worker if possible
@@ -118,8 +115,8 @@ do_mgr_done(PassName, {DonePid, _Ctok}, {Worker, WaitFor}, Acc) ->
             [{Worker, NewWaiting} | Acc]
     end.
 
-do_start_pass(Pass = #pass{}, State = #sched{project = Project, running = Running}) ->
-    spawn_worker(Pass, Project, []),
+do_start_pass(Pass = #pass{}, State = #sched{project = Project, running = Running, config = Config}) ->
+    spawn_worker(Pass, Project, Config),
     NewRunning = gb_sets:add_element(Pass#pass.fullname, Running),
     State#sched{running = NewRunning}.
 
@@ -132,24 +129,22 @@ is_running(#pass{fullname = Name}, State) ->
     gb_sets:is_element(Name, State#sched.running).
 
 %% unused callbacks
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-handle_info(_Info, State) ->
-    {noreply, State}.
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+terminate(_Reason, _State) -> ok.
+handle_cast(_Msg, State) -> {noreply, State}.
+handle_info(_Info, State) -> {noreply, State}.
+code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %% ------------------------------------------------------------
 %% -- worker API
-spawn_worker(Pass, Project, Options) ->
+spawn_worker(Pass, Project, Config) ->
     Sched = self(),
-    spawn_link(fun () -> init_worker(Pass, Sched, Project, Options) end).
+    spawn_link(fun () -> init_worker(Pass, Sched, Project, Config) end).
 
-init_worker(Pass = #pass{fullname = Name, module = PassModule}, Scheduler, Project, Options) ->
+init_worker(Pass = #pass{fullname = Name, module = PassModule}, Scheduler, Project, Config) ->
     tep_log:debug("worker: pass ~s starting", [Name]),
     put('$__tep_pass_scheduler', Scheduler),
     try
-        PassModule:pass_run({Pass#pass.group, Pass#pass.name}, Project, Options),
+        PassModule:pass_run({Pass#pass.group, Pass#pass.name}, Project, Config),
         gen_server:call(Scheduler, {done, Name})
     catch
         throw:{'$tep_pass_fail', Message} ->
@@ -253,7 +248,6 @@ lookup(Name, Universe) ->
                     {error, unknown_group}
             end
     end.
-
 
 lookup_all(Names, Universe) ->
     try

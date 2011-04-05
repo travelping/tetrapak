@@ -3,14 +3,6 @@
 
 -record(tep_repository, {name, type, options}).
 
-%% used for pass options
--record(option, {
-    name             :: atom(),
-    type             :: atom(),
-    default          :: term(),
-    required = false :: term()
-}).
-
 -record(pass, {
     name             :: atom(),
     group            :: atom(),

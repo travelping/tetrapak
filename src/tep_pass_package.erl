@@ -12,16 +12,13 @@
 
 -include("tetrapak.hrl").
 
--export([pass_options/1, pass_run/3]).
+-export([pass_run/3]).
 
 -passinfo({pkg,   [{deb,  "Create a binary debian package"}]}).
 -passinfo({clean, [{dist, "Delete packages"}]}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_options(pkg) ->
-    [#option{name = outdir, type = directory}].
-
 pass_run({pkg, Template}, Project, Options) ->
     tep_pass:require_all([build, check]),
 

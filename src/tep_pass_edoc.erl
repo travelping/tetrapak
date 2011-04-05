@@ -12,18 +12,19 @@
 
 -include("tetrapak.hrl").
 
--export([pass_options/1, pass_run/3]).
+-export([pass_run/3]).
 
--passinfo({global, [{doc, "Generate edoc documentation"}]}).
--passinfo({clean,  [{doc, "Delete generated documentation"}]}).
+-passinfo({doc,   [{edoc, "Generate edoc documentation"}]}).
+-passinfo({clean, [{edoc, "Delete generated documentation"}]}).
 
-pass_options(_) -> [].
-
-pass_run({global, doc}, #tep_project{name = AppName, directory = Dir}, _Options) ->
-    DocDir = filename:join(Dir, "doc"),
+pass_run({doc, edoc}, Project, Options) ->
+    DocDir = doc_dir(Project, Options),
     tep_file:mkdir(DocDir),
-    edoc:application(AppName, Dir, [{dir, DocDir}]);
+    edoc:application(Project#tep_project.name, Project#tep_project.directory, [{dir, DocDir}]);
 
-pass_run({clean, doc}, #tep_project{directory = Dir}, _Options) ->
-    DocDir = filename:join(Dir, "doc"),
+pass_run({clean, edoc}, Project, Options) ->
+    DocDir = doc_dir(Project, Options),
     tep_file:delete("(\\.(html|css|png)$)|edoc-info", DocDir).
+
+doc_dir(Project, Options) ->
+    filename:join(Project#tep_project.directory, tep_config:get_string(Options, "doc.directory", "doc")).
