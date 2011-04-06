@@ -25,16 +25,10 @@ pass_run({check, xref}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     EbinDir = filename:join(Project#tep_project.directory, "ebin"),
     case xref:d(EbinDir) of
-        {error, Module, Reason} ->
-            tep_pass:fail("xref error in ~p: ~p", [Module, Reason]);
-        Result ->
-            case proplists:get_value(undefined, Result) of
-                []    -> ok;
-                Undef ->
-                    Listing = lists:foldl(fun ({M,F,A}, Acc) -> tep_util:f("~s~n    ~s:~s/~b", [Acc, M, F, A]) end, "", Undef),
-                    tep_pass:fail("Undefined functions:~s", [Listing])
-            end
+        {error, Module, Reason} -> tep_pass:fail("xref error in ~p: ~p", [Module, Reason]);
+        Result                  -> lists:foreach(fun xref_result/1, Result)
     end;
+
 pass_run({check, appmodules}, Project, _Options) ->
     tep_pass:require("build:erlang"),
     check_modules(Project).
@@ -68,4 +62,32 @@ duplicates([Head|Tail], Seen, Dupli) ->
     case sets:is_element(Head, Seen) of
         true  -> duplicates(Tail, Seen, sets:add_element(Head, Dupli));
         false -> duplicates(Tail, sets:add_element(Head, Seen), Dupli)
+    end.
+
+xref_result({_, []}) ->
+    ok;
+xref_result({undefined, Functions}) ->
+    tep_pass:fail("Undefined Functions called:~n~s", [fmt_functions(Functions)]);
+xref_result({deprecated, Functions}) ->
+    tep_pass:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
+xref_result({unused, Functions}) ->
+    tep_log:warn("Unused functions:~n~s", [fmt_functions(Functions)]).
+
+fmt_functions(Functions) ->
+    case Functions of
+        [{T, _} | _] when is_tuple(T) ->
+            %% detailed caller information is available
+            {Output, _} = lists:foldr(
+                fun ({{M2, F2, A2}, Call}, {Acc, LastCall}) ->
+                    C1 = case Call of
+                             LastCall     -> [];
+                             {M1, F1, A1} -> io_lib:format("    ~p:~p/~p~n", [M1,F1,A1])
+                         end,
+                    C2 = io_lib:format("      by ~p:~p/~p~n", [M2,F2,A2]),
+                    {[C1, C2 | Acc], Call}
+                end, {[], undefined}, lists:keysort(2, Functions)),
+            Output;
+        _ ->
+            %% no caller info
+            lists:map(fun ({M, F, A}) -> io_lib:format("    ~p:~p/~p~n", [M,F,A]) end, Functions)
     end.
