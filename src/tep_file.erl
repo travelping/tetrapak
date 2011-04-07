@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_file).
--export([size/1, md5sum/1, is_useless/1, filter_useless/1, basename/1, rebase_filename/3]).
+-export([size/1, mtime/1, md5sum/1, is_useless/1, filter_useless/1, basename/1, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
@@ -27,6 +27,10 @@ basename(Filename) ->
 size(Filename) ->
   {ok, #file_info{size = Size}} = file:read_file_info(Filename),
   Size.
+
+mtime(Filename) ->
+  {ok, #file_info{mtime = MTime}} = file:read_file_info(Filename),
+  MTime.
 
 rebase_filename(FName, FromDir, ToDir) ->
   FromDirPath = filename:split(FromDir),

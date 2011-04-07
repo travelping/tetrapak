@@ -22,8 +22,7 @@
 
 %% ------------------------------------------------------------
 %% -- tep_pass API
-behaviour_info(exports) ->
-    [{options, 1}, {pass_run, 2}].
+behaviour_info(exports) -> [{pass_run, 2}].
 
 run_passes(PassMap, Project, Config, PassNames) ->
     {ok, Sched} = gen_server:start(?MODULE, [PassMap, Project, Config], []),
