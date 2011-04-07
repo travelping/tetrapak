@@ -69,7 +69,7 @@ xref_result({_, []}) ->
 xref_result({undefined, Functions}) ->
     tep_pass:fail("Undefined Functions called:~n~s", [fmt_functions(Functions)]);
 xref_result({deprecated, Functions}) ->
-    tep_pass:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
+    tep_log:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
 xref_result({unused, Functions}) ->
     tep_log:warn("Unused functions:~n~s", [fmt_functions(Functions)]).
 
