@@ -7,15 +7,15 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass_check).
--behaviour(tep_pass).
+-module(tetrapak_task_check).
+-behaviour(tetrapak_task).
 -export([run/2]).
 
--pass({"check:xref", "Check inter-module calls"}).
--pass({"check:appmodules", "Check app file module list"}).
+-task({"check:xref", "Check inter-module calls"}).
+-task({"check:appmodules", "Check app file module list"}).
 
 %% ------------------------------------------------------------
-%% -- Pass API
+%% -- Task API
 run("check:xref", _) ->
     tetrapak:require("build:erlang"),
     EbinDir = tetrapak:subdir("ebin"),
@@ -62,11 +62,11 @@ duplicates([Head|Tail], Seen, Dupli) ->
 xref_result({_, []}) ->
     ok;
 xref_result({undefined, Functions}) ->
-    tep_pass:fail("Undefined Functions called:~n~s", [fmt_functions(Functions)]);
+    tetrapak:fail("Undefined Functions called:~n~s", [fmt_functions(Functions)]);
 xref_result({deprecated, Functions}) ->
-    tep_log:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
+    tpk_log:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
 xref_result({unused, Functions}) ->
-    tep_log:warn("Unused functions:~n~s", [fmt_functions(Functions)]).
+    tpk_log:warn("Unused functions:~n~s", [fmt_functions(Functions)]).
 
 fmt_functions(Functions) ->
     case Functions of

@@ -7,7 +7,7 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_context).
+-module(tetrapak_context).
 -export([new/1, get_cached/2, wait_for/2, get_directory/1, signal_done/3]).
 -export([init/1, loop/1]).
 -compile(export_all).
@@ -18,8 +18,8 @@
 get_directory(Ctx) ->
     call(Ctx, get_directory, ?TIMEOUT).
 
-signal_done(Ctx, Pass, Result) ->
-    cast(Ctx, {ready, Pass, Result}).
+signal_done(Ctx, Task, Result) ->
+    cast(Ctx, {ready, Task, Result}).
 
 get_cached(Ctx, Key) ->
     call(Ctx, {get_cached, Key}, ?TIMEOUT).
@@ -28,8 +28,8 @@ wait_for(Ctx, Keys) ->
     case call(Ctx, {wait_for, Keys}) of
         {unknown_key, Key} ->
             {error, {unknown_key, Key}};
-        {error, {failed, Pass}} ->
-            {error, {failed, Pass}};
+        {error, {failed, Task}} ->
+            {error, {failed, Task}};
         {wait, WaitList} ->
             wait_loop(Ctx, WaitList)
     end.
@@ -38,10 +38,10 @@ wait_loop(_Ctx, []) ->
     ok;
 wait_loop(Ctx, WaitList) ->
     case get_response(Ctx, infinity) of
-        {done, Pass} ->
-            wait_loop(Ctx, lists:delete(Pass, WaitList));
-        {failed, Pass} ->
-            {error, {failed, Pass}};
+        {done, Task} ->
+            wait_loop(Ctx, lists:delete(Task, WaitList));
+        {failed, Task} ->
+            {error, {failed, Task}};
         wait_shutdown ->
             wait_shutdown(Ctx)
     end.
@@ -57,10 +57,10 @@ wait_shutdown(Ctx) ->
 %% -- server loop
 -record(st, {
     directory                 :: string(),
-    passes                    :: [{string(), #pass{}}],
+    tasks                     :: [{string(), #task{}}],
     cache     = dict:new()    :: dict(),
     running   = dict:new()    :: dict(),
-	done      = gb_sets:new() :: set()
+    done      = gb_sets:new() :: set()
 }).
 
 new(Directory) ->
@@ -68,16 +68,16 @@ new(Directory) ->
 
 init(Directory) ->
     process_flag(trap_exit, true),
-    loop(#st{directory = Directory, passes = tep_pass:find_passes()}).
+    loop(#st{directory = Directory, tasks = tetrapak_task:find_tasks()}).
 
-loop(LoopState = #st{cache = Cache, passes = PassMap, running = Running, done = Done}) ->
+loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done}) ->
     receive
         {request, FromPid, get_directory} ->
             reply(FromPid, LoopState#st.directory),
             loop(LoopState);
 
         {request, FromPid, {get_cached, Key}} ->
-            tep_log:debug("ctx get: ~p ~p", [FromPid, Key]),
+            tpk_log:debug("ctx get: ~p ~p", [FromPid, Key]),
             case dict:find(Key, Cache) of
                 {ok, Value} -> reply(FromPid, {ok, Value});
                 error       -> reply(FromPid, {error, unknown_key})
@@ -85,48 +85,48 @@ loop(LoopState = #st{cache = Cache, passes = PassMap, running = Running, done = 
             loop(LoopState);
 
         {request, FromPid, {wait_for, Keys}} ->
-            case resolve_keys(PassMap, Keys) of
+            case resolve_keys(TaskMap, Keys) of
                 {unknown_key, Key} ->
                     reply(FromPid, {unknown_key, Key}),
                     loop(LoopState);
-                PassList ->
-                    {NewLoopState, Wait} = lists:foldl(fun ({_, Pass}, {LS, S}) ->
-                                                              maybe_start_pass(FromPid, Pass, LS, S)
-                                                      end, {LoopState, []}, PassList),
+                TaskList ->
+                    {NewLoopState, Wait} = lists:foldl(fun ({_, Task}, {LS, S}) ->
+                                                              maybe_start_task(FromPid, Task, LS, S)
+                                                      end, {LoopState, []}, TaskList),
                     reply(FromPid, {wait, Wait}),
                     loop(NewLoopState)
             end;
 
-        {cast, FromPid, {ready, Pass, Variables}} ->
-            tep_log:info("done: ~s", [Pass]),
-            {FromPid, Waiting} = dict:fetch(Pass, Running),
-            lists:foreach(fun (WaitingPid) -> reply(WaitingPid, {done, Pass}) end, Waiting),
+        {cast, FromPid, {ready, Task, Variables}} ->
+            tpk_log:info("done: ~s", [Task]),
+            {FromPid, Waiting} = dict:fetch(Task, Running),
+            lists:foreach(fun (WaitingPid) -> reply(WaitingPid, {done, Task}) end, Waiting),
             NewCache   = dict:merge(fun (Key, _V1, V2) ->
-					   	                    tep_log:debug("ctx var merge conflict ~p", [Key]),
-											V2
-									end, Cache, Variables),
-            NewRunning = dict:erase(Pass, Running),
-			NewDone    = gb_sets:insert(Pass, Done),
+					                               tpk_log:debug("ctx var merge conflict ~p", [Key]),
+								       V2
+				    end, Cache, Variables),
+            NewRunning = dict:erase(Task, Running),
+			NewDone    = gb_sets:insert(Task, Done),
             loop(LoopState#st{cache = NewCache, done = NewDone, running = NewRunning});
 
         {'EXIT', _DeadPid, normal} ->
             loop(LoopState);
 
-        {'EXIT', DeadPid, {pass_failed, FailedPass}} ->
-            shutdown(LoopState, FailedPass, DeadPid);
+        {'EXIT', DeadPid, {task_failed, FailedTask}} ->
+            shutdown(LoopState, FailedTask, DeadPid);
 
         Other ->
-            tep_log:debug("ctx other ~p", [Other])
+            tpk_log:debug("ctx other ~p", [Other])
     end.
 
-shutdown(#st{running = Running}, FailedPass, FailedPid) ->
+shutdown(#st{running = Running}, FailedTask, FailedPid) ->
    RList   = dict:to_list(Running),
    Workers = [Pid || {_Name, {Pid, _}} <- RList, Pid /= FailedPid],
    Others  = [Pid || {_Name, {_, Waiting}} <- RList,
                      Pid <- Waiting, not lists:member(Pid, Workers)],
 
-   {FailedPid, WaitingForFailed} = dict:fetch(FailedPass, Running),
-   [reply(P, {failed, FailedPass}) || P <- WaitingForFailed, not lists:member(P, Others)],
+   {FailedPid, WaitingForFailed} = dict:fetch(FailedTask, Running),
+   [reply(P, {failed, FailedTask}) || P <- WaitingForFailed, not lists:member(P, Others)],
 
    lists:foreach(fun (P) -> reply(P, wait_shutdown) end, Others),
    shutdown_loop(Workers, Others, Running).
@@ -134,38 +134,38 @@ shutdown(#st{running = Running}, FailedPass, FailedPid) ->
 shutdown_loop([], _Others, _Running) -> ok;
 shutdown_loop(Workers, Others, Running) ->
     receive
-        {'EXIT', Pid, {pass_failed, PassName}} ->
-            {Pid, Waiting} = dict:fetch(PassName, Running),
-            [reply(P, {failed, PassName}) || P <- Waiting, not lists:member(P, Others)],
+        {'EXIT', Pid, {task_failed, TaskName}} ->
+            {Pid, Waiting} = dict:fetch(TaskName, Running),
+            [reply(P, {failed, TaskName}) || P <- Waiting, not lists:member(P, Others)],
             shutdown_loop(lists:delete(Pid, Workers), Others, Running);
         OtherMsg ->
-            tep_log:debug("ctx shutdown other ~p", [OtherMsg])
+            tpk_log:debug("ctx shutdown other ~p", [OtherMsg])
     end.
 
-maybe_start_pass(FromPid, Pass = #pass{name = PassName}, State, CallerWaitList) ->
-    case dict:find(PassName, State#st.running) of
+maybe_start_task(FromPid, Task = #task{name = TaskName}, State, CallerWaitList) ->
+    case dict:find(TaskName, State#st.running) of
         {ok, {WorkerPid, WaitList}} ->
-            %% pass is already running, add the caller to it's wait list
-            NewRunning = dict:store(PassName, {WorkerPid, [FromPid | WaitList]}, State#st.running),
-            {State#st{running = NewRunning}, [PassName | CallerWaitList]};
+            %% task is already running, add the caller to it's wait list
+            NewRunning = dict:store(TaskName, {WorkerPid, [FromPid | WaitList]}, State#st.running),
+            {State#st{running = NewRunning}, [TaskName | CallerWaitList]};
         error ->
-			case gb_sets:is_member(PassName, State#st.done) of
+			case gb_sets:is_member(TaskName, State#st.done) of
 				false ->
-					%% pass has not been run yet, the caller needs to wait
-					WorkerPid = spawn_link(tep_pass, worker, [Pass, self()]),
-					NewRunning = dict:store(PassName, {WorkerPid, [FromPid]}, State#st.running),
-					{State#st{running = NewRunning}, [PassName | CallerWaitList]};
+					%% task has not been run yet, the caller needs to wait
+					WorkerPid = spawn_link(tetrapak_task, worker, [Task, self()]),
+					NewRunning = dict:store(TaskName, {WorkerPid, [FromPid]}, State#st.running),
+					{State#st{running = NewRunning}, [TaskName | CallerWaitList]};
 				true ->
-					%% pass already did it's job so it's not added to the wait list
+					%% task already did it's job so it's not added to the wait list
 					{State, CallerWaitList}
 			end
     end.
 
-resolve_keys(PassMap, Keys) ->
+resolve_keys(TaskMap, Keys) ->
     try
         lists:foldl(fun (Key, Acc) ->
-                          [First | Rest] = tep_pass:split_name(Key),
-                          case descending_lookup(PassMap, [First], Rest) of
+                          [First | Rest] = tetrapak_task:split_name(Key),
+                          case descending_lookup(TaskMap, [First], Rest) of
                               error  -> throw({unknown, Key});
                               Assocs -> lists:keymerge(1, Assocs, Acc)
                           end
@@ -175,8 +175,8 @@ resolve_keys(PassMap, Keys) ->
             {unknown_key, Key}
     end.
 
-descending_lookup(PassMap, Prefix, KeyRest) ->
-    Matches = lists:filter(fun ({Name, _}) -> lists:prefix(Prefix, Name) end, PassMap),
+descending_lookup(TaskMap, Prefix, KeyRest) ->
+    Matches = lists:filter(fun ({Name, _}) -> lists:prefix(Prefix, Name) end, TaskMap),
     case {Matches, KeyRest} of
         {[], _}      -> error;
         {_, []}      -> Matches;

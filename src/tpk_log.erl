@@ -7,7 +7,7 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_log).
+-module(tpk_log).
 -export([output/1,output/2,info/1,info/2,debug/1,debug/2,warn/1,warn/2]).
 
 output(Fmt)       -> output(Fmt, []).

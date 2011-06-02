@@ -7,12 +7,12 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass_compile).
--behaviour(tep_pass).
+-module(tetrapak_task_erlc).
+-behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--pass({"build:erlang", "Build Erlang modules"}).
--pass({"clean:erlang", "Delete compiled Erlang modules"}).
+-task({"build:erlang", "Build Erlang modules"}).
+-task({"clean:erlang", "Delete compiled Erlang modules"}).
 
 -record(erl, {
     file,
@@ -26,7 +26,7 @@
 }).
 
 %% ------------------------------------------------------------
-%% -- Pass API
+%% -- Task API
 check("build:erlang") ->
     EbinDir             = tetrapak:subdir("ebin"),
     SrcDir              = tetrapak:subdir("src"),
@@ -47,39 +47,39 @@ check("build:erlang") ->
 
 run("build:erlang", ErlFiles) ->
     lists:foreach(fun ({File, CompileOptions}) ->
-                          tep_log:debug("compile ~s", [File#erl.file]),
+                          tpk_log:debug("compile ~s", [File#erl.file]),
                           case compile:file(File#erl.file, CompileOptions) of
-                              {ok, Module}              -> ok;
+                              {ok, _Module}             -> ok;
                               {error, Errors, Warnings} ->
-                                  tep_pass:fail("compilation of ~s failed:~n~s~n~s",
+                                  tetrapak:fail("compilation of ~s failed:~n~s~n~s",
                                                 [File#erl.module, string:join(Errors, "\n"), string:join(Warnings, "\n")])
                           end
                   end, ErlFiles);
 
 run("clean:erlang", _) ->
-    tep_file:delete("\\.beam$", tetrapak:subdir("ebin")).
+    tpk_file:delete("\\.beam$", tetrapak:subdir("ebin")).
 
 %% ------------------------------------------------------------
 %% -- Helpers
 needs_compile(NewCOptions, Ebin, #erl{module = Mod, attributes = Attrs, includes = Inc, mtime = ModMTime}) ->
-    Beam = filename:join(Ebin, tep_util:f("~s.beam", [Mod])),
+    Beam = filename:join(Ebin, tpk_util:f("~s.beam", [Mod])),
     COptions = proplists:get_value(compile, Attrs, []) ++ NewCOptions,
     case filelib:is_regular(Beam) of
         false -> true;
         true  ->
             {ok, {_, [{compile_info, ComInfo}]}} = beam_lib:chunks(Beam, [compile_info]),
             BeamCOptions = proplists:get_value(options, ComInfo),
-            BeamMTime    = tep_file:mtime(Beam),
-            (BeamMTime =< ModMTime) %% beam is older
+            BeamMTime    = tpk_file:mtime(Beam),
+            ((BeamMTime =< ModMTime)) %% beam is older
             orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
-            orelse lists:any(fun (I) -> tep_file:mtime(I) >= BeamMTime end, Inc) %% include file changed
+            orelse lists:any(fun (I) -> tpk_file:mtime(I) >= BeamMTime end, Inc) %% include file changed
     end.
 
 erlang_source_files(Path) ->
     case filelib:is_dir(Path) of
         true ->
-            tep_file:walk(fun (File, Acc) ->
-                              case tep_util:match("\\.erl$", File) of
+            tpk_file:walk(fun (File, Acc) ->
+                              case tpk_util:match("\\.erl$", File) of
                                   true ->
                                       {ok, MRec} = scan_source(File),
                                       insert_file(MRec, Acc);
@@ -88,7 +88,7 @@ erlang_source_files(Path) ->
                               end
                           end, [], Path);
         false ->
-            tep_pass:fail("not a directory: ~s", [Path])
+            tetrapak:fail("not a directory: ~s", [Path])
     end.
 
 insert_file(F, Acc) -> [F | Acc].
@@ -96,7 +96,7 @@ insert_file(F, Acc) -> [F | Acc].
 scan_source(Path) ->
     case epp:parse_file(Path, ["include"], []) of
         {ok, Forms} ->
-            Rec = #erl{mtime = tep_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")},
+            Rec = #erl{mtime = tpk_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")},
             {ok, lists:foldl(fun (F, Acc) -> do_form(Path, F, Acc) end, Rec, tl(Forms))};
         {error, Error} ->
             {error, Error}

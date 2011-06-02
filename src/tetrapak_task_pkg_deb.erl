@@ -7,39 +7,39 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass_package_debian).
--behaviour(tep_pass).
+-module(tetrapak_task_pkg_deb).
+-behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--pass({"pkg:deb", "Create a binary debian package"}).
--pass({"clean:pkg:deb", "Delete debian packages"}).
+-task({"pkg:deb", "Create a binary debian package"}).
+-task({"clean:pkg:deb", "Delete debian packages"}).
 
 %% ------------------------------------------------------------
-%% -- Pass API
+%% -- Task API
 check("clean:pkg:deb") ->
     filelib:is_dir(tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).
 
 run("pkg:deb", _) ->
-    tep_pass:require_all(["build", "check"]),
+    tetrapak_task:require_all(["build", "check"]),
 
     DistDir = tetrapak:subdir(tetrapak:get("config:pkg:outdir", "dist")),
     file:make_dir(DistDir),
 
-    DebFile = tep_file:with_temp_dir(fun make_deb/1),
-    tep_log:info("packaging done, package is at: ~s", [DebFile]);
+    DebFile = tpk_file:with_temp_dir(fun make_deb/1),
+    tpk_log:info("packaging done, package is at: ~s", [DebFile]);
 
 run("clean:pkg:deb", _) ->
-    tep_file:delete("\\.deb$", tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).
+    tpk_file:delete("\\.deb$", tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).
 
 %% ------------------------------------------------------------
 %% -- Implementation
 otp_related_files(D) ->
-    tep_file:wildcard(D, "ebin/*.beam") ++
-    tep_file:wildcard(D, "ebin/*.app") ++
-    tep_file:wildcard(D, "ebin/*.appup") ++
-    tep_file:wildcard(D, "include/*.hrl") ++
-    tep_file:filter_useless(tep_file:dir_contents(filename:join(D, "bin"))) ++
-    tep_file:filter_useless(tep_file:dir_contents(filename:join(D, "priv"))).
+    tpk_file:wildcard(D, "ebin/*.beam") ++
+    tpk_file:wildcard(D, "ebin/*.app") ++
+    tpk_file:wildcard(D, "ebin/*.appup") ++
+    tpk_file:wildcard(D, "include/*.hrl") ++
+    tpk_file:filter_useless(tpk_file:dir_contents(filename:join(D, "bin"))) ++
+    tpk_file:filter_useless(tpk_file:dir_contents(filename:join(D, "priv"))).
 
 file_target(_Pkg, "bin" ++ _) -> "usr/";
 file_target(Pkg, _Path)       -> "usr/lib/erlang/lib/" ++ Pkg.
@@ -47,8 +47,8 @@ file_target(Pkg, _Path)       -> "usr/lib/erlang/lib/" ++ Pkg.
 make_deb(PkgDir) ->
     Name    = tetrapak:get("config:appfile:name"),
     Vsn     = tetrapak:get("config:appfile:vsn"),
-    Pkg     = tep_util:f("~s-~s", [Name, Vsn]),
-    PkgName = tep_util:f("erlang-~s", [Name]),
+    Pkg     = tpk_util:f("~s-~s", [Name, Vsn]),
+    PkgName = tpk_util:f("erlang-~s", [Name]),
     Arch = "all",
     DebianName = no_underscores(PkgName),
     PackageFiles = otp_related_files(tetrapak:dir()),
@@ -59,24 +59,24 @@ make_deb(PkgDir) ->
     file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
 
     %% data.tar.gz
-    DataDir = filename:join(PkgDir, "data"), tep_file:mkdir(DataDir),
+    DataDir = filename:join(PkgDir, "data"), tpk_file:mkdir(DataDir),
     lists:foreach(fun (P) ->
-                          File = tep_file:rebase_filename(P, tetrapak:dir(), ""),
+                          File = tpk_file:rebase_filename(P, tetrapak:dir(), ""),
                           Target = filename:join([DataDir, file_target(Pkg, File), File]),
-                          tep_file:copy(P, Target)
+                          tpk_file:copy(P, Target)
                   end, PackageFiles),
-    tep_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
+    tpk_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
 
     %% control.tar.gz
     ControlDir = filename:join(PkgDir, "control"),
 
     %% copy control files with varsubst applied
-    DepString = lists:map(fun (S) -> no_underscores(tep_util:f(", erlang-~s", [S])) end,
+    DepString = lists:map(fun (S) -> no_underscores(tpk_util:f(", erlang-~s", [S])) end,
                           lists:sort(tetrapak:get("config:appfile:deps"))),
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", "deb"]),
-    tep_file:copy(TemplateDir, ControlDir),
-    tep_file:walk(fun (P, _) ->
-                          tep_file:varsubst([{"name", DebianName}, {"version", Vsn},
+    tpk_file:copy(TemplateDir, ControlDir),
+    tpk_file:walk(fun (P, _) ->
+                          tpk_file:varsubst([{"name", DebianName}, {"version", Vsn},
                                              {"appname", Name}, {"appdeps", DepString},
                                              {"desc", tetrapak:get("config:appfile:desc", "")}],
                                             P, P)
@@ -85,15 +85,15 @@ make_deb(PkgDir) ->
     %% generate md5sums
     Md5_File = filename:join(ControlDir, "md5sums"),
     {ok, Md5} = file:open(Md5_File, [write]),
-    tep_file:walk(fun (P, _) ->
-                          io:format(Md5, "~s ~s~n", [tep_file:md5sum(P), tep_file:rebase_filename(P, DataDir, "")])
+    tpk_file:walk(fun (P, _) ->
+                          io:format(Md5, "~s ~s~n", [tpk_file:md5sum(P), tpk_file:rebase_filename(P, DataDir, "")])
                   end, [], DataDir),
     file:close(Md5),
 
     %% tarballize control files
-    tep_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
+    tpk_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
 
-    DebFile = filename:join(DistDir, tep_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
+    DebFile = filename:join(DistDir, tpk_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
     make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
     DebFile.
 
@@ -103,7 +103,7 @@ make_ar(Outfile, Dir, Entries) ->
         file:write(ArFile, <<"!<arch>\n">>),
         lists:foldl(fun (Name, Offset) ->
                             File = filename:join(Dir, Name),
-                            Size = tep_file:size(File),
+                            Size = tpk_file:size(File),
                             io:format(ArFile, "~-16s~-12s~-6s~-6s~-8s~-10B`\n", [Name, "1280174243", "0", "0", "000644", Size]),
                             file:copy(File, ArFile),
                             NewOffset = Offset + 60 + Size,

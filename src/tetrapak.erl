@@ -30,46 +30,46 @@
 %% ------------------------------------------------------------
 %% -- Ext API
 all_commands() ->
-    [{Pass#pass.name, Pass#pass.description} || {_, Pass} <- lists:keysort(1, tep_pass:find_passes())].
+    [{Task#task.name, Task#task.description} || {_, Task} <- lists:keysort(1, tetrapak_task:find_tasks())].
 
-run(Directory, PassCmds) ->
-    Context = tep_context:new(Directory),
-    case tep_context:wait_for(Context, PassCmds) of
+run(Directory, TaskCmds) ->
+    Context = tetrapak_context:new(Directory),
+    case tetrapak_context:wait_for(Context, TaskCmds) of
         ok ->
             ok;
         {error, {unknown_key, Key}} ->
             {unknown, Key};
-        {error, {failed, _Pass}} ->
+        {error, {failed, _Task}} ->
             error; % unlikely
         {error, shutdown} ->
             error
     end.
 
 %% ------------------------------------------------------------
-%% -- Pass API
+%% -- Task API
 dir() ->
-    tep_context:get_directory(tep_pass:context()).
+    tetrapak_context:get_directory(tetrapak_task:context()).
 
 subdir(Dir) ->
     filename:join(dir(), Dir).
 
 require(Key) ->
-    tep_pass:require_all([Key]).
+    tetrapak_task:require_all([Key]).
 
 require_all(Keys) ->
-    tep_pass:require_all(Keys).
+    tetrapak_task:require_all(Keys).
 
 get(Key) ->
-    {ok, Value} = tep_pass:get(Key, true),
+    {ok, Value} = tetrapak_task:get(Key, true),
     Value.
 
 get(Key, Default) ->
-    case tep_pass:get(Key, false) of
+    case tetrapak_task:get(Key, false) of
         {ok, Value} -> Value;
         {error, unknown_key} -> Default
     end.
 
 fail(Reason) ->
-    tep_pass:fail(Reason, []).
+    tetrapak_task:fail(Reason, []).
 fail(Fmt, Args) ->
-    tep_pass:fail(Fmt, Args).
+    tetrapak_task:fail(Fmt, Args).

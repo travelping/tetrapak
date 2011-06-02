@@ -27,7 +27,7 @@ main(Commands) ->
 usage() ->
   io:format(standard_error,
             "Usage: tetrapak <command> [ options ]~n~n"
-            "Available Passes~n~s",
+            "Available Tasks~n~s",
             [tablist(tetrapak:all_commands())]).
 
 tablist(Lis) ->

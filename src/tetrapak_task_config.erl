@@ -7,22 +7,20 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_config).
--behaviour(tep_pass).
+-module(tetrapak_task_config).
+-behaviour(tetrapak_task).
 -export([project_config/1, read_ini_file/1]).
 -export([run/2]).
 
--pass({"config:appfile", "Read the application resource file"}).
--pass({"config:ini",     "Read the tetrapak config file"}).
-
--include("tetrapak.hrl").
+-task({"config:appfile", "Read the application resource file"}).
+-task({"config:ini",     "Read the tetrapak config file"}).
 
 run("config:appfile", _) ->
     Dir  = tetrapak:dir(),
     Ebin = filename:join(Dir, "ebin"),
     case find_app_file(Dir, Ebin) of
         {ok, Appfile} ->
-            tep_log:debug("found application resource file ~s", [Appfile]),
+            tpk_log:debug("found application resource file ~s", [Appfile]),
             case file:consult(Appfile) of
                 {ok, [Attrs]} ->
                     {done, appfile_info(Appfile, Attrs)};
@@ -50,7 +48,7 @@ appfile_info(File, {application, Name, Attrs}) ->
 app_attr(File, Key, Attrs) ->
     case proplists:get_value(Key, Attrs) of
         undefined ->
-            tep_log:warn("required property ~s missing in app file ~s",
+            tpk_log:warn("required property ~s missing in app file ~s",
                 [Key, File]),
             throw({error, application_prop_missing});
         Val -> Val
@@ -62,7 +60,7 @@ find_app_file(OrigDir, Ebin) ->
         {[], _} ->
             {error, no_app_file};
         {Files, nomatch} ->
-            tep_log:warn("project directory name not OTP-compliant"),
+            tpk_log:warn("project directory name not OTP-compliant"),
             {ok, hd(Files)};
         {Files, Appname} ->
             case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
@@ -72,7 +70,7 @@ find_app_file(OrigDir, Ebin) ->
     end.
 
 dir_to_appname(Dir) ->
-    Base = tep_file:basename(Dir),
+    Base = tpk_file:basename(Dir),
     case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
         {match, [Appname]} -> Appname;
         nomatch            -> nomatch
@@ -102,12 +100,12 @@ read_config(File) ->
 read_config(File, Tree) ->
     case read_ini_file(File, Tree) of
         {error, enoent} ->
-            tep_log:debug("config file ~s does not exist", [File]),
+            tpk_log:debug("config file ~s does not exist", [File]),
             {ok, gb_trees:empty()};
         {error, Error} ->
             {error, Error};
         {ok, ConfigTree} ->
-            tep_log:debug("read config file ~s", [File]),
+            tpk_log:debug("read config file ~s", [File]),
             {ok, ConfigTree}
     end.
 
@@ -123,7 +121,7 @@ read_ini_file(Filename, Tree) ->
         {ok, File} ->
             case read_ini_lines(File, 1, "", Tree) of
                 {parse_error, Line, Message} ->
-                    tep_log:warn("parse error in ~s:~b: ~s", [Filename, Line, Message]),
+                    tpk_log:warn("parse error in ~s:~b: ~s", [Filename, Line, Message]),
                     file:close(File),
                     {error, parse_error};
                 {ok, Values} ->

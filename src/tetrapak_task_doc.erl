@@ -7,12 +7,12 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass_edoc).
--behaviour(tep_pass).
+-module(tetrapak_task_doc).
+-behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--pass({"doc:edoc", "Generate edoc documentation"}).
--pass({"clean:edoc", "Delete generated documentation"}).
+-task({"doc:edoc", "Generate edoc documentation"}).
+-task({"clean:edoc", "Delete generated documentation"}).
 
 -define(DOC_DIR, tetrapak:subdir(tetrapak:get("config:ini:doc:directory", "doc"))).
 
@@ -21,11 +21,11 @@ check("clean:edoc") ->
 
 run("doc:edoc", _) ->
     DD = ?DOC_DIR,
-    tep_file:mkdir(DD),
+    tpk_file:mkdir(DD),
     edoc:application(tetrapak:get("config:appfile:name"), [{dir, DD}]);
 
 run("clean:edoc", _) ->
 	DD = ?DOC_DIR,
-    tep_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
+        tpk_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
 	file:del_dir(DD),
 	ok.

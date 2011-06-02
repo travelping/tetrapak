@@ -1,3 +1,4 @@
+
 %    __                        __      _
 %   / /__________ __   _____  / /___  (_)___  ____ _
 %  / __/ ___/ __ `/ | / / _ \/ / __ \/ / __ \/ __ `/
@@ -7,7 +8,7 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_file).
+-module(tpk_file).
 -export([size/1, mtime/1, md5sum/1, is_useless/1, filter_useless/1, basename/1, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
@@ -49,7 +50,7 @@ rebase_filename(FName, FromDir, ToDir) ->
 
 is_useless(Filename) ->
     Name = basename(Filename),
-    tep_util:match(".*~$", Name) or tep_util:match("^\\..*", Name) or tep_util:match("^.*/\\.git/.*$", Filename).
+    tpk_util:match(".*~$", Name) or tpk_util:match("^\\..*", Name) or tpk_util:match("^.*/\\.git/.*$", Filename).
 
 filter_useless(Files) ->
     lists:filter(fun (X) -> not is_useless(X) end, Files).
@@ -58,14 +59,14 @@ temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
     {A,B,C} = now(),
     Pid = re:replace(erlang:pid_to_list(self()), "<|>", "", [global, {return, list}]),
-    filename:join(Dir, tep_util:f("tetrapak-tmp-~p-~p-~p-~s", [A,B,C,Pid])).
+    filename:join(Dir, tpk_util:f("tetrapak-tmp-~p-~p-~p-~s", [A,B,C,Pid])).
 
 with_temp_dir(DoSomething) ->
     Temp = temp_name(),
     file:make_dir(Temp),
     try DoSomething(Temp)
     after
-        tep_log:debug("deleting directory ~s", [Temp]),
+        tpk_log:debug("deleting directory ~s", [Temp]),
         delete(Temp)
     end.
 
@@ -73,7 +74,7 @@ dir_contents(Dir) -> dir_contents(Dir, ".*").
 dir_contents(Dir, Mask) -> dir_contents(Dir, Mask, no_dir).
 dir_contents(Dir, Mask, DirOpt) ->
     AddL = fun (F, Acc) ->
-                   case tep_util:match(Mask, F) of
+                   case tpk_util:match(Mask, F) of
                        true -> [F|Acc];
                        false -> Acc
                    end
@@ -113,14 +114,14 @@ delete(Mask, Filename) ->
     walk(fun (F, _) -> delete_if_match(Mask, F) end, [], Filename, dir_last).
 
 delete_if_match(Mask, Path) ->
-    case tep_util:match(Mask, filename:basename(Path)) of
+    case tpk_util:match(Mask, filename:basename(Path)) of
         true ->
             case filelib:is_dir(Path) of
                 true  ->
-                    tep_log:debug("rmdir ~s", [Path]),
+                    tpk_log:debug("rmdir ~s", [Path]),
                     file:del_dir(Path);
                 false ->
-                    tep_log:debug("rm ~s", [Path]),
+                    tpk_log:debug("rm ~s", [Path]),
                     file:delete(Path)
             end;
         false -> ok
@@ -155,18 +156,18 @@ make_tarball(Outfile, Root, Dir, Mask) ->
 
 make_tarball_from_files(Outfile, Root, Dir, Files) ->
     XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
-    XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
-    tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
+    XForm = tpk_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
+    tpk_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
                          "--numeric-owner", "--owner=root", "--group=root", "--gzip",
                          "--no-recursion", "--touch", "--absolute-names",
                          "--preserve-permissions", "--preserve-order",
                          "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
 
 varsubst(Variables, Infile, Outfile) ->
-    tep_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),
+    tpk_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),
     {ok, Content} = file:read_file(Infile),
-    NewContent = tep_util:varsubst(Content, Variables),
-    tep_log:debug("~p", [NewContent]),
+    NewContent = tpk_util:varsubst(Content, Variables),
+    tpk_log:debug("~p", [NewContent]),
     file:write_file(Outfile, NewContent).
 
 md5sum(File) ->

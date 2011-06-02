@@ -7,37 +7,38 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
--module(tep_pass).
+-module(tetrapak_task).
 -include("tetrapak.hrl").
 -compile({no_auto_import, [get/1]}).
 
-%% pass behaviour functions
+%% task behaviour functions
 -export([behaviour_info/1]).
 -export([worker/2, context/0, fail/2, get/2, require_all/1]).
 %% misc
--export([normalize_name/1, split_name/1, find_passes/0]).
+-export([normalize_name/1, split_name/1, find_tasks/0]).
 
--define(CTX, '$__tep_pass_context').
+-define(CTX, '$__tetrapak_task_context').
+-define(FAIL, '$__tetrapak_task_fail').
 
 behaviour_info(exports) -> [{run, 2}].
 
-worker(#pass{name = PassName, modules = [PassModule | _OtherModules]}, Context) ->
-    tep_log:debug("worker: pass ~s starting", [PassName]),
+worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context) ->
+    tpk_log:debug("worker: task ~s starting", [TaskName]),
     erlang:put(?CTX, Context),
-    case try_check(PassModule, PassName) of
+    case try_check(TaskModule, TaskName) of
         {done, Variables} ->
-            tep_context:signal_done(Context, PassName, Variables);
-        {needs_run, PassData} ->
-            case try_run(PassModule, PassName, PassData) of
+            tetrapak_context:signal_done(Context, TaskName, Variables);
+        {needs_run, TaskData} ->
+            case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
-                    tep_context:signal_done(Context, PassName, Variables)
+                    tetrapak_context:signal_done(Context, TaskName, Variables)
             end
     end.
 
-try_check(PassModule, PassName) ->
-    Function = tep_util:f("~s:check/1", [PassModule]),
+try_check(TaskModule, TaskName) ->
+    Function = tpk_util:f("~s:check/1", [TaskModule]),
     try
-        case PassModule:check(PassName) of
+        case TaskModule:check(TaskName) of
             needs_run ->
                 {needs_run, undefined};
             {needs_run, Data} ->
@@ -45,7 +46,7 @@ try_check(PassModule, PassName) ->
             done ->
                 {done, dict:new()};
             {done, Variables} ->
-                {done, do_output_variables(Function, PassName, Variables)};
+                {done, do_output_variables(Function, TaskName, Variables)};
             true ->
                 {needs_run, undefined};
             false ->
@@ -58,27 +59,27 @@ try_check(PassModule, PassName) ->
     catch
         error:Exn ->
             case {Exn, erlang:get_stacktrace()} of
-                {undef, [{PassModule, check, [PassName]} | _]} ->
+                {undef, [{TaskModule, check, [TaskName]} | _]} ->
                     %% check/1 is undefined, treat it as 'needs_run'
                     {needs_run, undefined};
-                {function_clause, [{PassModule, check, [PassName]} | _]} ->
-                    %% check/1 is defined, but not for this pass, treat it as 'needs_run'
+                {function_clause, [{TaskModule, check, [TaskName]} | _]} ->
+                    %% check/1 is defined, but not for this task, treat it as 'needs_run'
                     {needs_run, undefined};
                 _ ->
-                    handle_error(PassName, Function, error, Exn)
+                    handle_error(TaskName, Function, error, Exn)
             end;
         Class:Exn ->
-            handle_error(PassName, Function, Class, Exn)
+            handle_error(TaskName, Function, Class, Exn)
     end.
 
-try_run(PassModule, PassName, PassData) ->
-    Function = tep_util:f("~s:run/1", [PassModule]),
+try_run(TaskModule, TaskName, TaskData) ->
+    Function = tpk_util:f("~s:run/1", [TaskModule]),
     try
-        case PassModule:run(PassName, PassData) of
+        case TaskModule:run(TaskName, TaskData) of
             done ->
                 {done, dict:new()};
             {done, Variables} ->
-                {done, do_output_variables(Function, PassName, Variables)};
+                {done, do_output_variables(Function, TaskName, Variables)};
             ok ->
                 {done, dict:new()};
             OtherInvalid ->
@@ -86,45 +87,45 @@ try_run(PassModule, PassName, PassData) ->
         end
     catch
         Class:Exn ->
-            handle_error(PassName, Function, Class, Exn)
+            handle_error(TaskName, Function, Class, Exn)
     end.
 
-handle_error(PassName, Function, throw, {'$tep_pass_fail', Message}) ->
-    tep_log:warn("failed: ~s (in ~s):~n  ~s", [PassName, Function, Message]),
-    exit({pass_failed, PassName});
-handle_error(PassName, Function, Class, Exn) ->
-    tep_log:warn("crashed: ~s (in ~s):~n  ~p:~p~n  ~p~n",
-                 [PassName, Function, Class, Exn, erlang:get_stacktrace()]),
-    exit({pass_failed, PassName}).
+handle_error(TaskName, Function, throw, {?FAIL, Message}) ->
+    tpk_log:warn("failed: ~s (in ~s):~n  ~s", [TaskName, Function, Message]),
+    exit({task_failed, TaskName});
+handle_error(TaskName, Function, Class, Exn) ->
+    tpk_log:warn("crashed: ~s (in ~s):~n  ~p:~p~n  ~p~n",
+                 [TaskName, Function, Class, Exn, erlang:get_stacktrace()]),
+    exit({task_failed, TaskName}).
 
-do_output_variables(Fun, PassName, Vars) when is_list(Vars) ->
+do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
     lists:foldl(fun ({Key, Value}, Acc) ->
-                        dict:store(PassName ++ ":" ++ str(Key), Value, Acc);
+                        dict:store(TaskName ++ ":" ++ str(Key), Value, Acc);
                     (Item, _Acc) ->
                         fail("~s returned an invalid proplist (item ~p)", [Fun, Item])
                 end, dict:new(), Vars);
-do_output_variables(_Fun, _PassName, {Size, nil}) when is_integer(Size) ->
+do_output_variables(_Fun, _TaskName, {Size, nil}) when is_integer(Size) ->
     dict:new();
-do_output_variables(_Fun, PassName, Tree = {Size, {_, _, _, _}}) when is_integer(Size) ->
-    tep_util:fold_tree(fun ({Key, Value}, Acc) ->
-                               dict:store(PassName ++ ":" ++ str(Key), Value, Acc)
+do_output_variables(_Fun, TaskName, Tree = {Size, {_, _, _, _}}) when is_integer(Size) ->
+    tpk_util:fold_tree(fun ({Key, Value}, Acc) ->
+                               dict:store(TaskName ++ ":" ++ str(Key), Value, Acc)
                        end, dict:new(), Tree);
-do_output_variables(Fun, _PassName, _Variables) ->
+do_output_variables(Fun, _TaskName, _Variables) ->
     fail("~s returned an invalid key-value structure (not a proplist() | gb_tree())", [Fun]).
 
 fail(Fmt, Args) ->
-    throw({'$tep_pass_fail', tep_util:f(Fmt, Args)}).
+    throw({?FAIL, tpk_util:f(Fmt, Args)}).
 
 context() ->
     case erlang:get(?CTX) of
         Ctx when is_pid(Ctx) -> Ctx;
-        _AnythingElse        -> error(not_inside_pass)
+        _AnythingElse        -> error(not_inside_task)
     end.
 
 get(Key, FailUnknown) ->
     case require_all([Key], FailUnknown) of
         ok ->
-            tep_context:get_cached(context(), Key);
+            tetrapak_context:get_cached(context(), Key);
         {error, {unknown_key, _}} ->
             {error, unknown_key}
     end.
@@ -133,13 +134,13 @@ require_all(Keys) ->
     require_all(Keys, false).
 require_all(Keys, FailUnknown) when is_list(Keys) ->
     KList = lists:map(fun str/1, Keys),
-    case tep_context:wait_for(context(), KList) of
+    case tetrapak_context:wait_for(context(), KList) of
         ok ->
             ok;
         {error, Error} ->
             case {FailUnknown, Error} of
                 {_, {failed, Other}}        ->
-                    fail("required pass '~s' failed", [Other]);
+                    fail("required task '~s' failed", [Other]);
                 {false, _} ->
                     {error, Error};
                 {true, {unknown_key, Unknown}} ->
@@ -149,29 +150,29 @@ require_all(Keys, FailUnknown) when is_list(Keys) ->
 
 %% ------------------------------------------------------------
 %% -- Beam Scan
-find_passes() ->
-    find_passes([code:lib_dir(tetrapak, ebin)]).
-find_passes(Directories) ->
+find_tasks() ->
+    find_tasks([code:lib_dir(tetrapak, ebin)]).
+find_tasks(Directories) ->
     lists:foldl(fun (Dir, OuterModAcc) ->
-                   tep_log:debug("checking for pass modules in ~s", [Dir]),
-                   tep_file:walk(fun (File, ModAcc) ->
-                                    case is_pass_module(File) of
+                   tpk_log:debug("checking for task modules in ~s", [Dir]),
+                   tpk_file:walk(fun (File, ModAcc) ->
+                                    case is_task_module(File) of
                                         false              -> ModAcc;
-                                        {Module, PassDefs} -> store_passdefs(Module, PassDefs, ModAcc)
+                                        {Module, TaskDefs} -> store_defs(Module, TaskDefs, ModAcc)
                                     end
                                   end, OuterModAcc, Dir)
                 end, [], Directories).
 
-is_pass_module(Mfile) ->
+is_task_module(Mfile) ->
     case filename:extension(Mfile) of
         ".beam" ->
             {ok, {ModuleName, Chunks}} = beam_lib:chunks(Mfile, [attributes]),
             Attributes = proplists:get_value(attributes, Chunks, []),
-            IsPass = lists:member(?MODULE, proplists:get_value(behaviour, Attributes, [])) orelse
+            IsTask = lists:member(?MODULE, proplists:get_value(behaviour, Attributes, [])) orelse
                      lists:member(?MODULE, proplists:get_value(behavior, Attributes, [])),
             if
-                IsPass ->
-                    case proplists:get_value(pass, Attributes) of
+                IsTask ->
+                    case proplists:get_value(task, Attributes) of
                         undefined -> false;
                         InfoList  -> {ModuleName, lists:flatten(InfoList)}
                     end;
@@ -182,14 +183,14 @@ is_pass_module(Mfile) ->
             false
     end.
 
-store_passdefs(Module, List, PassMap) ->
-    lists:foldl(fun ({PassName, Desc}, Acc) ->
-                        NewPass   = #pass{name = normalize_name(PassName),
+store_defs(Module, List, TaskMap) ->
+    lists:foldl(fun ({TaskName, Desc}, Acc) ->
+                        NewTask   = #task{name = normalize_name(TaskName),
                                           modules = [Module],
                                           description = Desc},
-                        AddModule = fun (#pass{modules = OldMods}) -> NewPass#pass{modules = [Module | OldMods]} end,
-                        pl_update(split_name(PassName), AddModule, NewPass, Acc)
-               end, PassMap, List).
+                        AddModule = fun (#task{modules = OldMods}) -> NewTask#task{modules = [Module | OldMods]} end,
+                        pl_update(split_name(TaskName), AddModule, NewTask, Acc)
+               end, TaskMap, List).
 
 pl_update(Key, AddItem, NewItem, Proplist) ->
     case proplists:get_value(Key, Proplist) of
