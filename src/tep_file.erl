@@ -18,34 +18,34 @@
 -include_lib("kernel/include/file.hrl").
 
 basename(Filename) ->
-  Abs = filename:absname(Filename),
-  case filename:basename(Abs) of
-    "." -> filename:dirname(Abs);
-    Other -> Other
-  end.
+    Abs = filename:absname(Filename),
+    case filename:basename(Abs) of
+        "." -> filename:dirname(Abs);
+        Other -> Other
+    end.
 
 size(Filename) ->
-  {ok, #file_info{size = Size}} = file:read_file_info(Filename),
-  Size.
+    {ok, #file_info{size = Size}} = file:read_file_info(Filename),
+    Size.
 
 mtime(Filename) ->
-  {ok, #file_info{mtime = MTime}} = file:read_file_info(Filename),
-  MTime.
+    {ok, #file_info{mtime = MTime}} = file:read_file_info(Filename),
+    MTime.
 
 rebase_filename(FName, FromDir, ToDir) ->
-  FromDirPath = filename:split(FromDir),
-  FPath = filename:split(FName),
-  case lists:prefix(FromDirPath, FPath) of
-    true ->
-      RP = FPath -- FromDirPath,
-      Joined = filename:join([ToDir|RP]),
-      case ToDir of
-          "" -> tl(Joined);
-          _  -> Joined
-      end;
-    false ->
-      exit(bad_filename)
-  end.
+    FromDirPath = filename:split(FromDir),
+    FPath = filename:split(FName),
+    case lists:prefix(FromDirPath, FPath) of
+        true ->
+            RP = FPath -- FromDirPath,
+            Joined = filename:join([ToDir|RP]),
+            case ToDir of
+                "" -> tl(Joined);
+                _  -> Joined
+            end;
+        false ->
+            exit(bad_filename)
+    end.
 
 is_useless(Filename) ->
     Name = basename(Filename),
@@ -56,56 +56,56 @@ filter_useless(Files) ->
 
 temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
-  {A,B,C} = now(),
-  Pid = re:replace(erlang:pid_to_list(self()), "<|>", "", [global, {return, list}]),
-  filename:join(Dir, tep_util:f("tetrapak-tmp-~p-~p-~p-~s", [A,B,C,Pid])).
+    {A,B,C} = now(),
+    Pid = re:replace(erlang:pid_to_list(self()), "<|>", "", [global, {return, list}]),
+    filename:join(Dir, tep_util:f("tetrapak-tmp-~p-~p-~p-~s", [A,B,C,Pid])).
 
 with_temp_dir(DoSomething) ->
-  Temp = temp_name(),
-  file:make_dir(Temp),
-  try DoSomething(Temp)
-  after
-    tep_log:debug("deleting directory ~s", [Temp]),
-    delete(Temp)
-  end.
+    Temp = temp_name(),
+    file:make_dir(Temp),
+    try DoSomething(Temp)
+    after
+        tep_log:debug("deleting directory ~s", [Temp]),
+        delete(Temp)
+    end.
 
 dir_contents(Dir) -> dir_contents(Dir, ".*").
 dir_contents(Dir, Mask) -> dir_contents(Dir, Mask, no_dir).
 dir_contents(Dir, Mask, DirOpt) ->
-  AddL = fun (F, Acc) ->
-      case tep_util:match(Mask, F) of
-        true -> [F|Acc];
-        false -> Acc
-      end
-  end,
-  case filelib:is_dir(Dir) of
-    true -> lists:reverse(walk(AddL, [], Dir, DirOpt));
-    false -> []
-  end.
+    AddL = fun (F, Acc) ->
+                   case tep_util:match(Mask, F) of
+                       true -> [F|Acc];
+                       false -> Acc
+                   end
+           end,
+    case filelib:is_dir(Dir) of
+        true -> lists:reverse(walk(AddL, [], Dir, DirOpt));
+        false -> []
+    end.
 
 wildcard(Dir, Wildcard) ->
-  WC = filename:join(filename:absname(Dir), Wildcard),
-  filelib:wildcard(WC).
+    WC = filename:join(filename:absname(Dir), Wildcard),
+    filelib:wildcard(WC).
 
 mkdir(Path) ->
-  filelib:ensure_dir(filename:join(Path, ".")).
+    filelib:ensure_dir(filename:join(Path, ".")).
 
 copy(From, To) ->
-  CP = fun (F, _) ->
-      case not is_useless(F) of
-       true ->
-         T = rebase_filename(F, From, To),
-         ok = filelib:ensure_dir(T),
-         case file:copy(F, T) of
-           {ok, _} ->
-             {ok, #file_info{mode = Mode}} = file:read_file_info(F),
-             file:change_mode(T, Mode);
-           {error, Reason} -> throw({file_copy_error, Reason})
-         end;
-       false -> nomatch
-     end
- end,
- walk(CP, [], From, no_dir).
+    CP = fun (F, _) ->
+                case not is_useless(F) of
+                    true ->
+                        T = rebase_filename(F, From, To),
+                        ok = filelib:ensure_dir(T),
+                        case file:copy(F, T) of
+                            {ok, _} ->
+                                {ok, #file_info{mode = Mode}} = file:read_file_info(F),
+                                file:change_mode(T, Mode);
+                            {error, Reason} -> throw({file_copy_error, Reason})
+                        end;
+                    false -> nomatch
+                end
+        end,
+    walk(CP, [], From, no_dir).
 
 delete(Filename) ->
     delete(".*", Filename).
@@ -123,57 +123,57 @@ delete_if_match(Mask, Path) ->
                     tep_log:debug("rm ~s", [Path]),
                     file:delete(Path)
             end;
-        false -> nomatch
+        false -> ok
     end.
 
 walk(Fun, AccIn, Path) -> walk(Fun, AccIn, Path, no_dir).
 walk(Fun, AccIn, Path, DirOpt) when (DirOpt == no_dir) or
                                     (DirOpt == dir_first) or
                                     (DirOpt == dir_last) ->
-  walk(Fun, {walk, Path}, AccIn, [], DirOpt).
+    walk(Fun, {walk, Path}, AccIn, [], DirOpt).
 walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
-  case {Walk, filelib:is_dir(Path)} of
-    {walk, true} ->
-      {ok, List} = file:list_dir(Path),
-      AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
-      [Next|Rest] = case DirOpt of
-        no_dir -> AddPaths ++ Queue;
-        dir_first -> [{nowalk, Path}|AddPaths] ++ Queue;
-        dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
-      end,
-      walk(Fun, Next, Acc, Rest, DirOpt);
-    {_, _} ->
-      case Queue of
-        [] -> Fun(Path,Acc);
-        [Next|Rest] -> walk(Fun, Next, Fun(Path, Acc), Rest, DirOpt)
-      end
-  end.
+    case {Walk, filelib:is_dir(Path)} of
+        {walk, true} ->
+            {ok, List} = file:list_dir(Path),
+            AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
+            [Next|Rest] = case DirOpt of
+                              no_dir -> AddPaths ++ Queue;
+                              dir_first -> [{nowalk, Path}|AddPaths] ++ Queue;
+                              dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
+                          end,
+            walk(Fun, Next, Acc, Rest, DirOpt);
+        {_, _} ->
+            case Queue of
+                [] -> Fun(Path,Acc);
+                [Next|Rest] -> walk(Fun, Next, Fun(Path, Acc), Rest, DirOpt)
+            end
+    end.
 
 make_tarball(Outfile, Root, Dir, Mask) ->
-  Files = dir_contents(Dir, Mask, dir_first),
-  make_tarball_from_files(Outfile, Root, Dir, Files).
+    Files = dir_contents(Dir, Mask, dir_first),
+    make_tarball_from_files(Outfile, Root, Dir, Files).
 
 make_tarball_from_files(Outfile, Root, Dir, Files) ->
-  XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
-  XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
-  tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
-                       "--numeric-owner", "--owner=root", "--group=root", "--gzip",
-                       "--no-recursion", "--touch", "--absolute-names",
-                       "--preserve-permissions", "--preserve-order",
-                       "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
+    XFEsc = fun (P) -> re:replace(P, "([,])", "\\\\\\1", [global, {return, list}]) end,
+    XForm = tep_util:f("s,~s,~s,", [XFEsc(filename:absname(Dir)), XFEsc(Root)]),
+    tep_util:run("tar", ["--create", "--directory", Dir, "--file", Outfile, "--format=ustar",
+                         "--numeric-owner", "--owner=root", "--group=root", "--gzip",
+                         "--no-recursion", "--touch", "--absolute-names",
+                         "--preserve-permissions", "--preserve-order",
+                         "--transform", XForm | lists:map(fun filename:absname/1, Files)]).
 
 varsubst(Variables, Infile, Outfile) ->
-  tep_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),
-  {ok, Content} = file:read_file(Infile),
-  NewContent = tep_util:varsubst(Content, Variables),
-  tep_log:debug("~p", [NewContent]),
-  file:write_file(Outfile, NewContent).
+    tep_log:debug("varsubst: ~s -> ~s", [Infile, Outfile]),
+    {ok, Content} = file:read_file(Infile),
+    NewContent = tep_util:varsubst(Content, Variables),
+    tep_log:debug("~p", [NewContent]),
+    file:write_file(Outfile, NewContent).
 
 md5sum(File) ->
     case file:open(File, [binary,raw,read]) of
         {ok, P} ->
-           Digest = md5_loop(P, erlang:md5_init()),
-           bin_to_hex(binary_to_list(Digest));
+            Digest = md5_loop(P, erlang:md5_init()),
+            bin_to_hex(binary_to_list(Digest));
         Error   -> Error
     end.
 

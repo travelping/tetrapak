@@ -8,78 +8,68 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak).
--behaviour(gen_server).
-
-%% API
--export([start/1, all_commands/1, run/2, run/3]).
-%% gen_server
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([all_commands/0, run/2]).
+-export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/1, fail/2]).
+-compile({no_auto_import, [get/1]}).
 
 -include("tetrapak.hrl").
 
-increase_version(#tep_project{vsn = Version, app_file = AppFile}) ->
-    VComps = re:split(Version, "\\.", [{return, list}]),
-    NewLast = integer_to_list(list_to_integer(lists:last(VComps)) + 1),
-    NewVL = lists:append(lists:sublist(VComps, length(VComps) - 1), [NewLast]),
-    NewV = string:join(NewVL, "."),
-    tep_log:info("increasing version in project app file from ~s to ~s", [Version, NewV]),
-    {ok, AppContents} = file:read_file(AppFile),
-    NewContents = re:replace(AppContents,
-                             "(\\{\\s*vsn\\s*,\\s*)(\"[^\"]+\")(\\s*\\})",
-                             "\\1\"" ++ NewV ++ "\"\\3",
-                             [{return, binary}]),
-    file:write_file(AppFile, NewContents).
+% increase_version(#tep_project{vsn = Version, app_file = AppFile}) ->
+%    VComps = re:split(Version, "\\.", [{return, list}]),
+%    NewLast = integer_to_list(list_to_integer(lists:last(VComps)) + 1),
+%    NewVL = lists:append(lists:sublist(VComps, length(VComps) - 1), [NewLast]),
+%    NewV = string:join(NewVL, "."),
+%    tep_log:info("increasing version in project app file from ~s to ~s", [Version, NewV]),
+%    {ok, AppContents} = file:read_file(AppFile),
+%    NewContents = re:replace(AppContents,
+%                             "(\\{\\s*vsn\\s*,\\s*)(\"[^\"]+\")(\\s*\\})",
+%                             "\\1\"" ++ NewV ++ "\"\\3",
+%                             [{return, binary}]),
+%    file:write_file(AppFile, NewContents).
 
 %% ------------------------------------------------------------
-%% -- API
-start(Dir) ->
-    case tep_config:project_info(Dir) of
-        {error, E} ->
-            {error, E};
-        {ok, Project} ->
-            gen_server:start(?MODULE, [Project], [])
+%% -- Ext API
+all_commands() ->
+    [{Pass#pass.name, Pass#pass.description} || {_, Pass} <- lists:keysort(1, tep_pass:find_passes())].
+
+run(Directory, PassCmds) ->
+    Context = tep_context:new(Directory),
+    case tep_context:wait_for(Context, PassCmds) of
+        ok ->
+            ok;
+        {error, {unknown_key, Key}} ->
+            {unknown, Key};
+        {error, {failed, _Pass}} ->
+            error; % unlikely
+        {error, shutdown} ->
+            error
     end.
 
-all_commands(Server) ->
-    gen_server:call(Server, all_commands).
-
-run(Server, PassCmd) ->
-    run(Server, PassCmd, []).
-run(Server, PassCmd, Options) ->
-    gen_server:call(Server, {run_command, PassCmd, Options}).
-
 %% ------------------------------------------------------------
-%% -- gen_server callbacks
--record(tpk, {passmap, config, project}).
+%% -- Pass API
+dir() ->
+    tep_context:get_directory(tep_pass:context()).
 
-init([Project]) ->
-    Passes = tep_pass:find_passes(),
-    Config = tep_config:project_config(Project),
-    State  = #tpk{project = Project, config = Config, passmap = Passes},
-    {ok, State}.
+subdir(Dir) ->
+    filename:join(dir(), Dir).
 
-handle_call(all_commands, _From, State = #tpk{passmap = PDict}) ->
-    Dict  = dict:to_list(PDict),
-    CList = lists:foldl(fun ({_Group, Passes}, Pl) ->
-                           PNames = [{Pass#pass.fullname, Pass#pass.description} 
-                                     || {_, Pass} <- dict:to_list(Passes)],
-                           PNames ++ Pl
-                        end, [], Dict),
-    {reply, CList, State};
+require(Key) ->
+    tep_pass:require_all([Key]).
 
-handle_call({run_command, PassCmd, Options}, _From, State = #tpk{project = Project, passmap = PMap}) ->
-    Reply = tep_pass:run_passes(PMap, Project, State#tpk.config, [PassCmd]),
-    {reply, Reply, State};
+require_all(Keys) ->
+    tep_pass:require_all(Keys).
 
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknown_call}, State}.
+get(Key) ->
+    {ok, Value} = tep_pass:get(Key, true),
+    Value.
 
-%% unused callbacks
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-handle_info(_Info, State) ->
-    {noreply, State}.
-terminate(_Reason, _State) ->
-    ok.
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+get(Key, Default) ->
+    case tep_pass:get(Key, false) of
+        {ok, Value} -> Value;
+        {error, unknown_key} -> Default
+    end.
+
+fail(Reason) ->
+    tep_pass:fail(Reason, []).
+fail(Fmt, Args) ->
+    tep_pass:fail(Fmt, Args).

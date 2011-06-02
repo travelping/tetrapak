@@ -9,22 +9,23 @@
 
 -module(tep_pass_edoc).
 -behaviour(tep_pass).
+-export([check/1, run/2]).
 
--include("tetrapak.hrl").
+-pass({"doc:edoc", "Generate edoc documentation"}).
+-pass({"clean:edoc", "Delete generated documentation"}).
 
--export([pass_run/3]).
+-define(DOC_DIR, tetrapak:subdir(tetrapak:get("config:ini:doc:directory", "doc"))).
 
--passinfo({doc,   [{edoc, "Generate edoc documentation"}]}).
--passinfo({clean, [{edoc, "Delete generated documentation"}]}).
+check("clean:edoc") ->
+    filelib:is_dir(?DOC_DIR).
 
-pass_run({doc, edoc}, Project, Options) ->
-    DocDir = doc_dir(Project, Options),
-    tep_file:mkdir(DocDir),
-    edoc:application(Project#tep_project.name, Project#tep_project.directory, [{dir, DocDir}]);
+run("doc:edoc", _) ->
+    DD = ?DOC_DIR,
+    tep_file:mkdir(DD),
+    edoc:application(tetrapak:get("config:appfile:name"), [{dir, DD}]);
 
-pass_run({clean, edoc}, Project, Options) ->
-    DocDir = doc_dir(Project, Options),
-    tep_file:delete("(\\.(html|css|png)$)|edoc-info", DocDir).
-
-doc_dir(Project, Options) ->
-    filename:join(Project#tep_project.directory, tep_config:get_string(Options, "doc.directory", "doc")).
+run("clean:edoc", _) ->
+	DD = ?DOC_DIR,
+    tep_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
+	file:del_dir(DD),
+	ok.

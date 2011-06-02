@@ -8,70 +8,75 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tep_config).
--export([project_info/1]).
+-behaviour(tep_pass).
 -export([project_config/1, read_ini_file/1]).
--export([get_string/3]).
+-export([run/2]).
+
+-pass({"config:appfile", "Read the application resource file"}).
+-pass({"config:ini",     "Read the tetrapak config file"}).
 
 -include("tetrapak.hrl").
 
+run("config:appfile", _) ->
+    Dir  = tetrapak:dir(),
+    Ebin = filename:join(Dir, "ebin"),
+    case find_app_file(Dir, Ebin) of
+        {ok, Appfile} ->
+            tep_log:debug("found application resource file ~s", [Appfile]),
+            case file:consult(Appfile) of
+                {ok, [Attrs]} ->
+                    {done, appfile_info(Appfile, Attrs)};
+                {error, SyntaxError} ->
+                    EDesc = file:format_error(SyntaxError),
+                    tetrapak:fail("syntax error in application resource file:~n    ~s~n", [EDesc])
+            end;
+        {error, FileError} ->
+            tetrapak:fail("app file could not be found: ~p", [FileError])
+    end;
+
+run("config:ini", _) ->
+    {done, gb_trees:to_list(project_config(tetrapak:dir()))}.
+
 %% ------------------------------------------------------------
 %% -- Project info
-project_info(Dir) ->
-  Ebin = filename:join(Dir, "ebin"),
-  case filelib:is_dir(Ebin) of
-    true ->
-      case find_app_file(Dir, Ebin) of
-        {ok, Appfile} ->
-          tep_log:debug("found application resource file ~s", [Appfile]),
-          case file:consult(Appfile) of
-            {ok, [Attrs]} -> {ok, app_to_project_info(Appfile, Dir, Attrs)};
-            {error, E} -> {error, invalid_app_file, E}
-          end;
-        Error ->
-          Error
-      end;
-    false ->
-      {error, no_ebin_dir}
-  end.
-
-app_to_project_info(File, Dir, {application,Name,Attrs}) ->
-  #tep_project{name = Name,
-               app_file = File,
-               directory = Dir,
-               vsn  = app_attr(File, vsn, Attrs),
-               deps = app_attr(File, applications, Attrs) -- [stdlib,kernel],
-               desc = proplists:get_value(description, Attrs, ""),
-               modules = app_attr(File, modules, Attrs)}.
+appfile_info(File, {application, Name, Attrs}) ->
+    [{"name",    Name},
+     {"path",    File},
+     {"vsn",     app_attr(File, vsn, Attrs)},
+     {"deps",    app_attr(File, applications, Attrs) -- [stdlib,kernel]},
+     {"desc",    proplists:get_value(description, Attrs, "")},
+     {"modules", app_attr(File, modules, Attrs)}].
 
 app_attr(File, Key, Attrs) ->
-  case proplists:get_value(Key, Attrs) of
-    undefined ->
-      tep_log:warn("required property ~s missing in app file ~s",
-        [Key, File]),
-      throw({error, application_prop_missing});
-    Val -> Val
-  end.
+    case proplists:get_value(Key, Attrs) of
+        undefined ->
+            tep_log:warn("required property ~s missing in app file ~s",
+                [Key, File]),
+            throw({error, application_prop_missing});
+        Val -> Val
+    end.
 
 find_app_file(OrigDir, Ebin) ->
-  Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
-  case {Candidates, dir_to_appname(OrigDir)} of
-    {[], _} -> {error, no_app_file};
-    {Files, nomatch} ->
-      tep_log:warn("project directory name not OTP-compliant"),
-      {ok, hd(Files)};
-    {Files, Appname} ->
-      case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
-        [] -> {ok, hd(Files)};
-        [File|_] -> {ok, File}
-      end
-  end.
+    Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
+    case {Candidates, dir_to_appname(OrigDir)} of
+        {[], _} ->
+            {error, no_app_file};
+        {Files, nomatch} ->
+            tep_log:warn("project directory name not OTP-compliant"),
+            {ok, hd(Files)};
+        {Files, Appname} ->
+            case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
+                [] -> {ok, hd(Files)};
+                [File|_] -> {ok, File}
+            end
+    end.
 
 dir_to_appname(Dir) ->
-  Base = tep_file:basename(Dir),
-  case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
-    {match, [Appname]} -> Appname;
-    nomatch -> nomatch
-  end.
+    Base = tep_file:basename(Dir),
+    case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
+        {match, [Appname]} -> Appname;
+        nomatch            -> nomatch
+    end.
 
 %% ------------------------------------------------------------
 %% -- Config files
@@ -79,15 +84,15 @@ home_config_path(File) ->
     HomeDir = os:getenv("HOME"),
     filename:join([HomeDir, ".tetrapak", File]).
 
-project_config_file(#tep_project{directory = Dir}) ->
-    filename:join([Dir, "tetrapak", "config.ini"]).
+project_config_file(Directory) ->
+    filename:join([Directory, "tetrapak", "config.ini"]).
 
-project_config(Project) ->
+project_config(Directory) ->
     BaseCfg = case read_config(home_config_path("config.ini")) of
                   {error, _Error} -> gb_trees:empty();
                   {ok, Tree}      -> Tree
               end,
-    case read_config(project_config_file(Project), BaseCfg) of
+    case read_config(project_config_file(Directory), BaseCfg) of
         {error, _Error2} -> BaseCfg;
         {ok, Config}     -> Config
     end.
@@ -106,20 +111,8 @@ read_config(File, Tree) ->
             {ok, ConfigTree}
     end.
 
-get_string(Config, Key, Default) ->
-    case gb_trees:lookup(ckey(Key), Config) of
-        {value, Value} -> Value;
-        none           -> Default
-    end.
-
-ckey(String) ->
-    case re:split(String, "\\.", [{return, list}]) of
-        []           -> error(badarg);
-        [NoSection]  -> error(badarg);
-        Parts ->
-            [Key | Section] = lists:reverse(Parts),
-            {string:join(lists:reverse(Section), ":"), Key}
-    end.
+ckey(Section, Key) ->
+    Section ++ ":" ++ Key.
 
 %% ------------------------------------------------------------
 %% -- INI files
@@ -149,7 +142,7 @@ read_ini_lines(File, Line, Section, Acc) ->
                 {section, NewSection} ->
                     read_ini_lines(File, Line + 1, NewSection, Acc);
                 {value, Key, Value} ->
-                    NewAcc = gb_trees:enter({Section, Key}, Value, Acc),
+                    NewAcc = gb_trees:enter(ckey(Section, Key), Value, Acc),
                     read_ini_lines(File, Line + 1, Section, NewAcc);
                 comment ->
                     read_ini_lines(File, Line + 1, Section, Acc)

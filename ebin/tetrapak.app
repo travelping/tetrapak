@@ -6,20 +6,16 @@
              tep_util,
              tep_log,
              tep_file,
-             tep_config,
              tep_pass,
-
-             %% templates
-             tetrapak_tpl_tarball,
-             tetrapak_tpl_deb,
-             tetrapak_tpl_deb_erlrc,
+             tep_context,
 
              %% passes
+             tep_config,
              tep_pass_compile,
              tep_pass_check,
-             tep_pass_package,
+             tep_pass_package_debian,
              tep_pass_edoc
     ]},
-  {applications, [kernel, stdlib, crypto, ssh, edoc, tools]},
+  {applications, [kernel, stdlib, crypto, edoc, tools]},
   {registered, []}
 ]}.

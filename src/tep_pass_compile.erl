@@ -9,42 +9,55 @@
 
 -module(tep_pass_compile).
 -behaviour(tep_pass).
+-export([check/1, run/2]).
 
--include("tetrapak.hrl").
+-pass({"build:erlang", "Build Erlang modules"}).
+-pass({"clean:erlang", "Delete compiled Erlang modules"}).
 
--export([pass_run/3]).
--compile(export_all).
-
--passinfo({build, [{erlang, "Build Erlang modules"}]}).
--passinfo({clean, [{erlang, "Delete compiled Erlang modules"}]}).
-
--record(erl, {file, module, attributes = [], exports = [], behaviours = [], includes = [], mtime, invalid = false}).
+-record(erl, {
+    file,
+    module,
+    attributes = [],
+    exports = [],
+    behaviours = [],
+    includes = [],
+    mtime,
+    invalid = false
+}).
 
 %% ------------------------------------------------------------
 %% -- Pass API
-pass_run({build, erlang}, #tep_project{directory = Dir}, _Options) ->
-    EbinDir = filename:join(Dir, "ebin"),
-    SrcDir  = filename:join(Dir, "src"),
-    Sources = erlang_source_files(SrcDir),
-    CompileOptions = [{outdir, EbinDir}, {i, "include"}, debug_info, return_errors],
-    lists:foreach(fun (File) ->
-                      case needs_compile(CompileOptions, EbinDir, File) of
-                          true ->
-                              tep_log:debug("compile ~s", [File#erl.file]),
-                              case compile:file(File#erl.file, CompileOptions) of
-                                  {ok, Module}              -> ok;
-                                  {error, Errors, Warnings} ->
-                                      tep_pass:fail("compilation of ~s failed:~n~s~n~s", [File#erl.module, string:join(Errors, "\n"), string:join(Warnings, "\n")])
-                              end;
-                          false ->
-                              tep_log:debug("skip compile ~s", [File#erl.file]),
-                              ok
-                      end
-                  end, Sources);
+check("build:erlang") ->
+    EbinDir             = tetrapak:subdir("ebin"),
+    SrcDir              = tetrapak:subdir("src"),
+    Sources             = erlang_source_files(SrcDir),
+    ExtraCompileOptions = tetrapak:get("config:build:erlang:options", []),
+    CompileOptions      = [{outdir, EbinDir}, {i, "include"}, debug_info, return_errors] ++ ExtraCompileOptions,
+    FileList            =
+        lists:flatmap(fun (File) ->
+                          case needs_compile(CompileOptions, EbinDir, File) of
+                              true  -> [{File, CompileOptions}];
+                              false -> []
+                          end
+                      end, Sources),
+    case FileList of
+        [] -> done;
+        _  -> {needs_run, FileList}
+    end.
 
-pass_run({clean, erlang}, #tep_project{directory = Dir}, _Options) ->
-    EbinDir = filename:join(Dir, "ebin"),
-    tep_file:delete("\\.beam$", EbinDir).
+run("build:erlang", ErlFiles) ->
+    lists:foreach(fun ({File, CompileOptions}) ->
+                          tep_log:debug("compile ~s", [File#erl.file]),
+                          case compile:file(File#erl.file, CompileOptions) of
+                              {ok, Module}              -> ok;
+                              {error, Errors, Warnings} ->
+                                  tep_pass:fail("compilation of ~s failed:~n~s~n~s",
+                                                [File#erl.module, string:join(Errors, "\n"), string:join(Warnings, "\n")])
+                          end
+                  end, ErlFiles);
+
+run("clean:erlang", _) ->
+    tep_file:delete("\\.beam$", tetrapak:subdir("ebin")).
 
 %% ------------------------------------------------------------
 %% -- Helpers

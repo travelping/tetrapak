@@ -14,19 +14,25 @@ output(Fmt)       -> output(Fmt, []).
 output(Fmt, Args) -> lprintf("", Fmt, Args).
 
 info(Fmt)         -> info(Fmt, []).
-info(Fmt, Args)   -> lprintf("==", Fmt, Args).
+info(Fmt, Args)   -> lprintf("%%", Fmt, Args).
 
 warn(Fmt)         -> warn(Fmt, []).
 warn(Fmt, Args)   -> lprintf("!!", Fmt, Args).
 
 debug(Fmt) -> debug(Fmt, []).
-debug(Fmt, Args) -> 
+debug(Fmt, Args) ->
     case os:getenv("DEBUG") of
         false -> ok;
-        Value when (Value /= "") and (Value /= "false") and (Value /= "0") -> 
+        Value when (Value /= "") and (Value /= "false") and (Value /= "0") ->
             lprintf("--", Fmt, Args);
         _ -> ok
     end.
 
 lprintf(Pre, Fmt, Args) ->
-    io:format(standard_error, "~11s ~s " ++ Fmt ++ "~n", [io_lib:write(self()), Pre | Args]).
+    Pid = case os:getenv("DEBUG") of
+              false ->
+                  "";
+              Value when (Value /= "") and (Value /= "false") and (Value /= "0") ->
+                  io_lib:format("~11s ", [io_lib:write(self())])
+          end,
+    io:put_chars(standard_error, [Pid, Pre, $ , io_lib:fwrite(Fmt, Args), $\n]).

@@ -1,51 +1,41 @@
 #!/usr/bin/env escript
-% vim: filetype=erlang
+%% vim: filetype=erlang
+%%! -smp auto
 
 main([]) ->
     ensure_code_path(),
-    usage(server()),
+    usage(),
     halt(1);
 main([[$- | _] | _ ]) ->
     ensure_code_path(),
     io:format(standard_error, "Error: options should be specified after <command>~n", []),
-    usage(server()),
+    usage(),
     halt(1);
-main([Command | _Args]) ->
+main(Commands) ->
     ensure_code_path(),
-    Server = server(),
-    case tetrapak:run(Server, Command) of
-        {error, unknown_pass} ->
-            io:format(standard_error, "Error: no such command: ~s~n", [Command]),
-            usage(Server),
+    {ok, Cwd} = file:get_cwd(),
+    case tetrapak:run(Cwd, Commands) of
+        {unknown, Key} ->
+            io:format(standard_error, "Error: no such command: ~s~n", [Key]),
             halt(1);
-        {error, {fail, PassName, Message}} ->
-            io:format(standard_error, "Error in pass '~s': ~s~n", [PassName, Message]),
-            halt(101);
-        {error, Other} ->
-            io:format(standard_error, "Error: ~p~n", [Other]),
-            halt(101);
+        error ->
+            halt(2);
         ok ->
-            io:format(standard_error, "All done...\n", []),
             halt(0)
     end.
 
-server() ->
-    {ok, Cwd} = file:get_cwd(),
-    {ok, S} = tetrapak:start(Cwd),
-    S.
-
-usage(Server) ->
+usage() ->
   io:format(standard_error,
             "Usage: tetrapak <command> [ options ]~n~n"
             "Available Passes~n~s",
-            [tablist(tetrapak:all_commands(Server))]).
+            [tablist(tetrapak:all_commands())]).
 
 tablist(Lis) ->
     MaxWidth = lists:foldl(fun ({K, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),
     lists:foldr(fun ({Name, Desc}, Acc) ->
                    Space = lists:duplicate(MaxWidth - iolist_size(Name), $ ),
-                   ["  " ++ Name  ++ "    " ++ Space ++ Desc ++ "\n" | Acc]
-                end, [], lists:keysort(1, Lis)).
+                   ["  " ++ Name  ++ "  " ++ Space ++ "- " ++ Desc ++ "\n" | Acc]
+                end, [], Lis).
 
 ensure_code_path() ->
   RealPath = case file:read_link(?FILE) of
