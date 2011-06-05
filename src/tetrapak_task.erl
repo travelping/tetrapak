@@ -18,7 +18,6 @@
 -export([normalize_name/1, split_name/1, find_tasks/0]).
 
 -define(CTX, '$__tetrapak_task_context').
--define(FAIL, '$__tetrapak_task_fail').
 
 behaviour_info(exports) -> [{run, 2}].
 
@@ -27,11 +26,15 @@ worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context) 
     erlang:put(?CTX, Context),
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
-            tetrapak_context:signal_done(Context, TaskName, Variables);
+            tpk_log:debug("skipped: ~s", [TaskName]),
+            tetrapak_context:signal_done(Context, TaskName, Variables),
+            exit({?TASK_DONE, TaskName});
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
-                    tetrapak_context:signal_done(Context, TaskName, Variables)
+                    tpk_log:info("done: ~s", [TaskName]),
+                    tetrapak_context:signal_done(Context, TaskName, Variables),
+                    exit({?TASK_DONE, TaskName})
             end
     end.
 
@@ -90,13 +93,13 @@ try_run(TaskModule, TaskName, TaskData) ->
             handle_error(TaskName, Function, Class, Exn)
     end.
 
-handle_error(TaskName, Function, throw, {?FAIL, Message}) ->
+handle_error(TaskName, Function, throw, {?TASK_FAIL, Message}) ->
     tpk_log:warn("failed: ~s (in ~s):~n  ~s", [TaskName, Function, Message]),
-    exit({task_failed, TaskName});
+    exit({?TASK_FAIL, TaskName});
 handle_error(TaskName, Function, Class, Exn) ->
     tpk_log:warn("crashed: ~s (in ~s):~n  ~p:~p~n  ~p~n",
                  [TaskName, Function, Class, Exn, erlang:get_stacktrace()]),
-    exit({task_failed, TaskName}).
+    exit({?TASK_FAIL, TaskName}).
 
 do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
     lists:foldl(fun ({Key, Value}, Acc) ->
@@ -114,7 +117,7 @@ do_output_variables(Fun, _TaskName, _Variables) ->
     fail("~s returned an invalid key-value structure (not a proplist() | gb_tree())", [Fun]).
 
 fail(Fmt, Args) ->
-    throw({?FAIL, tpk_util:f(Fmt, Args)}).
+    throw({?TASK_FAIL, tpk_util:f(Fmt, Args)}).
 
 context() ->
     case erlang:get(?CTX) of

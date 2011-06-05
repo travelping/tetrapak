@@ -40,8 +40,7 @@ run(Directory, TaskCmds) ->
         {error, {unknown_key, Key}} ->
             {unknown, Key};
         {error, {failed, _Task}} ->
-            error; % unlikely
-        {error, shutdown} ->
+            tetrapak_context:wait_shutdown(Context),
             error
     end.
 
