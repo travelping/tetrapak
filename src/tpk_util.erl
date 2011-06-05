@@ -8,9 +8,8 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk_util).
--export([f/1, f/2, match/2, set_prop/3, find_module/1, mfile_to_mod/1]).
--export([run/2, run/3]).
--export([varsubst/2]).
+-export([f/1, f/2, match/2, unix_time/0, unix_time/1, run/2, run/3]).
+-export([varsubst/2, varsubst_file/2]).
 -export([parse_cmdline/3]).
 
 f(Str) -> f(Str,[]).
@@ -24,25 +23,12 @@ match(Re, String) ->
         nomatch -> false
     end.
 
-find_module(Name) ->
-    case catch Name:module_info() of
-        {'EXIT', _} -> {error, bad_module};
-        _           -> {ok, Name}
-    end.
-
-mfile_to_mod(Mfile) ->
-    list_to_atom(filename:rootname(filename:basename(Mfile))).
-
-set_prop(SetKey, SetValue, Alist) ->
-    F = fun ({Key, Value}, {Found, Res}) ->
-            if (Key == SetKey) -> {true,  [{Key, SetValue} | Res]};
-               true            -> {Found, [{Key, Value} | Res]}
-            end
-        end,
-    {Found, NewAlist} = lists:foldl(F, {false, []}, Alist),
-    if Found -> NewAlist;
-       true  -> [{SetKey, SetValue} | NewAlist]
-    end.
+unix_time() ->
+    unix_time(calendar:universal_time()).
+unix_time(DateTime) ->
+    Epoch = 62167219200,
+    Secs  = calendar:datetime_to_gregorian_seconds(DateTime),
+    Secs - Epoch.
 
 run(Prog, Args) ->
     {ok, Cwd} = file:get_cwd(),
@@ -81,6 +67,10 @@ varsubst(Text, Variables) ->
             vs_replace(Matches, 0, BinText, <<>>, Variables)
     end.
 
+varsubst_file(Infile, Variables) ->
+    {ok, Content} = file:read_file(Infile),
+    tpk_util:varsubst(Content, Variables).
+
 vs_replace([], _Offset, TextRest, Result, _Vars) -> <<Result/bytes, TextRest/bytes>>;
 vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
     VDLen = VStart - Start, BStart = Start - Offset,
@@ -116,11 +106,13 @@ parse_options([Arg | Rest], OptDesc, ArgDesc, NextIsArg, Result) ->
             parse_options(Rest, OptDesc, ArgDesc, true, Result);
         "-"  ++ _Name when not NextIsArg ->
             {{Key, Val}, TheRest} = parse_option(Arg, Rest, OptDesc),
-            parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, set_prop(Key, Val, Result));
+            NewResult = lists:keyreplace(1, Key, Result, {Key, Val}),
+            parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, NewResult);
         _ ->
             case ArgDesc of
                 [{arg, Name} | ArgDescRest] ->
-                    parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, set_prop(Name, Arg, Result));
+                    NewResult = lists:keyreplace(1, Name, Result, {Name, Arg}),
+                    parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, NewResult);
                 [] ->
                     io:format("error: superfluous argument: ~p~n", [Arg]),
                     throw({error, {superfluous_argument, Arg}})

@@ -42,16 +42,16 @@ otp_related_files(D) ->
     tpk_file:filter_useless(tpk_file:dir_contents(filename:join(D, "priv"))).
 
 file_target(_Pkg, "bin" ++ _) -> "usr/";
-file_target(Pkg, _Path)       -> "usr/lib/erlang/lib/" ++ Pkg.
+file_target(Pkg, _Path)       -> "usr/lib/erlang/lib/" ++ Pkg ++ "/".
 
 make_deb(PkgDir) ->
+    BaseDir = tetrapak:dir(),
     Name    = tetrapak:get("config:appfile:name"),
     Vsn     = tetrapak:get("config:appfile:vsn"),
     Pkg     = tpk_util:f("~s-~s", [Name, Vsn]),
     PkgName = tpk_util:f("erlang-~s", [Name]),
     Arch = "all",
     DebianName = no_underscores(PkgName),
-    PackageFiles = otp_related_files(tetrapak:dir()),
     DistDir = tetrapak:subdir(tetrapak:get("config:pkg:outdir", "dist")),
     file:make_dir(DistDir),
 
@@ -59,40 +59,43 @@ make_deb(PkgDir) ->
     file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
 
     %% data.tar.gz
-    DataDir = filename:join(PkgDir, "data"), tpk_file:mkdir(DataDir),
-    lists:foreach(fun (P) ->
-                          File = tpk_file:rebase_filename(P, tetrapak:dir(), ""),
-                          Target = filename:join([DataDir, file_target(Pkg, File), File]),
-                          tpk_file:copy(P, Target)
-                  end, PackageFiles),
-    tpk_file:make_tarball(filename:join(PkgDir, "data.tar.gz"), ".", DataDir, ".*"),
+    PackageFiles = lists:map(fun (P) ->
+                                     File = tpk_file:rebase_filename(P, BaseDir, ""),
+                                     Target = file_target(Pkg, File) ++ File,
+                                     {P, Target}
+                             end, otp_related_files(tetrapak:dir())),
+    {ok, DataTarball} = tpk_file:tarball_create(filename:join(PkgDir, "data.tar.gz")),
+    lists:foreach(fun ({P, Target}) -> tpk_file:tarball_add_file(DataTarball, P, Target, [dereference]) end, PackageFiles),
+    tpk_file:tarball_close(DataTarball),
 
     %% control.tar.gz
-    ControlDir = filename:join(PkgDir, "control"),
+    {ok, ControlTarball} = tpk_file:tarball_create(filename:join(PkgDir, "control.tar.gz")),
 
     %% copy control files with varsubst applied
     DepString = lists:map(fun (S) -> no_underscores(tpk_util:f(", erlang-~s", [S])) end,
                           lists:sort(tetrapak:get("config:appfile:deps"))),
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", "deb"]),
-    tpk_file:copy(TemplateDir, ControlDir),
-    tpk_file:walk(fun (P, _) ->
-                          tpk_file:varsubst([{"name", DebianName}, {"version", Vsn},
-                                             {"appname", Name}, {"appdeps", DepString},
-                                             {"desc", tetrapak:get("config:appfile:desc", "")}],
-                                            P, P)
-                  end, [], ControlDir),
+    tpk_file:walk(fun (CFile, _) ->
+                          Content = tpk_util:varsubst_file(CFile,
+                                                           [{"name", DebianName}, {"version", Vsn},
+                                                            {"appname", Name}, {"appdeps", DepString},
+                                                            {"desc", tetrapak:get("config:appfile:desc", "")}]),
+                          tpk_file:tarball_add_binary(ControlTarball, filename:basename(CFile), Content, [])
+                  end, [], TemplateDir),
 
     %% generate md5sums
-    Md5_File = filename:join(ControlDir, "md5sums"),
-    {ok, Md5} = file:open(Md5_File, [write]),
-    tpk_file:walk(fun (P, _) ->
-                          io:format(Md5, "~s ~s~n", [tpk_file:md5sum(P), tpk_file:rebase_filename(P, DataDir, "")])
-                  end, [], DataDir),
-    file:close(Md5),
+    Md5 = lists:foldl(fun ({P, Target}, Acc) ->
+                              {ok, CkSum} = tpk_file:md5sum(P),
+                              PN = list_to_binary(Target),
+                              <<Acc/binary, CkSum/binary, " ", PN/binary, "\n">>
+                      end, <<>>, PackageFiles),
+    tpk_file:tarball_add_binary(ControlTarball, "md5sums", Md5, []),
+    tpk_file:tarball_close(ControlTarball),
 
-    %% tarballize control files
-    tpk_file:make_tarball(filename:join(PkgDir, "control.tar.gz"), ".", ControlDir, ".*"),
+    tpk_file:copy(PkgDir ++ "/data.tar.gz", DistDir ++ "/data.tar.gz"),
+    tpk_file:copy(PkgDir ++ "/control.tar.gz", DistDir ++ "/control.tar.gz"),
 
+    %% write the actual .deb as an AR archive (sic!)
     DebFile = filename:join(DistDir, tpk_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
     make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
     DebFile.
@@ -119,4 +122,4 @@ make_ar(Outfile, Dir, Entries) ->
          file:close(Outfile)
      end.
 
-no_underscores(S) -> re:replace(S, "_", "-", [{return, list}]).
+no_underscores(S) -> re:replace(S, "_", "-", [global, {return, list}]).
