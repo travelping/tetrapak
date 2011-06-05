@@ -17,12 +17,13 @@
 %% ------------------------------------------------------------
 %% -- Task API
 check("clean:pkg:deb") ->
-    filelib:is_dir(tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).
+    DistDir = tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist")),
+    filelib:wildcard("*.deb", DistDir) /= [].
 
 run("pkg:deb", _) ->
     tetrapak_task:require_all(["build", "check"]),
 
-    DistDir = tetrapak:subdir(tetrapak:get("config:pkg:outdir", "dist")),
+    DistDir = tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist")),
     file:make_dir(DistDir),
 
     DebFile = tpk_file:with_temp_dir(fun make_deb/1),
@@ -91,9 +92,6 @@ make_deb(PkgDir) ->
                       end, <<>>, PackageFiles),
     tpk_file:tarball_add_binary(ControlTarball, "md5sums", Md5, []),
     tpk_file:tarball_close(ControlTarball),
-
-    tpk_file:copy(PkgDir ++ "/data.tar.gz", DistDir ++ "/data.tar.gz"),
-    tpk_file:copy(PkgDir ++ "/control.tar.gz", DistDir ++ "/control.tar.gz"),
 
     %% write the actual .deb as an AR archive (sic!)
     DebFile = filename:join(DistDir, tpk_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
