@@ -33,7 +33,7 @@ run("config:appfile", _) ->
     end;
 
 run("config:ini", _) ->
-    {done, gb_trees:to_list(project_config(tetrapak:dir()))}.
+    {done, project_config(tetrapak:dir())}.
 
 %% ------------------------------------------------------------
 %% -- Project info

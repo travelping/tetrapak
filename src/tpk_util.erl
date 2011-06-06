@@ -10,6 +10,7 @@
 -module(tpk_util).
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1]).
 -export([check_files_mtime/4]).
+-export([fold_tree/3]).
 -export([varsubst/2, varsubst_file/2]).
 -export([parse_cmdline/3]).
 
@@ -81,6 +82,15 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
                         <<Result/bytes, Before/bytes, PP/bytes>>
                 end,
     vs_replace(RM, Offset + BStart + Len, After, NewResult, Vars).
+
+fold_tree(Fun, Acc, Tree) ->
+    Iter = gb_trees:iterator(Tree),
+    fold_tree1(Fun, Acc, Iter).
+fold_tree1(Fun, Acc, Iterator) ->
+    case gb_trees:next(Iterator) of
+        none              -> Acc;
+        {Key, Val, Iter2} -> fold_tree1(Fun, Fun({Key, Val}, Acc), Iter2)
+    end.
 
 %% ------------------------------------------------------------
 %% -- getopt-style option parsing
