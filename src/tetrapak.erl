@@ -9,7 +9,7 @@
 
 -module(tetrapak).
 -export([all_commands/0, run/2]).
--export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/1, fail/2]).
+-export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2]).
 -compile({no_auto_import, [get/1]}).
 
 -include("tetrapak.hrl").
@@ -69,6 +69,8 @@ get(Key, Default) ->
         {error, unknown_key} -> Default
     end.
 
+fail() ->
+    tetrapak_task:fail().
 fail(Reason) ->
     tetrapak_task:fail(Reason, []).
 fail(Fmt, Args) ->

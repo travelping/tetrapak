@@ -22,10 +22,8 @@ task_done(Ctx, Task, Result) ->
     cast(Ctx, {done, Task, Result}).
 
 task_wants_output(Ctx, WorkerPid) ->
-    tpk_log:debug("signal_output ~p", [WorkerPid]),
     cast(Ctx, {want_output, WorkerPid}).
 task_output_done(Ctx, WorkerPid) ->
-    tpk_log:debug("signal_output_done ~p", [WorkerPid]),
     cast(Ctx, {output_done, WorkerPid}).
 
 get_cached(Ctx, Key) ->
@@ -154,7 +152,6 @@ shutdown_loop(Workers, Running, IOQueue) ->
     end.
 
 finish_output(IOQueue) ->
-    tpk_log:debug("finish_output ~p", [IOQueue]),
     case queue:peek(IOQueue) of
         empty -> ok;
         {value, {Worker, IOProc}} ->

@@ -13,14 +13,15 @@
 
 %% task behaviour functions
 -export([behaviour_info/1]).
--export([worker/2, context/0, fail/2, get/2, require_all/1]).
+-export([worker/2, context/0, fail/0, fail/2, get/2, require_all/1]).
 -export([output_collector/3]).
 %% misc
 -export([normalize_name/1, split_name/1, find_tasks/0]).
 
 -define(CTX, '$__tetrapak_task_context').
 
-behaviour_info(exports) -> [{run, 2}].
+behaviour_info(callbacks) -> [{run, 2}];
+behaviour_info(_) -> undefined.
 
 worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context) ->
     tpk_log:debug("worker: task ~s starting", [TaskName]),
@@ -96,8 +97,12 @@ try_run(TaskModule, TaskName, TaskData) ->
             handle_error(TaskName, Function, Class, Exn)
     end.
 
-handle_error(TaskName, Function, throw, {?TASK_FAIL, Message}) ->
-    io:format("failed in ~s~n~s~n", [Function, Message]),
+handle_error(TaskName, _Function, throw, {?TASK_FAIL, Message}) ->
+    case Message of
+        undefined -> ok;
+        _ ->
+            io:put_chars(["Error: ", Message, $\n])
+    end,
     exit({?TASK_FAIL, TaskName});
 handle_error(TaskName, Function, Class, Exn) ->
     io:format("crashed in ~s:~n~p:~p~n~p~n", [Function, Class, Exn, erlang:get_stacktrace()]),
@@ -118,6 +123,8 @@ do_output_variables(_Fun, TaskName, Tree = {Size, {_, _, _, _}}) when is_integer
 do_output_variables(Fun, _TaskName, _Variables) ->
     fail("~s returned an invalid key-value structure (not a proplist() | gb_tree())", [Fun]).
 
+fail() ->
+    throw({?TASK_FAIL, undefined}).
 fail(Fmt, Args) ->
     throw({?TASK_FAIL, tpk_util:f(Fmt, Args)}).
 
@@ -185,10 +192,8 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
     end.
 
 wait_output_ok(Context, TaskName, TaskProcess, Buffer) ->
-    tpk_log:debug("wait_output_ok"),
     receive
         {reply, Context, output_ok} ->
-            tpk_log:debug("output_ok"),
             print_output_header(TaskName),
             do_output(console, Buffer),
             tetrapak_context:task_output_done(Context, TaskProcess)

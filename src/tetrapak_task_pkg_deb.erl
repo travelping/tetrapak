@@ -27,7 +27,7 @@ run("pkg:deb", _) ->
     file:make_dir(DistDir),
 
     DebFile = tpk_file:with_temp_dir(fun make_deb/1),
-    tpk_log:info("packaging done, package is at: ~s", [DebFile]);
+    io:format("package: ~s~n", [DebFile]);
 
 run("clean:pkg:deb", _) ->
     tpk_file:delete("\\.deb$", tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).

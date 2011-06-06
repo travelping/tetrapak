@@ -25,7 +25,7 @@ run("doc:edoc", _) ->
     edoc:application(tetrapak:get("config:appfile:name"), [{dir, DD}]);
 
 run("clean:edoc", _) ->
-	DD = ?DOC_DIR,
-        tpk_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
-	file:del_dir(DD),
-	ok.
+    DD = ?DOC_DIR,
+    tpk_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
+    file:del_dir(DD),
+    ok.

@@ -26,7 +26,6 @@ run("check:xref", _) ->
 
 run("check:appmodules", _) ->
     tetrapak:require("build:erlang"),
-
     Mods  = tetrapak:get("config:appfile:modules"),
     Files = filelib:wildcard("*.beam", tetrapak:subdir("ebin")),
 
@@ -62,27 +61,29 @@ duplicates([Head|Tail], Seen, Dupli) ->
 xref_result({_, []}) ->
     ok;
 xref_result({undefined, Functions}) ->
-    tetrapak:fail("Undefined Functions called:~n~s", [fmt_functions(Functions)]);
+    io:format("Undefined Functions called:~n"),
+    fmt_functions(Functions),
+    tetrapak:fail();
 xref_result({deprecated, Functions}) ->
-    tpk_log:warn("Deprecated Functions called:~n~s", [fmt_functions(Functions)]);
+    io:format("Deprecated Functions called:~n"),
+    fmt_functions(Functions);
 xref_result({unused, Functions}) ->
-    tpk_log:warn("Unused functions:~n~s", [fmt_functions(Functions)]).
+    io:format("Unused functions called:~n"),
+    fmt_functions(Functions).
 
 fmt_functions(Functions) ->
     case Functions of
         [{T, _} | _] when is_tuple(T) ->
             %% detailed caller information is available
             SortedFunctions = lists:keysort(2, Functions),
-            {Output, _} = lists:foldl(fun ({{M1, F1, A1}, ThisCall}, {Acc, LastCall}) ->
-                                          C1 = io_lib:format("      by ~p:~p/~p~n", [M1,F1,A1]),
-                                          C2 = case ThisCall of
-                                                   LastCall     -> [];
-                                                   {M2, F2, A2} -> io_lib:format("    ~p:~p/~p~n", [M2,F2,A2])
-                                               end,
-                                          {[C1, C2 | Acc], ThisCall}
-                                      end, {[], undefined}, SortedFunctions),
-            lists:reverse(Output);
+            lists:foldl(fun ({{M1, F1, A1}, ThisCall}, LastCall) ->
+                                case ThisCall of
+                                    LastCall     -> [];
+                                    {M2, F2, A2} -> io:format("  ~p:~p/~p~n", [M2,F2,A2])
+                                end,
+                                io:format("    by ~p:~p/~p~n", [M1,F1,A1])
+                        end, undefined, SortedFunctions);
         _ ->
             %% no caller info
-            lists:map(fun ({M, F, A}) -> io_lib:format("    ~p:~p/~p~n", [M,F,A]) end, Functions)
+            lists:foreach(fun ({M, F, A}) -> io:format("  ~p:~p/~p~n", [M,F,A]) end, Functions)
     end.
