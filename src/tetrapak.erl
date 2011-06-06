@@ -48,10 +48,10 @@ run(Directory, TaskCmds) ->
 %% ------------------------------------------------------------
 %% -- Task API
 dir() ->
-    tetrapak_context:get_directory(tetrapak_task:context()).
+    tetrapak_task:directory().
 
 subdir(Dir) ->
-    filename:join(dir(), Dir).
+    filename:join(tetrapak_task:directory(), Dir).
 
 require(Key) ->
     tetrapak_task:require_all([Key]).

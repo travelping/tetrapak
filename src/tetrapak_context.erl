@@ -8,15 +8,12 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak_context).
--export([new/1, get_cached/2, wait_for/2, wait_shutdown/1, get_directory/1,
+-export([new/1, get_cached/2, wait_for/2, wait_shutdown/1,
          task_done/3, task_wants_output/2, task_output_done/2]).
 -export([init/1, loop/1]).
 
 -include("tetrapak.hrl").
 -define(TIMEOUT, 10000).
-
-get_directory(Ctx) ->
-    call(Ctx, get_directory, ?TIMEOUT).
 
 task_done(Ctx, Task, Result) ->
     cast(Ctx, {done, Task, Result}).
@@ -73,10 +70,6 @@ init(Directory) ->
 
 loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
     receive
-        {request, FromPid, get_directory} ->
-            reply(FromPid, LoopState#st.directory),
-            loop(LoopState);
-
         {request, FromPid, {get_cached, Key}} ->
             tpk_log:debug("ctx get: ~p ~p", [FromPid, Key]),
             case dict:find(Key, Cache) of
@@ -170,7 +163,7 @@ maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
             case gb_sets:is_member(TaskName, State#st.done) of
                 false ->
                     %% task has not been run yet, the caller needs to wait
-                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self()]),
+                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self(), State#st.directory]),
                     NewRunning = dict:store(TaskName, WorkerPid, State#st.running),
                     {State#st{running = NewRunning}, [WorkerPid | CallerWaitList]};
                 true ->

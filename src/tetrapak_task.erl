@@ -13,23 +13,37 @@
 
 %% task behaviour functions
 -export([behaviour_info/1]).
--export([worker/2, context/0, fail/0, fail/2, get/2, require_all/1]).
+-export([worker/3, context/0, directory/0, fail/0, fail/2, get/2, require_all/1]).
 -export([output_collector/3]).
 %% misc
 -export([normalize_name/1, split_name/1, find_tasks/0]).
 
 -define(CTX, '$__tetrapak_task_context').
+-define(DIRECTORY, '$__tetrapak_task_directory').
 
 behaviour_info(callbacks) -> [{run, 2}];
 behaviour_info(_) -> undefined.
 
-worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context) ->
+context() ->
+    case erlang:get(?CTX) of
+        Ctx when is_pid(Ctx) -> Ctx;
+        _AnythingElse        -> error(not_inside_task)
+    end.
+
+directory() ->
+    case erlang:get(?DIRECTORY) of
+        Ctx when is_list(Ctx) -> Ctx;
+        _AnythingElse         -> error(not_inside_task)
+    end.
+
+worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context, Directory) ->
     tpk_log:debug("worker: task ~s starting", [TaskName]),
 
     OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
     group_leader(OutputCollector, self()),
 
     erlang:put(?CTX, Context),
+    erlang:put(?DIRECTORY, Directory),
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
             tetrapak_context:task_done(Context, TaskName, Variables),
@@ -127,12 +141,6 @@ fail() ->
     throw({?TASK_FAIL, undefined}).
 fail(Fmt, Args) ->
     throw({?TASK_FAIL, tpk_util:f(Fmt, Args)}).
-
-context() ->
-    case erlang:get(?CTX) of
-        Ctx when is_pid(Ctx) -> Ctx;
-        _AnythingElse        -> error(not_inside_task)
-    end.
 
 get(Key, FailUnknown) ->
     case require_all([Key], FailUnknown) of
