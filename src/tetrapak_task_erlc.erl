@@ -47,7 +47,7 @@ check("build:erlang") ->
 
 run("build:erlang", ErlFiles) ->
     lists:foreach(fun ({File, CompileOptions}) ->
-                          tpk_log:debug("compile ~s", [File#erl.file]),
+                          io:format("compile ~s\n", [File#erl.file]),
                           case compile:file(File#erl.file, CompileOptions) of
                               {ok, _Module}             -> ok;
                               {error, Errors, Warnings} ->

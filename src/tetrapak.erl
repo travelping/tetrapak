@@ -36,6 +36,7 @@ run(Directory, TaskCmds) ->
     Context = tetrapak_context:new(Directory),
     case tetrapak_context:wait_for(Context, TaskCmds) of
         ok ->
+            tetrapak_context:wait_shutdown(Context),
             ok;
         {error, {unknown_key, Key}} ->
             {unknown, Key};

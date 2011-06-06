@@ -14,6 +14,7 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([worker/2, context/0, fail/2, get/2, require_all/1]).
+-export([output_collector/3]).
 %% misc
 -export([normalize_name/1, split_name/1, find_tasks/0]).
 
@@ -23,17 +24,19 @@ behaviour_info(exports) -> [{run, 2}].
 
 worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context) ->
     tpk_log:debug("worker: task ~s starting", [TaskName]),
+
+    OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
+    group_leader(OutputCollector, self()),
+
     erlang:put(?CTX, Context),
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
-            tpk_log:debug("skipped: ~s", [TaskName]),
-            tetrapak_context:signal_done(Context, TaskName, Variables),
+            tetrapak_context:task_done(Context, TaskName, Variables),
             exit({?TASK_DONE, TaskName});
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
-                    tpk_log:info("done: ~s", [TaskName]),
-                    tetrapak_context:signal_done(Context, TaskName, Variables),
+                    tetrapak_context:task_done(Context, TaskName, Variables),
                     exit({?TASK_DONE, TaskName})
             end
     end.
@@ -94,11 +97,10 @@ try_run(TaskModule, TaskName, TaskData) ->
     end.
 
 handle_error(TaskName, Function, throw, {?TASK_FAIL, Message}) ->
-    tpk_log:warn("failed: ~s (in ~s):~n  ~s", [TaskName, Function, Message]),
+    io:format("failed in ~s~n~s~n", [Function, Message]),
     exit({?TASK_FAIL, TaskName});
 handle_error(TaskName, Function, Class, Exn) ->
-    tpk_log:warn("crashed: ~s (in ~s):~n  ~p:~p~n  ~p~n",
-                 [TaskName, Function, Class, Exn, erlang:get_stacktrace()]),
+    io:format("crashed in ~s:~n~p:~p~n~p~n", [Function, Class, Exn, erlang:get_stacktrace()]),
     exit({?TASK_FAIL, TaskName}).
 
 do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
@@ -150,6 +152,77 @@ require_all(Keys, FailUnknown) when is_list(Keys) ->
                     fail("require/1 of unknown key: ~p", [Unknown])
             end
     end.
+
+%% ------------------------------------------------------------
+%% -- Output handler
+-define(LineWidth, 30).
+
+output_collector(Context, TaskName, TaskProcess) ->
+    receive
+        Req = {io_request, _, _, _} ->
+            process_flag(trap_exit, true),
+            tetrapak_context:task_wants_output(Context, TaskProcess),
+            Buffer = handle_io(Req, <<>>),
+            output_collector_loop(Context, TaskName, TaskProcess, Buffer)
+    end.
+
+output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
+    receive
+        Req = {io_request, _, _, _} ->
+            NewBuffer = handle_io(Req, Buffer),
+            output_collector_loop(Context, TaskName, TaskProcess, NewBuffer);
+        {reply, Context, output_ok} ->
+            print_output_header(TaskName),
+            do_output(console, Buffer),
+            output_collector_loop(Context, TaskName, TaskProcess, console);
+        {'EXIT', TaskProcess, _Reason} ->
+            case Buffer of
+                console ->
+                    tetrapak_context:task_output_done(Context, TaskProcess);
+                _ ->
+                    wait_output_ok(Context, TaskName, TaskProcess, Buffer)
+            end
+    end.
+
+wait_output_ok(Context, TaskName, TaskProcess, Buffer) ->
+    tpk_log:debug("wait_output_ok"),
+    receive
+        {reply, Context, output_ok} ->
+            tpk_log:debug("output_ok"),
+            print_output_header(TaskName),
+            do_output(console, Buffer),
+            tetrapak_context:task_output_done(Context, TaskProcess)
+    end.
+
+handle_io({io_request, From, ReplyAs, Request}, Buffer) ->
+    case ioreq_chars([Request], []) of
+        {notsup, Chars} ->
+            NewBuffer = do_output(Buffer, Chars),
+            From ! {io_reply, ReplyAs, {error, request}};
+        {ok, Chars} ->
+            NewBuffer = do_output(Buffer, Chars),
+            From ! {io_reply, ReplyAs, ok}
+    end,
+    NewBuffer.
+
+do_output(console, Chars) ->
+    io:put_chars(Chars),
+    console;
+do_output(Buffer, Chars) ->
+    <<Buffer/binary, (iolist_to_binary(Chars))/binary>>.
+
+ioreq_chars([{put_chars, _Enc, Chars} | R], Acc)   -> ioreq_chars(R, [Chars | Acc]);
+ioreq_chars([{put_chars, _Enc, M, F, A} | R], Acc) -> ioreq_chars(R, [apply(M, F, A) | Acc]);
+ioreq_chars([{put_chars, Chars} | R], Acc)         -> ioreq_chars(R, [Chars | Acc]);
+ioreq_chars([{put_chars, M, F, A} | R], Acc)       -> ioreq_chars(R, [apply(M, F, A) | Acc]);
+ioreq_chars([{requests, Requests} | _R], Acc)       -> ioreq_chars(Requests, Acc);
+ioreq_chars([_OtherRequest | _R], Acc) ->
+    {notsup, lists:reverse(Acc)};
+ioreq_chars([], Acc) ->
+    {ok, lists:reverse(Acc)}.
+
+print_output_header(TaskName) ->
+    io:put_chars(["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
 
 %% ------------------------------------------------------------
 %% -- Beam Scan

@@ -117,10 +117,8 @@ delete_if_match(Mask, Path) ->
         true ->
             case filelib:is_dir(Path) of
                 true  ->
-                    tpk_log:debug("rmdir ~s", [Path]),
                     file:del_dir(Path);
                 false ->
-                    tpk_log:debug("rm ~s", [Path]),
                     file:delete(Path)
             end;
         false -> ok

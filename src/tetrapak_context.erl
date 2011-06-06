@@ -8,7 +8,8 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak_context).
--export([new/1, get_cached/2, wait_for/2, wait_shutdown/1, get_directory/1, signal_done/3]).
+-export([new/1, get_cached/2, wait_for/2, wait_shutdown/1, get_directory/1,
+         task_done/3, task_wants_output/2, task_output_done/2]).
 -export([init/1, loop/1]).
 
 -include("tetrapak.hrl").
@@ -17,8 +18,15 @@
 get_directory(Ctx) ->
     call(Ctx, get_directory, ?TIMEOUT).
 
-signal_done(Ctx, Task, Result) ->
+task_done(Ctx, Task, Result) ->
     cast(Ctx, {done, Task, Result}).
+
+task_wants_output(Ctx, WorkerPid) ->
+    tpk_log:debug("signal_output ~p", [WorkerPid]),
+    cast(Ctx, {want_output, WorkerPid}).
+task_output_done(Ctx, WorkerPid) ->
+    tpk_log:debug("signal_output_done ~p", [WorkerPid]),
+    cast(Ctx, {output_done, WorkerPid}).
 
 get_cached(Ctx, Key) ->
     call(Ctx, {get_cached, Key}, ?TIMEOUT).
@@ -35,7 +43,7 @@ wait_loop(_Ctx, []) ->
     ok;
 wait_loop(Ctx, WaitList) ->
     receive
-        {'DOWN', MRef, process, _DownPid, {?TASK_DONE, Name}} ->
+        {'DOWN', MRef, process, _DownPid, {?TASK_DONE, _Name}} ->
             wait_loop(Ctx, lists:delete(MRef, WaitList));
         {'DOWN', _MRef, process, _DownPid, {?TASK_FAIL, Name}} ->
             {error, {failed, Name}}
@@ -54,7 +62,8 @@ wait_shutdown(Ctx) ->
     tasks                     :: [{string(), #task{}}],
     cache     = dict:new()    :: dict(),
     running   = dict:new()    :: dict(),
-    done      = gb_sets:new() :: set()
+    done      = gb_sets:new() :: set(),
+    io_queue  = queue:new()   :: queue()
 }).
 
 new(Directory) ->
@@ -64,7 +73,7 @@ init(Directory) ->
     process_flag(trap_exit, true),
     loop(#st{directory = Directory, tasks = tetrapak_task:find_tasks()}).
 
-loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done}) ->
+loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
     receive
         {request, FromPid, get_directory} ->
             reply(FromPid, LoopState#st.directory),
@@ -86,10 +95,24 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
                 TaskList ->
                     {NewLoopState, Wait} = lists:foldl(fun ({_, Task}, {LS, S}) ->
                                                               maybe_start_task(Task, LS, S)
-                                                      end, {LoopState, []}, TaskList),
+                                                       end, {LoopState, []}, TaskList),
                     reply(FromPid, {wait, Wait}),
                     loop(NewLoopState)
             end;
+
+        {cast, FromPid, {want_output, TaskWorker}} ->
+            case queue:is_empty(IOQueue) of
+                true  -> reply(FromPid, output_ok);
+                false -> ok
+            end,
+            loop(LoopState#st{io_queue = queue:in({TaskWorker, FromPid}, IOQueue)});
+
+        {cast, _FromPid, {output_done, _TaskWorker}} ->
+            case queue:out(IOQueue) of
+                {empty, NewIOQueue}                              -> ok;
+                {{value, {_NextWorker, NextIOProc}}, NewIOQueue} -> reply(NextIOProc, output_ok)
+            end,
+            loop(LoopState#st{io_queue = NewIOQueue});
 
         {cast, _FromPid, {done, Task, Variables}} ->
             NewCache  = dict:merge(fun (Key, _V1, V2) ->
@@ -98,7 +121,14 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
                                    end, Cache, Variables),
             NewRunning = dict:erase(Task, Running),
             NewDone    = gb_sets:insert(Task, Done),
-            loop(LoopState#st{cache = NewCache, done = NewDone, running = NewRunning});
+
+            case dict:size(NewRunning) of
+                0 ->
+                    %% we're done
+                    finish_output(IOQueue);
+                _ ->
+                    loop(LoopState#st{cache = NewCache, done = NewDone, running = NewRunning})
+            end;
 
         {'EXIT', _DeadPid, {?TASK_DONE, _Name}} ->
             loop(LoopState);
@@ -110,18 +140,29 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             tpk_log:debug("ctx other ~p", [Other])
     end.
 
-shutdown(#st{running = Running}, FailedPid) ->
+shutdown(#st{running = Running, io_queue = IOQueue}, FailedPid) ->
    RList   = dict:to_list(Running),
    Workers = [Pid || {_Name, Pid} <- RList, Pid /= FailedPid],
-   shutdown_loop(Workers, Running).
+   shutdown_loop(Workers, Running, IOQueue).
 
-shutdown_loop([], _Running) -> ok;
-shutdown_loop(Workers, Running) ->
+shutdown_loop([], _Running, IOQueue) ->
+    finish_output(IOQueue);
+shutdown_loop(Workers, Running, IOQueue) ->
     receive
         {'EXIT', Pid, {?TASK_FAIL, _TaskName}} ->
-            shutdown_loop(lists:delete(Pid, Workers), Running);
-        OtherMsg ->
-            tpk_log:debug("ctx shutdown other ~p", [OtherMsg])
+            shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue)
+    end.
+
+finish_output(IOQueue) ->
+    tpk_log:debug("finish_output ~p", [IOQueue]),
+    case queue:peek(IOQueue) of
+        empty -> ok;
+        {value, {Worker, IOProc}} ->
+            reply(IOProc, output_ok),
+            receive
+                {cast, IOProc, {output_done, Worker}} ->
+                    finish_output(queue:drop(IOQueue))
+            end
     end.
 
 maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
@@ -171,9 +212,6 @@ call(Ctx, Request) ->
     call(Ctx, Request, infinity).
 call(Ctx, Request, Timeout) ->
     Ctx ! {request, self(), Request},
-    get_response(Ctx, Timeout).
-
-get_response(Ctx, Timeout) ->
     receive
         {reply, Ctx, Reply} -> Reply
     after
