@@ -8,7 +8,8 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk_util).
--export([f/1, f/2, match/2, unix_time/0, unix_time/1, run/2, run/3]).
+-export([f/1, f/2, match/2, unix_time/0, unix_time/1]).
+-export([check_files_mtime/4]).
 -export([varsubst/2, varsubst_file/2]).
 -export([parse_cmdline/3]).
 
@@ -30,33 +31,29 @@ unix_time(DateTime) ->
     Secs  = calendar:datetime_to_gregorian_seconds(DateTime),
     Secs - Epoch.
 
-run(Prog, Args) ->
-    {ok, Cwd} = file:get_cwd(),
-    run(Prog, Args, Cwd).
-run(Prog, Args, Dir) ->
-    tpk_log:debug("running command ~s ~s", [Prog, string:join(Args, " ")]),
-    case os:find_executable(Prog) of
-        false -> {error, no_such_program};
-        Cmd ->
-            Port = erlang:open_port({spawn_executable, Cmd},
-                                    [{cd, Dir}, in, exit_status, stderr_to_stdout, {args, Args}, {line, 400}]),
-            display_output(Port)
-    end.
-
-display_output(Port) ->
-    receive
-        {Port, {data, {Eol, Line}}} ->
-            tpk_log:output(case Eol of
-                               eol -> "~s~n";
-                               noeol -> "~s"
-                           end, [Line]),
-            display_output(Port);
-        {Port, {exit_status, 0}} ->
-            {exit, ok};
-        {Port, {exit_status, _}} ->
-            {exit, error};
-        {Port, closed} ->
-            {exit, error}
+check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
+    Files =
+      tpk_file:walk(fun (Path, Acc) ->
+                            case lists:suffix(Suffix1, Path) of
+                                true ->
+                                    InOtherDir = filename:join(Dir2, tpk_file:rebase_filename(Path, Dir1, Dir2)),
+                                    WithoutSuffix = string:substr(InOtherDir, 1, length(InOtherDir) - length(Suffix1)),
+                                    OtherPath = WithoutSuffix ++ Suffix2,
+                                    case filelib:is_regular(OtherPath) of
+                                        true ->
+                                            case tpk_file:mtime(OtherPath) =< tpk_file:mtime(Path) of
+                                                true  -> [{Path, OtherPath} | Acc];
+                                                false -> Acc
+                                            end;
+                                        false ->
+                                            [{Path, OtherPath} | Acc]
+                                    end;
+                                false -> Acc
+                            end
+                    end, [], Dir1),
+    case Files of
+        [] -> done;
+        _  -> {needs_run, Files}
     end.
 
 varsubst(Text, Variables) ->

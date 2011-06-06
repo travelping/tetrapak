@@ -11,7 +11,9 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--task({"build:erlang", "Build Erlang modules"}).
+-task({"build:erlang", "Compile Erlang modules"}).
+-task({"build:yecc",   "Compile yecc parsers (.yrl) to Erlang"}).
+-task({"build:leex",   "Compile lexical analysers (.xrl) to Erlang"}).
 -task({"clean:erlang", "Delete compiled Erlang modules"}).
 
 -record(erl, {
@@ -27,6 +29,7 @@
 %% ------------------------------------------------------------
 %% -- Task API
 check("build:erlang") ->
+    tetrapak:require(["build:yecc"]),
     EbinDir             = tetrapak:subdir("ebin"),
     SrcDir              = tetrapak:subdir("src"),
     ExtraCompileOptions = tetrapak:get("config:ini:build:erlc_options", []),
@@ -43,34 +46,63 @@ check("build:erlang") ->
     case FileList of
         [] -> done;
         _  -> {needs_run, FileList}
-    end.
+    end;
+
+check("build:yecc") ->
+    SrcDir = tetrapak:subdir("src"),
+    tpk_util:check_files_mtime(SrcDir, ".yrl", SrcDir, ".erl");
+
+check("build:leex") ->
+    SrcDir = tetrapak:subdir("src"),
+    tpk_util:check_files_mtime(SrcDir, ".xrl", SrcDir, ".erl").
 
 run("build:erlang", ErlFiles) ->
-    BaseDir = tetrapak:dir(),
-    EbinDir = tetrapak:subdir("ebin"),
-    Fail = lists:foldr(fun ({File, CompileOptions}, DoFail) ->
-                               try_load(EbinDir, File#erl.behaviours),
-                               case compile:file(File#erl.file, CompileOptions) of
-                                   {ok, _Module} ->
-                                       DoFail;
-                                   {ok, _Module, Warnings} ->
-                                       show_errors(BaseDir, "Warning: ", Warnings),
-                                       DoFail;
-                                   {error, Errors, Warnings} ->
-                                       show_errors(BaseDir, "Error: ", Errors),
-                                       show_errors(BaseDir, "Warning: ", Warnings),
-                                       true
-                               end
-                       end, false, ErlFiles),
-    if Fail -> tetrapak:fail();
-       true -> ok
-    end;
+    compile_foreach(fun ({File, CompileOptions}) ->
+                            try_load(tetrapak:subdir("ebin"), File#erl.behaviours),
+                            run_compiler(compile, file, [File#erl.file, CompileOptions])
+                    end, ErlFiles);
+
+run("build:yecc", Files) ->
+    compile_foreach(fun ({InputFile, OutputFile}) ->
+                            run_compiler(yecc, file, [InputFile, [{parserfile, OutputFile}, {return, true}, {report, false}]])
+                    end, Files);
+
+run("build:leex", Files) ->
+    compile_foreach(fun ({InputFile, OutputFile}) ->
+                            run_compiler(leex, file, [InputFile, [{scannerfile, OutputFile}, {return, true}, {report, false}]])
+                    end, Files);
 
 run("clean:erlang", _) ->
     tpk_file:delete("\\.beam$", tetrapak:subdir("ebin")).
 
 %% ------------------------------------------------------------
 %% -- Helpers
+compile_foreach(Function, List) ->
+    Res = lists:foldl(fun (Item, DoFail) ->
+                              case Function(Item) of
+                                  ok    -> DoFail;
+                                  error -> true
+                              end
+                      end, false, List),
+    if Res  -> tetrapak:fail("compilation failed");
+       true -> ok
+    end.
+
+run_compiler(M, F, A) ->
+    BaseDir = tetrapak:dir(),
+    case apply(M, F, A) of
+        {ok, _Module} -> ok;
+        {ok, _Module, Warnings} ->
+            show_errors(BaseDir, "Warning: ", Warnings),
+            ok;
+        error ->
+            error;
+        {error, Errors, Warnings} ->
+            show_errors(BaseDir, "Error: ", Errors),
+            show_errors(BaseDir, "Warning: ", Warnings),
+            error
+    end.
+
 show_errors(BaseDir, Prefix, Errors) ->
     lists:foreach(fun ({FileName, FileErrors}) ->
                           case lists:prefix(BaseDir, FileName) of
@@ -84,8 +116,9 @@ show_errors(BaseDir, Prefix, Errors) ->
                                         end, FileErrors)
                   end, Errors).
 
-compile_order(File1, File2) ->
-    lists:member(File1#erl.module, File2#erl.behaviours).
+compile_order(File1, _File2) ->
+    lists:member({behaviour_info, 1}, proplists:get_value(export, File1#erl.attributes, [])) or
+    lists:member({parse_transform, 2}, proplists:get_value(export, File1#erl.attributes, [])).
 
 try_load(EbinDir, ModList) ->
     lists:foreach(fun (Mod) ->
