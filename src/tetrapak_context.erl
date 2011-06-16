@@ -44,10 +44,10 @@ wait_loop(Ctx, WaitList) ->
             {error, {failed, Name}}
     end.
 
-wait_shutdown(Ctx) ->
-    MRef = monitor(process, Ctx),
+wait_shutdown(Process) ->
+    MRef = monitor(process, Process),
     receive
-        {'DOWN', MRef, process, Ctx, _Info} -> ok
+        {'DOWN', MRef, process, Process, _Info} -> ok
     end.
 
 %% ------------------------------------------------------------

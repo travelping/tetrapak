@@ -1,47 +1,5 @@
-#!/usr/bin/env escript
-%% vim: filetype=erlang
-%%! -smp auto
+#!/bin/sh
 
-main([]) ->
-    ensure_code_path(),
-    usage(),
-    halt(1);
-main([[$- | _] | _ ]) ->
-    ensure_code_path(),
-    io:format(standard_error, "Error: options should be specified after <command>~n", []),
-    usage(),
-    halt(1);
-main(Commands) ->
-    ensure_code_path(),
-    {ok, Cwd} = file:get_cwd(),
-    case tetrapak:run(Cwd, Commands) of
-        {unknown, Key} ->
-            io:format(standard_error, "Error: no such command: ~s~n", [Key]),
-            halt(1);
-        error ->
-            halt(2);
-        ok ->
-            halt(0)
-    end.
+HERE=`dirname $0`
 
-usage() ->
-  io:format(standard_error,
-            "Usage: tetrapak <command> [ options ]~n~n"
-            "Available Tasks~n~s",
-            [tablist(tetrapak:all_commands())]).
-
-tablist(Lis) ->
-    MaxWidth = lists:foldl(fun ({K, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),
-    lists:foldr(fun ({Name, Desc}, Acc) ->
-                   Space = lists:duplicate(MaxWidth - iolist_size(Name), $ ),
-                   ["  " ++ Name  ++ "  " ++ Space ++ "- " ++ Desc ++ "\n" | Acc]
-                end, [], Lis).
-
-ensure_code_path() ->
-  RealPath = case file:read_link(?FILE) of
-    {ok, R} -> R;
-    {error, einval} -> ?FILE;
-    {error, enotsup} -> ?FILE
-  end,
-  Root = filename:absname(filename:dirname(filename:dirname(RealPath))),
-  code:add_patha(filename:join(Root, "ebin")).
+exec erl -pa "$HERE/../ebin" -noinput -noshell -user tetrapak_io -smp auto -run tetrapak_cli boot -- $@

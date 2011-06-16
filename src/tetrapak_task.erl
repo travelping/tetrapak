@@ -46,11 +46,13 @@ worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context, 
     erlang:put(?DIRECTORY, Directory),
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
+            tpk_log:debug("worker: check/1 -> done"),
             tetrapak_context:task_done(Context, TaskName, Variables),
             exit({?TASK_DONE, TaskName});
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
+                    tpk_log:debug("worker: run/2 -> done"),
                     tetrapak_context:task_done(Context, TaskName, Variables),
                     exit({?TASK_DONE, TaskName})
             end
@@ -188,7 +190,7 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
             output_collector_loop(Context, TaskName, TaskProcess, NewBuffer);
         {reply, Context, output_ok} ->
             print_output_header(TaskName),
-            do_output(console, Buffer),
+            io:put_chars(Buffer),
             output_collector_loop(Context, TaskName, TaskProcess, console);
         {'EXIT', TaskProcess, _Reason} ->
             case Buffer of
@@ -203,36 +205,21 @@ wait_output_ok(Context, TaskName, TaskProcess, Buffer) ->
     receive
         {reply, Context, output_ok} ->
             print_output_header(TaskName),
-            do_output(console, Buffer),
+            io:put_chars(Buffer),
             tetrapak_context:task_output_done(Context, TaskProcess)
     end.
 
+handle_io(Req, console) ->
+    group_leader() ! Req,
+    console;
 handle_io({io_request, From, ReplyAs, Request}, Buffer) ->
-    case ioreq_chars([Request], []) of
-        {notsup, Chars} ->
-            NewBuffer = do_output(Buffer, Chars),
-            From ! {io_reply, ReplyAs, {error, request}};
-        {ok, Chars} ->
-            NewBuffer = do_output(Buffer, Chars),
-            From ! {io_reply, ReplyAs, ok}
-    end,
+    {Reply, Chars} = tetrapak_io:ioreq_output(Request),
+    NewBuffer = do_output(Buffer, Chars),
+    From ! {io_reply, ReplyAs, Reply},
     NewBuffer.
 
-do_output(console, Chars) ->
-    io:put_chars(Chars),
-    console;
 do_output(Buffer, Chars) ->
     <<Buffer/binary, (iolist_to_binary(Chars))/binary>>.
-
-ioreq_chars([{put_chars, _Enc, Chars} | R], Acc)   -> ioreq_chars(R, [Chars | Acc]);
-ioreq_chars([{put_chars, _Enc, M, F, A} | R], Acc) -> ioreq_chars(R, [apply(M, F, A) | Acc]);
-ioreq_chars([{put_chars, Chars} | R], Acc)         -> ioreq_chars(R, [Chars | Acc]);
-ioreq_chars([{put_chars, M, F, A} | R], Acc)       -> ioreq_chars(R, [apply(M, F, A) | Acc]);
-ioreq_chars([{requests, Requests} | _R], Acc)       -> ioreq_chars(Requests, Acc);
-ioreq_chars([_OtherRequest | _R], Acc) ->
-    {notsup, lists:reverse(Acc)};
-ioreq_chars([], Acc) ->
-    {ok, lists:reverse(Acc)}.
 
 print_output_header(TaskName) ->
     io:put_chars(["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
