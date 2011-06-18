@@ -11,9 +11,6 @@
 -behaviour(tetrapak_task).
 -export([run/2]).
 
--task({"check:xref", "Check inter-module calls"}).
--task({"check:appmodules", "Check app file module list"}).
-
 %% ------------------------------------------------------------
 %% -- Task API
 run("check:xref", _) ->

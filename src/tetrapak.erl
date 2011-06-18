@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak).
--export([all_commands/0, run/2]).
+-export([run/2]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2]).
 -compile({no_auto_import, [get/1]}).
 
@@ -29,9 +29,6 @@
 
 %% ------------------------------------------------------------
 %% -- Ext API
-all_commands() ->
-    [{Task#task.name, Task#task.description} || {_, Task} <- lists:keysort(1, tetrapak_task:find_tasks())].
-
 run(Directory, TaskCmds) ->
     Context = tetrapak_context:new(Directory),
     case tetrapak_context:wait_for(Context, TaskCmds) of

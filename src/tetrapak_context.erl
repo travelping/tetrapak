@@ -66,7 +66,7 @@ new(Directory) ->
 
 init(Directory) ->
     process_flag(trap_exit, true),
-    loop(#st{directory = Directory, tasks = tetrapak_task:find_tasks()}).
+    loop(#st{directory = Directory, tasks = tetrapak_task:builtin_tasks()}).
 
 loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
     receive

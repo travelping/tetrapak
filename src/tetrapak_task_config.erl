@@ -12,9 +12,6 @@
 -export([project_config/1, read_ini_file/1]).
 -export([run/2]).
 
--task({"config:appfile", "Read the application resource file"}).
--task({"config:ini",     "Read the tetrapak config file"}).
-
 run("config:appfile", _) ->
     Dir  = tetrapak:dir(),
     Ebin = filename:join(Dir, "ebin"),

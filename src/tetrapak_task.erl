@@ -16,7 +16,7 @@
 -export([worker/3, context/0, directory/0, fail/0, fail/2, get/2, require_all/1]).
 -export([output_collector/3]).
 %% misc
--export([normalize_name/1, split_name/1, find_tasks/0]).
+-export([normalize_name/1, split_name/1, builtin_tasks/0]).
 
 -define(CTX, '$__tetrapak_task_context').
 -define(DIRECTORY, '$__tetrapak_task_directory').
@@ -226,47 +226,17 @@ print_output_header(TaskName) ->
 
 %% ------------------------------------------------------------
 %% -- Beam Scan
-find_tasks() ->
-    find_tasks([code:lib_dir(tetrapak, ebin)]).
-find_tasks(Directories) ->
-    lists:foldl(fun (Dir, OuterModAcc) ->
-                   tpk_log:debug("checking for task modules in ~s", [Dir]),
-                   tpk_file:walk(fun (File, ModAcc) ->
-                                    case is_task_module(File) of
-                                        false              -> ModAcc;
-                                        {Module, TaskDefs} -> store_defs(Module, TaskDefs, ModAcc)
-                                    end
-                                  end, OuterModAcc, Dir)
-                end, [], Directories).
-
-is_task_module(Mfile) ->
-    case filename:extension(Mfile) of
-        ".beam" ->
-            {ok, {ModuleName, Chunks}} = beam_lib:chunks(Mfile, [attributes]),
-            Attributes = proplists:get_value(attributes, Chunks, []),
-            IsTask = lists:member(?MODULE, proplists:get_value(behaviour, Attributes, [])) orelse
-                     lists:member(?MODULE, proplists:get_value(behavior, Attributes, [])),
-            if
-                IsTask ->
-                    case proplists:get_value(task, Attributes) of
-                        undefined -> false;
-                        InfoList  -> {ModuleName, lists:flatten(InfoList)}
-                    end;
-                true ->
-                    false
-            end;
-        _ ->
-            false
-    end.
-
-store_defs(Module, List, TaskMap) ->
-    lists:foldl(fun ({TaskName, Desc}, Acc) ->
+builtin_tasks() ->
+    AppFile = code:where_is_file("tetrapak.app"),
+    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
+    Tasks = proplists:get_value(tasks, proplists:get_value(tetrapak, Props, [])),
+    lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
                         NewTask   = #task{name = normalize_name(TaskName),
                                           modules = [Module],
                                           description = Desc},
                         AddModule = fun (#task{modules = OldMods}) -> NewTask#task{modules = [Module | OldMods]} end,
                         pl_update(split_name(TaskName), AddModule, NewTask, Acc)
-               end, TaskMap, List).
+                end, [], Tasks).
 
 pl_update(Key, AddItem, NewItem, Proplist) ->
     case proplists:get_value(Key, Proplist) of

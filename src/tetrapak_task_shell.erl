@@ -11,8 +11,6 @@
 -behaviour(tetrapak_task).
 -export([run/2]).
 
--task({"shell", "Start the Erlang shell"}).
-
 run("shell", _) ->
     code:add_patha(tetrapak:subdir("ebin")),
     case tetrapak_io:can_start_shell() of

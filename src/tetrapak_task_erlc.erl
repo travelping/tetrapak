@@ -11,11 +11,6 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--task({"build:erlang", "Compile Erlang modules"}).
--task({"build:yecc",   "Compile yecc parsers (.yrl) to Erlang"}).
--task({"build:leex",   "Compile lexical analysers (.xrl) to Erlang"}).
--task({"clean:erlang", "Delete compiled Erlang modules"}).
-
 -record(erl, {
     file,
     module,

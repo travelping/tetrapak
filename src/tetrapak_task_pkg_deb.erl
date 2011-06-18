@@ -11,9 +11,6 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--task({"pkg:deb", "Create a binary debian package"}).
--task({"clean:pkg:deb", "Delete debian packages"}).
-
 %% ------------------------------------------------------------
 %% -- Task API
 check("clean:pkg:deb") ->

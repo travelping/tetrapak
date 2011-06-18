@@ -11,6 +11,8 @@
 -export([boot/0, start/1]).
 -export([shell_dummy/0]).
 
+-include("tetrapak.hrl").
+
 boot() ->
     start(init:get_plain_arguments()).
 
@@ -32,8 +34,11 @@ start(Commands) ->
 usage() ->
     io:format(standard_error,
               "Usage: tetrapak <command> [ options ]~n~n"
-              "Available Tasks~n~s",
-              [tablist(tetrapak:all_commands())]).
+              "Builtin Tasks~n~s",
+              [tablist(all_commands())]).
+
+all_commands() ->
+    [{Task#task.name, Task#task.description} || {_, Task} <- lists:keysort(1, tetrapak_task:builtin_tasks())].
 
 tablist(Lis) ->
     MaxWidth = lists:foldl(fun ({K, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),

@@ -11,9 +11,6 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--task({"doc:edoc", "Generate edoc documentation"}).
--task({"clean:edoc", "Delete generated documentation"}).
-
 -define(DOC_DIR, tetrapak:subdir(tetrapak:get("config:ini:doc:directory", "doc"))).
 
 check("clean:edoc") ->
