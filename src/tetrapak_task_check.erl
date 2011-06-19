@@ -65,7 +65,7 @@ xref_result({deprecated, Functions}) ->
     io:format("Deprecated Functions called:~n"),
     fmt_functions(Functions);
 xref_result({unused, Functions}) ->
-    io:format("Unused functions called:~n"),
+    io:format("Unused functions:~n"),
     fmt_functions(Functions).
 
 fmt_functions(Functions) ->

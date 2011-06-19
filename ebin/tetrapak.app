@@ -7,6 +7,8 @@
              tetrapak_task,
              tetrapak_cli,
              tetrapak_io,
+             tetrapak_ini_parser,
+             tetrapak_ini_lexer,
              tpk_util,
              tpk_file,
              tpk_log,

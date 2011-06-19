@@ -96,99 +96,37 @@ read_config(File) ->
     read_config(File, gb_trees:empty()).
 read_config(File, Tree) ->
     case read_ini_file(File, Tree) of
-        {error, enoent} ->
-            tpk_log:debug("config file ~s does not exist", [File]),
+        {error, {file, enoent}} ->
             {ok, gb_trees:empty()};
-        {error, Error} ->
-            {error, Error};
         {ok, ConfigTree} ->
-            tpk_log:debug("read config file ~s", [File]),
-            {ok, ConfigTree}
+            {ok, ConfigTree};
+        {error, Error} ->
+            fmt_error(File, Error),
+            tetrapak:fail()
     end.
 
-ckey(Section, Key) ->
-    Section ++ ":" ++ Key.
-
-%% ------------------------------------------------------------
-%% -- INI files
 read_ini_file(Filename) ->
     read_ini_file(Filename, gb_trees:empty()).
 read_ini_file(Filename, Tree) ->
-    case file:open(Filename, [read]) of
-        {ok, File} ->
-            case read_ini_lines(File, 1, "", Tree) of
-                {parse_error, Line, Message} ->
-                    tpk_log:warn("parse error in ~s:~b: ~s", [Filename, Line, Message]),
-                    file:close(File),
-                    {error, parse_error};
-                {ok, Values} ->
-                    file:close(File),
-                    {ok, Values}
+    case tetrapak_ini_lexer:file(Filename) of
+        {ok, Tokens, _Endl} ->
+            case tetrapak_ini_parser:parse(Tokens) of
+                {ok, Sections} -> {ok, do_sections(Sections, Tree)};
+                Error          -> Error
             end;
-        {error, Error} ->
-            {error, Error}
+        Error -> Error
     end.
 
-read_ini_lines(File, Line, Section, Acc) ->
-    case file:read_line(File) of
-        eof        -> {ok, Acc};
-        {ok, Data} ->
-            try ini_line(string:strip(string:strip(Data, right, $\n))) of
-                {section, NewSection} ->
-                    read_ini_lines(File, Line + 1, NewSection, Acc);
-                {value, Key, Value} ->
-                    NewAcc = gb_trees:enter(ckey(Section, Key), Value, Acc),
-                    read_ini_lines(File, Line + 1, Section, NewAcc);
-                comment ->
-                    read_ini_lines(File, Line + 1, Section, Acc)
-            catch
-                {parse_error, Message} ->
-                    {parse_error, Line, Message}
-            end
-    end.
+do_sections(SList, Tree) ->
+    lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
+                        lists:foldl(fun ({Key, Value}, InnerAcc) ->
+                                            gb_trees:enter(SName ++ "." ++ Key, Value, InnerAcc)
+                                    end, OuterAcc, Props)
+                end, Tree, SList).
 
-ini_line("")                 -> comment;
-ini_line(";" ++ _Comment)    -> comment;
-ini_line("[" ++ SectionDecl) ->
-    case re:run(SectionDecl, "([^\\]]+)\\].*", [{capture, all_but_first, list}]) of
-        {match, [Section]} -> {section, Section};
-        nomatch            -> throw({parse_error, "invalid section declaration"})
-    end;
-ini_line(Assignment) ->
-    case re:run(Assignment, "^([\\w-]*)\\s*=\\s*([^;]*).*$", [{capture, all_but_first, list}]) of
-        {match, ["", _Value]} -> throw({parse_error, "assignment to without key"});
-        {match, [Key, Value]} -> {value, Key, ini_value(Value)};
-        nomatch               -> throw({parse_error, "invalid assignment"})
-    end.
-
-ini_value(Value) ->
-    case (catch list_to_integer(Value)) of
-        Int when is_integer(Int) ->
-            Int;
-        {'EXIT', {badarg, _}} ->
-            case Value of
-                []    -> throw({parse_error, "assignment of empty value"});
-                [Start | _] ->
-                    case lists:member(Start, "\"[{") of
-                        true ->
-                            case read_term(Value) of
-                                {ok, Term}       -> Term;
-                                {error, Message} -> throw({parse_error, Message})
-                            end;
-                        false ->
-                            string:strip(Value)
-                    end
-            end
-    end.
-
-read_term(String) ->
-    case erl_scan:string(String) of
-        {ok, Tokens, _End} ->
-            case erl_parse:parse_term(Tokens ++ [{dot, 1}]) of
-                {ok, Term} -> {ok, Term};
-                {error, {_Loc, erl_parse, ParseError}} ->
-                    {error, erl_parse:format_error(ParseError)}
-            end;
-        {error, {_Loc, erl_scan, ScanError}, _EndLoc} ->
-            {error, erl_scan:format_error(ScanError)}
-    end.
+fmt_error(File, {Line, Module, ErrorDesc}) ->
+    English = Module:format_error(ErrorDesc),
+    io:format("~s:~b: Error: ~s~n", [File, Line, English]);
+fmt_error(File, {file, Error}) ->
+    English = file:format_error(Error),
+    io:format("~s: Error: ~s~n", [File, English]).

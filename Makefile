@@ -14,13 +14,26 @@ SRC_DIR     = $(CURDIR)/src
 EBIN_DIR    = $(CURDIR)/ebin
 INCLUDE_DIR = $(CURDIR)/include
 
+GRAMMAR     = $(SRC_DIR)/tetrapak_ini_parser.yrl
+GRAMMAR_ERL = $(SRC_DIR)/tetrapak_ini_parser.erl
+
+LEXER       = $(SRC_DIR)/tetrapak_ini_lexer.xrl
+LEXER_ERL   = $(SRC_DIR)/tetrapak_ini_lexer.erl
+
 .PHONY: all clean doc shell 
 
-all:
+all: $(LEXER_ERL) $(GRAMMAR_ERL)
 	$(ERL) -pa $(EBIN_DIR) -noinput -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
 
 clean:
+	rm -f $(GRAMMAR_ERL)
 	rm -f $(EBIN_DIR)/*.beam
 
 shell: all
 	$(ERL) -pa $(EBIN_DIR)
+
+$(LEXER_ERL): $(LEXER)
+	$(ERLC) -o $(SRC_DIR) $<
+
+$(GRAMMAR_ERL): $(GRAMMAR)
+	$(ERLC) -o $(SRC_DIR) $<
