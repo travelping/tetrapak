@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak).
--export([run/2]).
+-export([version/0, run/2]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2]).
 -compile({no_auto_import, [get/1]}).
 
@@ -29,6 +29,11 @@
 
 %% ------------------------------------------------------------
 %% -- Ext API
+version() ->
+    AppFile = code:where_is_file("tetrapak.app"),
+    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
+    proplists:get_value(vsn, Props).
+
 run(Directory, TaskCmds) ->
     Context = tetrapak_context:new(Directory),
     case tetrapak_context:wait_for(Context, TaskCmds) of

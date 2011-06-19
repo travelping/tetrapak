@@ -33,9 +33,9 @@ start(Commands) ->
 
 usage() ->
     io:format(standard_error,
-              "Usage: tetrapak <command> [ options ]~n~n"
+              "*** tetrapak ~s~n~n"
               "Builtin Tasks~n~s",
-              [tablist(all_commands())]).
+              [tetrapak:version(), tablist(all_commands())]).
 
 all_commands() ->
     [{Task#task.name, Task#task.description} || {_, Task} <- lists:keysort(1, tetrapak_task:builtin_tasks())].
