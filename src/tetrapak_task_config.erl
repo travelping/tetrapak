@@ -33,6 +33,7 @@ run("config:ini", _) ->
     BaseConfig = gb_trees:from_orddict(lists:keysort(1, tetrapak:get("tetrapak:appdata:defaults"))),
     HomeConfig = read_config(home_config_path("config.ini"), BaseConfig),
     ProjectConfig = read_config(project_config_path("config.ini"), HomeConfig),
+    % io:format("~p~n", [ProjectConfig]),
     {done, ProjectConfig}.
 
 %% ------------------------------------------------------------
@@ -111,9 +112,12 @@ read_ini_file(Filename, Tree) ->
 do_sections(SList, Tree) ->
     lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
                         lists:foldl(fun ({Key, Value}, InnerAcc) ->
-                                            gb_trees:enter(SName ++ "." ++ Key, Value, InnerAcc)
+                                            gb_trees:enter(ckey(SName, Key), Value, InnerAcc)
                                     end, OuterAcc, Props)
                 end, Tree, SList).
+
+ckey("", Key) -> Key;
+ckey(Section, Key) -> Section ++ "." ++ Key.
 
 fmt_error(File, {Line, Module, ErrorDesc}) ->
     English = Module:format_error(ErrorDesc),

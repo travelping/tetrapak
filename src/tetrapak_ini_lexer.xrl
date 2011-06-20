@@ -8,14 +8,15 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 Definitions.
-D     = [0-9]
+D = [0-9]
 
 Rules.
 \.|=|,|\{|\}|\[|\]                 : {token, {list_to_atom(TokenChars), TokenLine}}.
 [-]?{D}+                           : {token, {number, TokenLine, list_to_integer(TokenChars)}}.
 [-]?{D}+\.{D}+((E|e)(\+|\-)?{D}+)? : {token, {number, TokenLine, list_to_float(TokenChars)}}.
 [a-z][0-9a-zA-Z_]*                 : {token, {atom, TokenLine, TokenChars}}.
-"([^\\"]*(\\.)?)*"                 : {token, {string, TokenLine, do_string(tl(TokenChars), [])}}.
+"([^\\"]*(\\.)?)*"                 : to_erlang(string, TokenLine, TokenChars).
+'([^\\']*(\\.)?)*'                 : to_erlang(quoted_atom, TokenLine, TokenChars).
 [\s\n\r\t]+                        : skip_token.
 \%[^\n]*                           : skip_token.
 
@@ -33,11 +34,10 @@ file(Filename) ->
             {error, {file, Error}}
     end.
 
-do_string([$\\, $n | R], Acc) -> do_string(R, [$\n | Acc]);
-do_string([$\\, $t | R], Acc) -> do_string(R, [$\t | Acc]);
-do_string([$\\, $b | R], Acc) -> do_string(R, [$\b | Acc]);
-do_string([$\\, $f | R], Acc) -> do_string(R, [$\f | Acc]);
-do_string([$\\, $s | R], Acc) -> do_string(R, [$\s | Acc]);
-do_string([$\\, C  | R], Acc) -> do_string(R, [C | Acc]);
-do_string([$"], Acc) -> lists:reverse(Acc);
-do_string([C | R], Acc) -> do_string(R, [C | Acc]).
+to_erlang(Type, TokenLine, Chars) ->
+    case erl_scan:string(Chars, TokenLine) of
+        {ok, [{_EType, Line, Content}], _Endl} ->
+            {token, {Type, Line, Content}};
+        {error, {_Line, EMod, EDesc}, _Endl} ->
+            {error, EMod:format_error(EDesc)}
+    end.
