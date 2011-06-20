@@ -12,6 +12,7 @@
 -export([run/2]).
 
 run("shell", _) ->
+    code:ensure_loaded(tpk),
     code:add_patha(tetrapak:subdir("ebin")),
     case tetrapak_io:can_start_shell() of
         true ->
@@ -23,9 +24,12 @@ run("shell", _) ->
 
 run("tetrapak:reload", _) ->
     tetrapak:require("build"),
-    Modules = lists:map(fun list_to_atom/1, tetrapak:get("build:erlang:modules")),
-    io:format("reloading changed modules:~n  ~p~n", [Modules]),
-    lists:foreach(fun load/1, Modules).
+    case lists:map(fun list_to_atom/1, tetrapak:get("build:erlang:modules", [])) of
+        [] -> done;
+        Modules ->
+            io:format("reloading changed modules:~n  ~p~n", [Modules]),
+            lists:foreach(fun load/1, Modules)
+    end.
 
 load(Mod) ->
     code:purge(Mod),
