@@ -55,7 +55,8 @@ run("build:erlang", ErlFiles) ->
     compile_foreach(fun ({File, CompileOptions}) ->
                             try_load(tetrapak:subdir("ebin"), File#erl.behaviours),
                             run_compiler(compile, file, [File#erl.file, CompileOptions])
-                    end, ErlFiles);
+                    end, ErlFiles),
+    {done, [{modules, [F#erl.module || {F, _} <- ErlFiles]}]};
 
 run("build:yecc", Files) ->
     compile_foreach(fun ({InputFile, OutputFile}) ->

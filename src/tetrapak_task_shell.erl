@@ -19,4 +19,14 @@ run("shell", _) ->
             timer:sleep(infinity);
         false ->
             tetrapak:fail("Cannot start shell")
-    end.
+    end;
+
+run("tetrapak:reload", _) ->
+    tetrapak:require("build"),
+    Modules = lists:map(fun list_to_atom/1, tetrapak:get("build:erlang:modules")),
+    io:format("reloading changed modules:~n  ~p~n", [Modules]),
+    lists:foreach(fun load/1, Modules).
+
+load(Mod) ->
+    code:purge(Mod),
+    code:load_file(Mod).

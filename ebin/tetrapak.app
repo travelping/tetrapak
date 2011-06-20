@@ -11,6 +11,7 @@
              tpk_util,
              tpk_file,
              tpk_log,
+             tpk,
 
              %% tasks
              tetrapak_task_boot,
@@ -37,7 +38,8 @@
       {"clean:erlang", tetrapak_task_erlc, "Delete compiled Erlang modules"},
       {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
       {"clean:pkg:deb", tetrapak_task_pkg_deb, "Delete debian packages"},
-      {"shell", tetrapak_task_shell, "Start the Erlang shell"}
+      {"shell", tetrapak_task_shell, "Start the Erlang shell"},
+      {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"}
     ]},
     {config, [
       {"build.erlc_options", []},
