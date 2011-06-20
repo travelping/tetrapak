@@ -27,7 +27,7 @@ check("build:erlang") ->
     tetrapak:require(["build:yecc"]),
     EbinDir             = tetrapak:subdir("ebin"),
     SrcDir              = tetrapak:subdir("src"),
-    ExtraCompileOptions = tetrapak:get("config:ini:build:erlc_options", []),
+    ExtraCompileOptions = tetrapak:config("build.erlc_options", []),
     CompileOptions      = [{outdir, EbinDir}, {i, tetrapak:subdir("include")}, return_errors, return_warnings, debug_info]
                           ++ ExtraCompileOptions,
     Sources             = lists:sort(fun compile_order/2, erlang_source_files(SrcDir)),

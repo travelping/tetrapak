@@ -8,8 +8,9 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tetrapak).
--export([version/0, run/2]).
--export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2]).
+-export([version/0, run/2, cli_main/0]).
+-export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2,
+         config/1, config/2, config_path/1, config_path/2]).
 -compile({no_auto_import, [get/1]}).
 
 -include("tetrapak.hrl").
@@ -29,26 +30,37 @@
 
 %% ------------------------------------------------------------
 %% -- Ext API
-version() ->
-    AppFile = code:where_is_file("tetrapak.app"),
-    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
-    proplists:get_value(vsn, Props).
-
 run(Directory, TaskCmds) ->
     Context = tetrapak_context:new(Directory),
-    case tetrapak_context:wait_for(Context, TaskCmds) of
-        ok ->
-            tetrapak_context:wait_shutdown(Context),
-            ok;
-        {error, {unknown_key, Key}} ->
-            {unknown, Key};
-        {error, {failed, _Task}} ->
-            tetrapak_context:wait_shutdown(Context),
-            error
+    case tetrapak_context:run_sequentially(Context, ["tetrapak:boot" | TaskCmds]) of
+        ok                          -> ok;
+        {error, {unknown_key, Key}} -> {unknown, Key};
+        {error, _}                  -> error
+    end.
+
+cli_main() ->
+    {ok, Cwd} = file:get_cwd(),
+    case init:get_plain_arguments() of
+        [] ->
+            run(Cwd, ["tetrapak:info"]),
+            halt(1);
+        Cmds ->
+            case tetrapak:run(Cwd, Cmds) of
+                {unknown, Key} ->
+                    io:format(standard_error, "Error: no such command: ~s~n", [Key]),
+                    halt(1);
+                error ->
+                    halt(2);
+                ok ->
+                    halt(0)
+            end
     end.
 
 %% ------------------------------------------------------------
 %% -- Task API
+version() ->
+    get("tetrapak:info:version").
+
 dir() ->
     tetrapak_task:directory().
 
@@ -62,11 +74,13 @@ require_all(Keys) ->
     tetrapak_task:require_all(Keys).
 
 get(Key) ->
-    {ok, Value} = tetrapak_task:get(Key, true),
-    Value.
+    case tetrapak_task:get(Key) of
+        {ok, Value}          -> Value;
+        {error, unknown_key} -> fail("get() of unknown key: ~s", [Key])
+    end.
 
 get(Key, Default) ->
-    case tetrapak_task:get(Key, false) of
+    case tetrapak_task:get(Key) of
         {ok, Value} -> Value;
         {error, unknown_key} -> Default
     end.
@@ -77,3 +91,8 @@ fail(Reason) ->
     tetrapak_task:fail(Reason, []).
 fail(Fmt, Args) ->
     tetrapak_task:fail(Fmt, Args).
+
+config(Key)               -> get("config:ini:" ++ Key).
+config(Key, Default)      -> get("config:ini:" ++ Key, Default).
+config_path(Key)          -> subdir(config(Key)).
+config_path(Key, Default) -> subdir(config(Key, Default)).

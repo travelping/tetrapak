@@ -27,6 +27,7 @@ all: $(LEXER_ERL) $(GRAMMAR_ERL)
 
 clean:
 	rm -f $(GRAMMAR_ERL)
+	rm -f $(LEXER_ERL)
 	rm -f $(EBIN_DIR)/*.beam
 
 shell: all

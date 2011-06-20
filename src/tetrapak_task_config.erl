@@ -9,7 +9,7 @@
 
 -module(tetrapak_task_config).
 -behaviour(tetrapak_task).
--export([project_config/1, read_ini_file/1]).
+-export([read_ini_file/1]).
 -export([run/2]).
 
 run("config:appfile", _) ->
@@ -30,7 +30,10 @@ run("config:appfile", _) ->
     end;
 
 run("config:ini", _) ->
-    {done, project_config(tetrapak:dir())}.
+    BaseConfig = gb_trees:from_orddict(lists:keysort(1, tetrapak:get("tetrapak:appdata:defaults"))),
+    HomeConfig = read_config(home_config_path("config.ini"), BaseConfig),
+    ProjectConfig = read_config(project_config_path("config.ini"), HomeConfig),
+    {done, ProjectConfig}.
 
 %% ------------------------------------------------------------
 %% -- Project info
@@ -79,27 +82,15 @@ home_config_path(File) ->
     HomeDir = os:getenv("HOME"),
     filename:join([HomeDir, ".tetrapak", File]).
 
-project_config_file(Directory) ->
-    filename:join([Directory, "tetrapak", "config.ini"]).
+project_config_path(Filename) ->
+    filename:join(tetrapak:subdir("tetrapak"), Filename).
 
-project_config(Directory) ->
-    BaseCfg = case read_config(home_config_path("config.ini")) of
-                  {error, _Error} -> gb_trees:empty();
-                  {ok, Tree}      -> Tree
-              end,
-    case read_config(project_config_file(Directory), BaseCfg) of
-        {error, _Error2} -> BaseCfg;
-        {ok, Config}     -> Config
-    end.
-
-read_config(File) ->
-    read_config(File, gb_trees:empty()).
 read_config(File, Tree) ->
     case read_ini_file(File, Tree) of
         {error, {file, enoent}} ->
-            {ok, gb_trees:empty()};
+            Tree;
         {ok, ConfigTree} ->
-            {ok, ConfigTree};
+            ConfigTree;
         {error, Error} ->
             fmt_error(File, Error),
             tetrapak:fail()

@@ -150,7 +150,7 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
 %% ---------------------------------------------------------
 %% -- MD5
 md5sum(File) ->
-    case file:open(File, [binary,raw,read]) of
+    case file:open(File, [binary, raw, read_ahead]) of
         {ok, P} ->
             Digest = md5_loop(P, erlang:md5_init()),
             {ok, << <<(nibble2hex(N))>> || <<N:4>> <= Digest >>};
@@ -255,7 +255,7 @@ tar_ftype(symlink)   -> "1";
 tar_ftype(directory) -> "5".
 
 tar_write_regular(TarFile, FilePath, Options) ->
-    case file:open(FilePath, [read, raw, binary]) of
+    case file:open(FilePath, [read, raw, read_ahead, binary]) of
         {ok, File} ->
             file:write(TarFile, ustar_header(lists:keydelete(link_target, 1, Options))),
             file:copy(File, TarFile),

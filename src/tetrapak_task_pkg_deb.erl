@@ -14,20 +14,16 @@
 %% ------------------------------------------------------------
 %% -- Task API
 check("clean:pkg:deb") ->
-    DistDir = tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist")),
-    filelib:wildcard("*.deb", DistDir) /= [].
+    filelib:wildcard("*.deb", tetrapak:config_path("package.outdir")) /= [].
 
 run("pkg:deb", _) ->
     tetrapak_task:require_all(["build", "check"]),
-
-    DistDir = tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist")),
-    file:make_dir(DistDir),
-
+    file:make_dir(tetrapak:config_path("package.outdir")),
     DebFile = tpk_file:with_temp_dir(fun make_deb/1),
     io:format("package: ~s~n", [DebFile]);
 
 run("clean:pkg:deb", _) ->
-    tpk_file:delete("\\.deb$", tetrapak:subdir(tetrapak:get("config:ini:pkg:outdir", "dist"))).
+    tpk_file:delete("\\.deb$", tetrapak:config_path("package.outdir")).
 
 %% ------------------------------------------------------------
 %% -- Implementation
@@ -48,10 +44,8 @@ make_deb(PkgDir) ->
     Vsn     = tetrapak:get("config:appfile:vsn"),
     Pkg     = tpk_util:f("~s-~s", [Name, Vsn]),
     PkgName = tpk_util:f("erlang-~s", [Name]),
-    Arch = "all",
+    Arch    = "all",
     DebianName = no_underscores(PkgName),
-    DistDir = tetrapak:subdir(tetrapak:get("config:pkg:outdir", "dist")),
-    file:make_dir(DistDir),
 
     %% debian-binary
     file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
@@ -91,7 +85,7 @@ make_deb(PkgDir) ->
     tpk_file:tarball_close(ControlTarball),
 
     %% write the actual .deb as an AR archive (sic!)
-    DebFile = filename:join(DistDir, tpk_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
+    DebFile = filename:join(tetrapak:config_path("package.outdir"), tpk_util:f("~s_~s_~s.deb", [DebianName, Vsn, Arch])),
     make_ar(DebFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
     DebFile.
 

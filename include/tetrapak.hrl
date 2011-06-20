@@ -1,6 +1,6 @@
 -record(task, {
     name             :: string(),
-    modules          :: [atom()],
+    module           :: atom(),
     description = "" :: string()
 }).
 

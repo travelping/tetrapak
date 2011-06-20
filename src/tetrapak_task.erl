@@ -13,10 +13,10 @@
 
 %% task behaviour functions
 -export([behaviour_info/1]).
--export([worker/3, context/0, directory/0, fail/0, fail/2, get/2, require_all/1]).
+-export([worker/3, context/0, directory/0, fail/0, fail/2, get/1, require_all/1]).
 -export([output_collector/3]).
 %% misc
--export([normalize_name/1, split_name/1, builtin_tasks/0]).
+-export([normalize_name/1, split_name/1]).
 
 -define(CTX, '$__tetrapak_task_context').
 -define(DIRECTORY, '$__tetrapak_task_directory').
@@ -36,7 +36,7 @@ directory() ->
         _AnythingElse         -> error(not_inside_task)
     end.
 
-worker(#task{name = TaskName, modules = [TaskModule | _OtherModules]}, Context, Directory) ->
+worker(#task{name = TaskName, module = TaskModule}, Context, Directory) ->
     tpk_log:debug("worker: task ~s starting", [TaskName]),
 
     OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
@@ -144,31 +144,36 @@ fail() ->
 fail(Fmt, Args) ->
     throw({?TASK_FAIL, tpk_util:f(Fmt, Args)}).
 
-get(Key, FailUnknown) ->
-    case require_all([Key], FailUnknown) of
+get(Key) ->
+    case require_all([Key]) of
         ok ->
             tetrapak_context:get_cached(context(), Key);
         {error, {unknown_key, _}} ->
             {error, unknown_key}
     end.
 
-require_all(Keys) ->
-    require_all(Keys, false).
-require_all(Keys, FailUnknown) when is_list(Keys) ->
+require_all(Keys) when is_list(Keys) ->
     KList = lists:map(fun str/1, Keys),
     case tetrapak_context:wait_for(context(), KList) of
         ok ->
             ok;
+        {error, {failed, Other}} ->
+            fail("required task '~s' failed", [Other]);
         {error, Error} ->
-            case {FailUnknown, Error} of
-                {_, {failed, Other}}        ->
-                    fail("required task '~s' failed", [Other]);
-                {false, _} ->
-                    {error, Error};
-                {true, {unknown_key, Unknown}} ->
-                    fail("require/1 of unknown key: ~p", [Unknown])
-            end
+            {error, Error}
     end.
+
+normalize_name(Key) ->
+    string:to_lower(string:strip(str(Key))).
+split_name(Key) ->
+    SplitName = re:split(normalize_name(Key), ":", [{return, list}]),
+    lists:filter(fun ([]) -> false;
+                     (_)  -> true
+                 end, SplitName).
+
+str(Atom) when is_atom(Atom) -> atom_to_list(Atom);
+str(Bin) when is_binary(Bin) -> binary_to_list(Bin);
+str(Lis)                     -> Lis.
 
 %% ------------------------------------------------------------
 %% -- Output handler
@@ -223,35 +228,3 @@ do_output(Buffer, Chars) ->
 
 print_output_header(TaskName) ->
     io:put_chars(["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
-
-%% ------------------------------------------------------------
-%% -- Beam Scan
-builtin_tasks() ->
-    AppFile = code:where_is_file("tetrapak.app"),
-    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
-    Tasks = proplists:get_value(tasks, proplists:get_value(tetrapak, Props, [])),
-    lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
-                        NewTask   = #task{name = normalize_name(TaskName),
-                                          modules = [Module],
-                                          description = Desc},
-                        AddModule = fun (#task{modules = OldMods}) -> NewTask#task{modules = [Module | OldMods]} end,
-                        pl_update(split_name(TaskName), AddModule, NewTask, Acc)
-                end, [], Tasks).
-
-pl_update(Key, AddItem, NewItem, Proplist) ->
-    case proplists:get_value(Key, Proplist) of
-        undefined -> [{Key, NewItem} | Proplist];
-        Value     -> [AddItem(Value) | proplists:delete(Key, Proplist)]
-    end.
-
-normalize_name(Key) ->
-    string:to_lower(string:strip(str(Key))).
-split_name(Key) ->
-    SplitName = re:split(normalize_name(Key), ":", [{return, list}]),
-    lists:filter(fun ([]) -> false;
-                     (_)  -> true
-                 end, SplitName).
-
-str(Atom) when is_atom(Atom) -> atom_to_list(Atom);
-str(Bin) when is_binary(Bin) -> binary_to_list(Bin);
-str(Lis)                     -> Lis.

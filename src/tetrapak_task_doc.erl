@@ -11,18 +11,21 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
--define(DOC_DIR, tetrapak:subdir(tetrapak:get("config:ini:doc:directory", "doc"))).
-
 check("clean:edoc") ->
-    filelib:is_dir(?DOC_DIR).
+    filelib:is_dir(tetrapak:config_path("edoc.outdir")).
 
 run("doc:edoc", _) ->
-    DD = ?DOC_DIR,
+    DD = tetrapak:config_path("edoc.outdir"),
     tpk_file:mkdir(DD),
-    edoc:application(tetrapak:get("config:appfile:name"), [{dir, DD}]);
+    edoc:application(tetrapak:get("config:appfile:name"),
+                     tetrapak:subdir("src"),
+                     [{dir, DD},
+                      {private, tetrapak:config("edoc.private")},
+                      {hidden, tetrapak:config("edoc.hidden")},
+                      {todo, tetrapak:config("edoc.todo")}]);
 
 run("clean:edoc", _) ->
-    DD = ?DOC_DIR,
+    DD = tetrapak:config_path("edoc.outdir"),
     tpk_file:delete("(\\.(html|css|png)$)|edoc-info", DD),
     file:del_dir(DD),
     ok.

@@ -5,7 +5,6 @@
   {modules, [tetrapak,
              tetrapak_context,
              tetrapak_task,
-             tetrapak_cli,
              tetrapak_io,
              tetrapak_ini_parser,
              tetrapak_ini_lexer,
@@ -14,6 +13,7 @@
              tpk_log,
 
              %% tasks
+             tetrapak_task_boot,
              tetrapak_task_config,
              tetrapak_task_erlc,
              tetrapak_task_check,
@@ -38,5 +38,13 @@
       {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
       {"clean:pkg:deb", tetrapak_task_pkg_deb, "Delete debian packages"},
       {"shell", tetrapak_task_shell, "Start the Erlang shell"}
+    ]},
+    {config, [
+      {"build.erlc_options", []},
+      {"package.outdir", "dist"},
+      {"edoc.outdir", "doc"},
+      {"edoc.private", false},
+      {"edoc.hidden", false},
+      {"edoc.todo", false}
     ]}]}
 ]}.
