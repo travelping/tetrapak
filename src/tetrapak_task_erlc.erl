@@ -108,7 +108,12 @@ show_errors(BaseDir, Prefix, Errors) ->
                                   Path = FileName
                           end,
                           lists:foreach(fun ({Line, Module, Error}) ->
-                                                io:format("~s:~b: ~s~s~n", [Path, Line, Prefix, Module:format_error(Error)])
+                                                if 
+                                                   is_integer(Line) -> 
+                                                       io:format("~s:~b: ~s~s~n", [Path, Line, Prefix, Module:format_error(Error)]);
+                                                   true ->
+                                                       io:format("~s: ~s~s~n", [Path, Prefix, Module:format_error(Error)])
+                                                end
                                         end, FileErrors)
                   end, Errors).
 
