@@ -59,5 +59,5 @@ builtin_tasks() ->
 pl_update(Key, AddItem, NewItem, Proplist) ->
     case proplists:get_value(Key, Proplist) of
         undefined -> [{Key, NewItem} | Proplist];
-        Value     -> [AddItem(Value) | proplists:delete(Key, Proplist)]
+        Value     -> [{Key, AddItem(Value)} | proplists:delete(Key, Proplist)]
     end.

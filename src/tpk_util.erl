@@ -9,7 +9,7 @@
 
 -module(tpk_util).
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1]).
--export([check_files_mtime/4]).
+-export([check_files/5, check_files_mtime/4, check_files_exist/4]).
 -export([fold_tree/3]).
 -export([varsubst/2, varsubst_file/2]).
 -export([parse_cmdline/3]).
@@ -32,7 +32,7 @@ unix_time(DateTime) ->
     Secs  = calendar:datetime_to_gregorian_seconds(DateTime),
     Secs - Epoch.
 
-check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
+check_files(Dir1, Suffix1, Dir2, Suffix2, CheckFunction) ->
     Files =
       tpk_file:walk(fun (Path, Acc) ->
                             case lists:suffix(Suffix1, Path) of
@@ -42,7 +42,7 @@ check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
                                     OtherPath = WithoutSuffix ++ Suffix2,
                                     case filelib:is_regular(OtherPath) of
                                         true ->
-                                            case tpk_file:mtime(OtherPath) =< tpk_file:mtime(Path) of
+                                            case CheckFunction(Path, OtherPath) of
                                                 true  -> [{Path, OtherPath} | Acc];
                                                 false -> Acc
                                             end;
@@ -56,6 +56,12 @@ check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
         [] -> done;
         _  -> {needs_run, Files}
     end.
+
+check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
+    check_files(Dir1, Suffix1, Dir2, Suffix2, fun (P1, P2) -> tpk_file:mtime(P2) =< tpk_file:mtime(P1) end).
+
+check_files_exist(Dir1, Suffix1, Dir2, Suffix2) ->
+    check_files(Dir1, Suffix1, Dir2, Suffix2, fun (_, _) -> true end).
 
 varsubst(Text, Variables) ->
     BinText = iolist_to_binary(Text),

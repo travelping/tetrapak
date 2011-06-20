@@ -36,6 +36,8 @@
       {"build:yecc", tetrapak_task_erlc, "Compile yecc parsers (.yrl) to Erlang"},
       {"build:leex", tetrapak_task_erlc, "Compile lexical analysers (.xrl) to Erlang"},
       {"clean:erlang", tetrapak_task_erlc, "Delete compiled Erlang modules"},
+      {"clean:yecc", tetrapak_task_erlc, "Delete compiled yecc parsers"},
+      {"clean:leex", tetrapak_task_erlc, "Delete compiled lexical analysers"},
       {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
       {"clean:pkg:deb", tetrapak_task_pkg_deb, "Delete debian packages"},
       {"shell", tetrapak_task_shell, "Start the Erlang shell"},

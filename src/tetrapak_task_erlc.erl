@@ -39,7 +39,7 @@ check("build:erlang") ->
                           end
                       end, Sources),
     case FileList of
-        [] -> done;
+        [] -> {done,      [{modules, []}]};
         _  -> {needs_run, FileList}
     end;
 
@@ -49,7 +49,15 @@ check("build:yecc") ->
 
 check("build:leex") ->
     SrcDir = tetrapak:subdir("src"),
-    tpk_util:check_files_mtime(SrcDir, ".xrl", SrcDir, ".erl").
+    tpk_util:check_files_mtime(SrcDir, ".xrl", SrcDir, ".erl");
+
+check("clean:yecc") ->
+    SrcDir = tetrapak:subdir("src"),
+    tpk_util:check_files_exist(SrcDir, ".yrl", SrcDir, ".erl");
+
+check("clean:leex") ->
+    SrcDir = tetrapak:subdir("src"),
+    tpk_util:check_files_exist(SrcDir, ".xrl", SrcDir, ".erl").
 
 run("build:erlang", ErlFiles) ->
     compile_foreach(fun ({File, CompileOptions}) ->
@@ -69,7 +77,13 @@ run("build:leex", Files) ->
                     end, Files);
 
 run("clean:erlang", _) ->
-    tpk_file:delete("\\.beam$", tetrapak:subdir("ebin")).
+    tpk_file:delete("\\.beam$", tetrapak:subdir("ebin"));
+
+run("clean:yecc", Files) ->
+    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
+
+run("clean:leex", Files) ->
+    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files).
 
 %% ------------------------------------------------------------
 %% -- Helpers
@@ -108,8 +122,8 @@ show_errors(BaseDir, Prefix, Errors) ->
                                   Path = FileName
                           end,
                           lists:foreach(fun ({Line, Module, Error}) ->
-                                                if 
-                                                   is_integer(Line) -> 
+                                                if
+                                                   is_integer(Line) ->
                                                        io:format("~s:~b: ~s~s~n", [Path, Line, Prefix, Module:format_error(Error)]);
                                                    true ->
                                                        io:format("~s: ~s~s~n", [Path, Prefix, Module:format_error(Error)])
