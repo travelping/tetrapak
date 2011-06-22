@@ -19,11 +19,13 @@ f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
 
 match(Fun, String) when is_function(Fun) ->
     Fun(String);
-match(Re, String) ->
+match(Re, String) when is_list(Re) or is_binary(Re) ->
     case re:run(String, Re, [{capture, none}]) of
         match -> true;
         nomatch -> false
-    end.
+    end;
+match(undefined, _String) ->
+    false.
 
 unix_time() ->
     unix_time(calendar:universal_time()).

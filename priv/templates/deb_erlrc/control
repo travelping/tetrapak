@@ -1,6 +1,9 @@
 Package: @@name@@
 Version: @@version@@
 Architecture: all
-Depends: erlang-base|erlang-base-hipe, erlang-erlrc@@appdeps@@
+Section: @@section@@
+Priority: @@priority@@
+Maintainer: @@maintainer@@
+Depends: erlang-base|erlang-base-hipe, erlang-erlrc, @@appdeps@@
 Description: @@desc@@
-
+ Auto-generated package, no long description.

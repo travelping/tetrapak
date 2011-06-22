@@ -8,12 +8,13 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk_file).
--export([size/1, mtime/1, md5sum/1, is_useless/1, filter_useless/1, basename/1, rebase_filename/3]).
+-export([size/1, mtime/1, md5sum/1, basename/1, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
 -export([copy/2, delete/1, delete/2, walk/3, walk/4]).
--export([tarball_create/1, tarball_add_file/4, tarball_add_binary/4, tarball_add_link/4, tarball_mkdir/3,  tarball_close/1]).
+-export([tarball_create/1, tarball_add_file/4, tarball_add_binary/4, tarball_add_link/4, tarball_mkdir/3,
+         tarball_mkdir_parents/3, tarball_close/1]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -39,20 +40,14 @@ rebase_filename(FName, FromDir, ToDir) ->
         true ->
             RP = FPath -- FromDirPath,
             Joined = filename:join([ToDir|RP]),
-            case ToDir of
-                "" -> tl(Joined);
-                _  -> Joined
+            case {Joined, ToDir} of
+                {"", _} -> "";
+                {_, ""} -> tl(Joined);
+                {_, _}  -> Joined
             end;
         false ->
             exit(bad_filename)
     end.
-
-is_useless(Filename) ->
-    Name = basename(Filename),
-    tpk_util:match(".*~$", Name) or tpk_util:match("^\\..*", Name) or tpk_util:match("^.*/\\.git/.*$", Filename).
-
-filter_useless(Files) ->
-    lists:filter(fun (X) -> not is_useless(X) end, Files).
 
 temp_name() -> temp_name("/tmp").
 temp_name(Dir) ->
@@ -92,19 +87,16 @@ mkdir(Path) ->
 
 copy(From, To) ->
     CP = fun (F, _) ->
-                case not is_useless(F) of
-                    true ->
-                        T = rebase_filename(F, From, To),
-                        ok = filelib:ensure_dir(T),
-                        case file:copy(F, T) of
-                            {ok, _} ->
-                                {ok, #file_info{mode = Mode}} = file:read_file_info(F),
-                                file:change_mode(T, Mode);
-                            {error, Reason} -> throw({file_copy_error, Reason})
-                        end;
-                    false -> nomatch
-                end
-        end,
+                 T = rebase_filename(F, From, To),
+                 ok = filelib:ensure_dir(T),
+                 case file:copy(F, T) of
+                     {ok, _} ->
+                         {ok, #file_info{mode = Mode}} = file:read_file_info(F),
+                         file:change_mode(T, Mode);
+                     {error, Reason} ->
+                         throw({file_copy_error, Reason})
+                 end
+         end,
     walk(CP, [], From, no_dir).
 
 delete(Filename) ->
@@ -224,6 +216,13 @@ tarball_add_link({tar, TarFile}, VirtualPath, LinkTarget, Options) ->
 tarball_mkdir({tar, TarFile}, VirtualPath, Options) ->
     FileInfo = #file_info{type = directory, size = 0, mtime = calendar:local_time(), mode = 8#664},
     file:write(TarFile, ustar_header(tar_options(FileInfo, VirtualPath, Options))).
+
+tarball_mkdir_parents(Ball = {tar, _TarFile}, VirtualPath, Options) ->
+    [First | Rest] = filename:split(VirtualPath),
+    Parents = lists:foldl(fun (C, [Prefix | Acc]) ->
+                                  [Prefix ++ "/" ++ C, Prefix | Acc]
+                          end, [First], Rest),
+    lists:foreach(fun (P) -> tarball_mkdir(Ball, P, Options) end, lists:reverse(Parents)).
 
 tarball_close({tar, Device}) ->
     NullBlocks = <<0:8192>>,

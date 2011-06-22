@@ -17,7 +17,11 @@ check("clean:pkg:deb") ->
     filelib:wildcard("*.deb", tetrapak:config_path("package.outdir")) /= [].
 
 run("pkg:deb", _) ->
-    tetrapak_task:require_all(["build", "check"]),
+    ReqDoc = case tetrapak:config("package.include_doc") of
+                 true  -> ["doc"];
+                 false -> []
+             end,
+    tetrapak_task:require_all(["build", "check" | ReqDoc]),
     file:make_dir(tetrapak:config_path("package.outdir")),
     DebFile = tpk_file:with_temp_dir(fun make_deb/1),
     io:format("package: ~s~n", [DebFile]);
@@ -27,16 +31,30 @@ run("clean:pkg:deb", _) ->
 
 %% ------------------------------------------------------------
 %% -- Implementation
-otp_related_files(D) ->
-    tpk_file:wildcard(D, "ebin/*.beam") ++
-    tpk_file:wildcard(D, "ebin/*.app") ++
-    tpk_file:wildcard(D, "ebin/*.appup") ++
-    tpk_file:wildcard(D, "include/*.hrl") ++
-    tpk_file:filter_useless(tpk_file:dir_contents(filename:join(D, "bin"))) ++
-    tpk_file:filter_useless(tpk_file:dir_contents(filename:join(D, "priv"))).
+is_file_excluded(Path) ->
+    is_useless(Path) orelse
+    (in_dir("tetrapak", Path) and not tetrapak:config("package.include_src")) orelse
+    (in_dir("src", Path)      and not tetrapak:config("package.include_src")) orelse
+    (in_dir(tetrapak:config("edoc.outdir"), Path) and not tetrapak:config("package.include_doc")) orelse
+    in_dir(tetrapak:config("package.outdir"), Path).
 
-file_target(_Pkg, "bin" ++ _) -> "usr/";
-file_target(Pkg, _Path)       -> "usr/lib/erlang/lib/" ++ Pkg ++ "/".
+in_dir(Dir, Path) ->
+    lists:prefix(filename:split(Dir), filename:split(Path)).
+
+in_erlang_base(Application) ->
+    lists:member(Application, tetrapak:config("package.deb.erlang_base_apps")).
+
+is_useless(Filename) ->
+    Name = tpk_file:basename(Filename),
+    tpk_util:match(".*~$", Name) %% editor backups
+    or tpk_util:match("\\..*\\.sw[po]", Name) %% vim swap files
+    or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
+    or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
+    or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
+    or tpk_util:match(tetrapak:config("package.exclude"), Filename).
+
+file_mode("bin" ++ _) -> 8#755;
+file_mode(_Path)      -> 8#644.
 
 make_deb(PkgDir) ->
     BaseDir = tetrapak:dir(),
@@ -51,28 +69,49 @@ make_deb(PkgDir) ->
     file:write_file(filename:join(PkgDir, "debian-binary"), <<"2.0\n">>),
 
     %% data.tar.gz
-    PackageFiles = lists:map(fun (P) ->
-                                     File = tpk_file:rebase_filename(P, BaseDir, ""),
-                                     Target = file_target(Pkg, File) ++ File,
-                                     {P, Target}
-                             end, otp_related_files(tetrapak:dir())),
     {ok, DataTarball} = tpk_file:tarball_create(filename:join(PkgDir, "data.tar.gz")),
-    lists:foreach(fun ({P, Target}) -> tpk_file:tarball_add_file(DataTarball, P, Target, [dereference]) end, PackageFiles),
+    InstallDir = "usr/lib/erlang/lib/",
+    tpk_file:tarball_mkdir_parents(DataTarball, InstallDir, [{mode, 8#755}]),
+    PackageFiles =
+        tpk_file:walk(fun (P, Acc) ->
+                        File    = tpk_file:rebase_filename(P, BaseDir, ""),
+                        Target  = InstallDir ++ Pkg ++ "/" ++ File,
+                        case is_file_excluded(File) of
+                            true ->
+                                Acc;
+                            false ->
+                                case filelib:is_dir(P) of
+                                    true ->
+                                        tpk_file:tarball_mkdir(DataTarball, Target, [{mode, 8#755}]),
+                                        Acc;
+                                    false ->
+                                        io:format("add ~s~n", [File]),
+                                        Mode = file_mode(File),
+                                        tpk_file:tarball_add_file(DataTarball, P, Target, [dereference, {mode, Mode}]),
+                                        [{P, Target} | Acc]
+                                end
+                        end
+                     end, [], tetrapak:dir(), dir_first),
     tpk_file:tarball_close(DataTarball),
 
     %% control.tar.gz
     {ok, ControlTarball} = tpk_file:tarball_create(filename:join(PkgDir, "control.tar.gz")),
+    ControlFileOptions = [{owner, "root"}, {group, "root"}],
 
     %% copy control files with varsubst applied
-    DepString = lists:map(fun (S) -> no_underscores(tpk_util:f(", erlang-~s", [S])) end,
-                          lists:sort(tetrapak:get("config:appfile:deps"))),
+    Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
+                S <- tetrapak:get("config:appfile:deps"),
+                not in_erlang_base(S)],
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", "deb"]),
     tpk_file:walk(fun (CFile, _) ->
                           Content = tpk_util:varsubst_file(CFile,
                                                            [{"name", DebianName}, {"version", Vsn},
-                                                            {"appname", Name}, {"appdeps", DepString},
+                                                            {"appname", Name}, {"appdeps", string:join(Deps, ", ")},
+                                                            {"section", tetrapak:config("package.deb.section")},
+                                                            {"priority", tetrapak:config("package.deb.priority")},
+                                                            {"maintainer", tetrapak:config("package.maintainer")},
                                                             {"desc", tetrapak:get("config:appfile:desc", "")}]),
-                          tpk_file:tarball_add_binary(ControlTarball, filename:basename(CFile), Content, [])
+                          tpk_file:tarball_add_binary(ControlTarball, filename:basename(CFile), Content, [{mode, 8#0744} | ControlFileOptions])
                   end, [], TemplateDir),
 
     %% generate md5sums
@@ -81,7 +120,7 @@ make_deb(PkgDir) ->
                               PN = list_to_binary(Target),
                               <<Acc/binary, CkSum/binary, " ", PN/binary, "\n">>
                       end, <<>>, PackageFiles),
-    tpk_file:tarball_add_binary(ControlTarball, "md5sums", Md5, []),
+    tpk_file:tarball_add_binary(ControlTarball, "md5sums", Md5, [{mode, 8#0644} | ControlFileOptions]),
     tpk_file:tarball_close(ControlTarball),
 
     %% write the actual .deb as an AR archive (sic!)
@@ -97,7 +136,7 @@ make_ar(Outfile, Dir, Entries) ->
                             File = filename:join(Dir, Name),
                             Size = tpk_file:size(File),
                             io:format(ArFile, "~-16s~-12s~-6s~-6s~-8s~-10B`\n", [Name, "1280174243", "0", "0", "000644", Size]),
-                            file:copy(File, ArFile),
+                            {ok, Size} = file:copy(File, ArFile),
                             NewOffset = Offset + 60 + Size,
                             if
                                 NewOffset rem 2 =:= 0 ->

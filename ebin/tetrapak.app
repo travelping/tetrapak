@@ -22,7 +22,7 @@
              tetrapak_task_doc,
              tetrapak_task_shell
             ]},
-  {applications, [kernel, stdlib, compiler, edoc, tools]},
+  {applications, [kernel, stdlib, compiler, edoc, tools, parse_tools]},
   {registered, [tetrapak_io]},
   {tetrapak, [
     {tasks, [
@@ -46,6 +46,13 @@
     {config, [
       {"build.erlc_options", []},
       {"package.outdir", "dist"},
+      {"package.maintainer", "Joe User <joe@example.com>"},
+      {"package.exclude", undefined},
+      {"package.include_src", false},
+      {"package.include_doc", false},
+      {"package.deb.section", "misc"},
+      {"package.deb.priority", "extra"},
+      {"package.deb.erlang_base_apps", [kernel, stdlib, compiler, sasl]},
       {"edoc.outdir", "doc"},
       {"edoc.private", false},
       {"edoc.hidden", false},
