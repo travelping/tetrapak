@@ -51,6 +51,7 @@ is_useless(Filename) ->
     or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
+    or tpk_util:match("^(.*/)*\\.bzr(/.*)?$", Filename)
     or tpk_util:match(tetrapak:config("package.exclude"), Filename).
 
 file_mode("bin" ++ _) -> 8#755;
@@ -102,7 +103,11 @@ make_deb(PkgDir) ->
     Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
                 S <- tetrapak:get("config:appfile:deps"),
                 not in_erlang_base(S)],
-    TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", "deb"]),
+    case tetrapak:config("package.use_erlrc") of
+        false -> Template = "deb";
+        true  -> Template = "deb_erlrc"
+    end,
+    TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", Template]),
     tpk_file:walk(fun (CFile, _) ->
                           Content = tpk_util:varsubst_file(CFile,
                                                            [{"name", DebianName}, {"version", Vsn},

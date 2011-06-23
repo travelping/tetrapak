@@ -50,6 +50,7 @@
       {"package.exclude", undefined},
       {"package.include_src", false},
       {"package.include_doc", false},
+      {"package.use_erlrc", false},
       {"package.deb.section", "misc"},
       {"package.deb.priority", "extra"},
       {"package.deb.erlang_base_apps", [kernel, stdlib, compiler, sasl]},
