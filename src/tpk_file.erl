@@ -145,7 +145,7 @@ md5sum(File) ->
     case file:open(File, [binary, raw, read_ahead]) of
         {ok, P} ->
             Digest = md5_loop(P, erlang:md5_init()),
-            {ok, << <<(nibble2hex(N))>> || <<N:4>> <= Digest >>};
+            {ok, tpk_util:to_hex(Digest)};
         {error, Error} ->
             {error, Error}
     end.
@@ -158,9 +158,6 @@ md5_loop(P, C) ->
             file:close(P),
             erlang:md5_final(C)
     end.
-
-nibble2hex(X) when X < 10 -> X + $0;
-nibble2hex(X)             -> X - 10 + $a.
 
 %% ----------------------------------------------------------
 %% Tarballs (erl_tar doesn't cut it...)

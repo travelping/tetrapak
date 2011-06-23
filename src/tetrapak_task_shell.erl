@@ -23,14 +23,23 @@ run("shell", _) ->
     end;
 
 run("tetrapak:reload", _) ->
-    tetrapak:require("build"),
-    case lists:map(fun list_to_atom/1, tetrapak:get("build:erlang:modules", [])) of
-        [] -> done;
-        Modules ->
-            io:format("reloading changed modules:~n  ~p~n", [Modules]),
-            lists:foreach(fun load/1, Modules)
-    end.
+    EbinDir = tetrapak:subdir("ebin"),
+    Modules = lists:map(fun (F) -> {list_to_atom(filename:basename(F, ".beam")), filename:join(EbinDir, F)} end, filelib:wildcard("*.beam", EbinDir)),
+    lists:foreach(fun ({Mod, Path}) ->
+                          case code:is_loaded(Mod) of
+                              {file, _} ->
+                                  DiskMtime = tpk_file:mtime(Path),
+                                  (DiskMtime > loaded_mtime(Mod)) andalso load(Mod);
+                              false ->
+                                  load(Mod)
+                          end
+                  end, Modules).
+
+loaded_mtime(Mod) ->
+    {Y,Mon,D,H,Min,S} = proplists:get_value(time, Mod:module_info(compile)),
+    calendar:universal_time_to_local_time({{Y,Mon,D},{H,Min,S}}).
 
 load(Mod) ->
+    io:format("load ~s~n", [Mod]),
     code:purge(Mod),
     code:load_file(Mod).

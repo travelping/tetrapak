@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk_util).
--export([f/1, f/2, match/2, unix_time/0, unix_time/1]).
+-export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1]).
 -export([check_files/5, check_files_mtime/4, check_files_exist/4]).
 -export([fold_tree/3]).
 -export([varsubst/2, varsubst_file/2]).
@@ -29,10 +29,16 @@ match(undefined, _String) ->
 
 unix_time() ->
     unix_time(calendar:universal_time()).
-unix_time(DateTime) ->
+unix_time(DateTime = {{_y, _mon, _d}, {_h, _min, _s}}) ->
     Epoch = 62167219200,
     Secs  = calendar:datetime_to_gregorian_seconds(DateTime),
     Secs - Epoch.
+
+to_hex(B) when is_binary(B) ->
+    << <<(nibble2hex(N))>> || <<N:4>> <= B >>.
+
+nibble2hex(X) when X < 10 -> X + $0;
+nibble2hex(X)             -> X - 10 + $a.
 
 check_files(Dir1, Suffix1, Dir2, Suffix2, CheckFunction) ->
     Files =
