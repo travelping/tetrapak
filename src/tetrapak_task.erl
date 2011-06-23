@@ -180,12 +180,15 @@ str(Lis)                     -> Lis.
 -define(LineWidth, 30).
 
 output_collector(Context, TaskName, TaskProcess) ->
+    process_flag(trap_exit, true),
+    tetrapak_context:register_io_worker(Context),
     receive
         Req = {io_request, _, _, _} ->
-            process_flag(trap_exit, true),
             tetrapak_context:task_wants_output(Context, TaskProcess),
             Buffer = handle_io(Req, <<>>),
-            output_collector_loop(Context, TaskName, TaskProcess, Buffer)
+            output_collector_loop(Context, TaskName, TaskProcess, Buffer);
+        {'EXIT', TaskProcess, _Reason} ->
+            exit(normal)
     end.
 
 output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->

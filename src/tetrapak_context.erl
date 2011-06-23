@@ -11,6 +11,7 @@
 -export([new/1, run_sequentially/2, shutdown/1,
          get_cached/2, wait_for/2, wait_shutdown/1,
          task_done/3, task_wants_output/2, task_output_done/2,
+         register_io_worker/1,
          register_tasks/2, get_tasks/1]).
 -export([init/1, loop/1]).
 
@@ -22,8 +23,13 @@ task_done(Ctx, Task, Result) ->
 
 task_wants_output(Ctx, WorkerPid) ->
     cast(Ctx, {want_output, WorkerPid}).
+
 task_output_done(Ctx, WorkerPid) ->
     cast(Ctx, {output_done, WorkerPid}).
+
+register_io_worker(Ctx) ->
+    link(Ctx),
+    cast(Ctx, register_io_worker).
 
 register_tasks(Ctx, TList) ->
     call(Ctx, {register_tasks, TList}).
@@ -84,7 +90,8 @@ wait_shutdown(Process) ->
     cache     = dict:new()    :: dict(),
     running   = dict:new()    :: dict(),
     done      = gb_sets:new() :: set(),
-    io_queue  = queue:new()   :: queue()
+    io_queue   = queue:new()   :: queue(),
+    io_workers = ordsets:new() :: queue()
 }).
 
 new(Directory) ->
@@ -107,7 +114,6 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             loop(LoopState);
 
         {request, FromPid, {get_cached, Key}} ->
-            tpk_log:debug("ctx get: ~p ~p", [FromPid, Key]),
             case dict:find(Key, Cache) of
                 {ok, Value} -> reply(FromPid, {ok, Value});
                 error       -> reply(FromPid, {error, unknown_key})
@@ -133,6 +139,10 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
         {cast, _FromPid, {output_done, _TaskWorker}} ->
             loop(LoopState#st{io_queue = pop_ioqueue(IOQueue)});
 
+        {cast, FromPid, register_io_worker} ->
+            tpk_log:debug("register_io_worker ~p", [FromPid]),
+            loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
+
         {cast, _FromPid, {done, Task, Variables}} ->
             NewCache  = dict:merge(fun (Key, _V1, V2) ->
                                            tpk_log:debug("ctx var merge conflict ~p", [Key]),
@@ -152,20 +162,25 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
         {'EXIT', DeadPid, {?TASK_FAIL, _FailedTask}} ->
             do_shutdown(LoopState, DeadPid);
 
+        {'EXIT', DeadPid, Reason} ->
+            tpk_log:debug("ctx EXIT ~p ~p", [DeadPid, Reason]),
+            loop(LoopState#st{io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
+
         Other ->
             tpk_log:debug("ctx other ~p", [Other])
     end.
 
-do_shutdown(#st{running = Running, io_queue = IOQueue}, FailedPid) ->
+do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, FailedPid) ->
    RList   = dict:to_list(Running),
    Workers = [Pid || {_Name, Pid} <- RList, Pid /= FailedPid],
-   shutdown_loop(Workers, Running, IOQueue).
+   shutdown_loop(Workers ++ IOWorkers, Running, IOQueue).
 
-shutdown_loop([], _Running, IOQueue) ->
-    finish_output(IOQueue);
+shutdown_loop([], _, _) ->
+    ok;
 shutdown_loop(Workers, Running, IOQueue) ->
+    tpk_log:debug("shutdown: ~p", [Workers]),
     receive
-        {'EXIT', Pid, {Reason, _TaskName}} when Reason == ?TASK_FAIL; Reason == ?TASK_DONE ->
+        {'EXIT', Pid, _Reason} ->
             shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue);
         {cast, _FromPid, {output_done, _TaskWorker}} ->
             shutdown_loop(Workers, Running, pop_ioqueue(IOQueue));
@@ -189,21 +204,6 @@ push_ioqueue(IOQueue, FromPid, TaskWorker) ->
         false -> ok
     end,
     queue:in({TaskWorker, FromPid}, IOQueue).
-
-finish_output(IOQueue) ->
-    tpk_log:debug("finish output: ~p", [IOQueue]),
-    case queue:peek(IOQueue) of
-        empty -> ok;
-        {value, {Worker, IOProc}} ->
-            reply(IOProc, output_ok),
-            receive
-                {cast, IOProc, {output_done, Worker}} ->
-                    finish_output(queue:drop(IOQueue));
-                Other ->
-                    tpk_log:debug("finish output other: ~p", [Other]),
-                    finish_output(IOQueue)
-            end
-    end.
 
 maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
     case dict:find(TaskName, State#st.running) of
