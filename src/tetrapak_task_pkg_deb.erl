@@ -38,6 +38,8 @@ is_useless(Filename) ->
     Name = tpk_file:basename(Filename),
     tpk_util:match(".*~$", Name) %% editor backups
     or tpk_util:match("\\..*\\.sw[po]", Name) %% vim swap files
+    or tpk_util:match("\\.#.*", Name) %% emacs swap files
+    or tpk_util:match("erl_crash.dump", Name) %% you know those...
     or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
