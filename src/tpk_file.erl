@@ -198,14 +198,7 @@ tarball_add_binary({tar, TarFile}, VirtualPath, Binary, Options) when is_binary(
     FileInfo = #file_info{type = regular, size = Size, mtime = calendar:local_time(), mode = 8#664},
     file:write(TarFile, ustar_header(tar_options(FileInfo, VirtualPath, Options))),
     file:write(TarFile, Binary),
-    case Size of
-        0 ->
-            ok;
-        _ ->
-            Padding = ?TAR_BLOCKSIZE - (Size rem ?TAR_BLOCKSIZE),
-            (Padding > 0) andalso file:write(TarFile, <<0:(8 * Padding)>>),
-            ok
-    end.
+    tar_padding(TarFile, Size).
 
 tarball_add_link({tar, TarFile}, VirtualPath, LinkTarget, Options) ->
     FileInfo = #file_info{type = symlink, size = 0, mtime = calendar:local_time(), mode = 8#664},
@@ -259,18 +252,16 @@ tar_write_regular(TarFile, FilePath, Options) ->
     case file:open(FilePath, [read, raw, read_ahead, binary]) of
         {ok, File} ->
             file:write(TarFile, ustar_header(lists:keydelete(link_target, 1, Options))),
-            case proplists:get_value(size, Options) of
-                0 ->
-                    ok;
-                Size ->
-                    {ok, Size} = file:copy(File, TarFile),
-                    Padding = ?TAR_BLOCKSIZE - (Size rem ?TAR_BLOCKSIZE),
-                    (Padding > 0) andalso file:write(TarFile, <<0:(8 * Padding)>>)
-            end,
+            {ok, Size} = file:copy(File, TarFile),
+            tar_padding(TarFile, Size),
             file:close(File);
         {error, Error} ->
             {error, Error}
     end.
+
+tar_padding(TarFile, Size) ->
+    Padding = (?TAR_BLOCKSIZE - Size rem ?TAR_BLOCKSIZE) rem ?TAR_BLOCKSIZE,
+    (Padding > 0) andalso file:write(TarFile, <<0:(8 * Padding)>>).
 
 pad0(Size, Binary) when is_binary(Binary) ->
     BSize = byte_size(Binary),
