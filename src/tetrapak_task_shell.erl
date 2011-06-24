@@ -13,7 +13,6 @@
 
 run("shell", _) ->
     code:ensure_loaded(tpk),
-    code:add_patha(tetrapak:subdir("ebin")),
     case tetrapak_io:can_start_shell() of
         true ->
             tetrapak_io:start_shell(),

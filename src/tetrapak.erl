@@ -40,6 +40,15 @@ run(Directory, TaskCmds) ->
 
 cli_main() ->
     {ok, Cwd} = file:get_cwd(),
+
+    EbinDir = filename:join(Cwd, "ebin"),
+    case filelib:is_dir(EbinDir) of
+        true ->
+            code:add_patha(EbinDir);
+        false ->
+            ok
+    end,
+
     case init:get_plain_arguments() of
         [] ->
             run(Cwd, ["tetrapak:info"]),
