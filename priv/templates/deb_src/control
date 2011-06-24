@@ -9,5 +9,5 @@ Package: @@name@@
 Architecture: any
 Priority: @@priority@@
 Section: @@section@@
-Depends: erlang-base|erlang-base-hipe, @@appdeps@@
+Depends: erlang-base|erlang-base-hipe @@appdeps@@
 Description: @@desc@@

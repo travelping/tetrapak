@@ -245,7 +245,7 @@ tar_options(Info = #file_info{}, VirtualPath, Options) ->
                 end, Base, proplists:compact(Options)).
 
 tar_ftype(regular)   -> "0";
-tar_ftype(symlink)   -> "1";
+tar_ftype(symlink)   -> "2";
 tar_ftype(directory) -> "5".
 
 tar_write_regular(TarFile, FilePath, Options) ->

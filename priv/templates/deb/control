@@ -4,6 +4,6 @@ Architecture: all
 Section: @@section@@
 Priority: @@priority@@
 Maintainer: @@maintainer@@
-Depends: erlang-base|erlang-base-hipe, @@appdeps@@
+Depends: erlang-base|erlang-base-hipe @@appdeps@@
 Description: @@desc@@
  Auto-generated package, no long description.

@@ -69,7 +69,24 @@ make_deb(PkgDir) ->
                          in_dir(tetrapak:config("package.outdir"), Path) orelse
                          in_dir("debian", Path)
                  end,
-    PackageFiles = copy_files(DataTarball, InstallDir, IsExcluded),
+    PackageFiles1 = copy_files(DataTarball, InstallDir, IsExcluded),
+
+    %% symlink binaries
+    BinDir = "usr/bin",
+    tpk_file:tarball_mkdir(DataTarball, BinDir, [{owner, "root"}, {group, "root"}]),
+    PackageFiles2 = lists:foldl(fun (ScriptName, Acc) ->
+                                        Original = filename:join(tetrapak:subdir("bin"), ScriptName),
+                                        case filelib:is_regular(Original) and (not is_useless(Original)) of
+                                            true ->
+                                                Target = "/" ++ InstallDir ++ "bin/" ++ ScriptName,
+                                                Link = BinDir ++ "/" ++ ScriptName,
+                                                tpk_file:tarball_add_link(DataTarball, Link, Target, [{owner, "root"}, {group, "root"}]),
+                                                [{Original, Link} | Acc];
+                                            false ->
+                                                Acc
+                                        end
+                                end, PackageFiles1, filelib:wildcard("*", tetrapak:subdir("bin"))),
+
     tpk_file:tarball_close(DataTarball),
 
     %% control.tar.gz
@@ -79,14 +96,14 @@ make_deb(PkgDir) ->
         false -> Template = "deb";
         true  -> Template = "deb_erlrc"
     end,
-    copy_control_template(ControlTarball, Template, PkgName, []),
+    copy_control_template(ControlTarball, Template, "./", []),
 
     %% generate md5sums
     Md5 = lists:foldl(fun ({P, Target}, Acc) ->
                               {ok, CkSum} = tpk_file:md5sum(P),
                               PN = list_to_binary(Target),
                               <<Acc/binary, CkSum/binary, " ", PN/binary, "\n">>
-                      end, <<>>, PackageFiles),
+                      end, <<>>, PackageFiles2),
     tpk_file:tarball_add_binary(ControlTarball, "md5sums", Md5, [{mode, 8#0644}, {owner, "root"}, {group, "root"}]),
     tpk_file:tarball_close(ControlTarball),
 
@@ -166,6 +183,10 @@ copy_control_template(Tarball, Template, ExtractDir, Variables) ->
     Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
                 S <- tetrapak:get("config:appfile:deps"),
                 not in_erlang_base(S)],
+    case Deps of
+        [] -> DepString = "";
+        _  -> DepString = ", " ++ string:join(Deps, ", ")
+    end,
     FileOptions = [{mode, 8#0744}, {owner, "root"}, {group, "root"}],
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", Template]),
     tpk_file:walk(fun (CFile, _) ->
@@ -180,7 +201,7 @@ copy_control_template(Tarball, Template, ExtractDir, Variables) ->
                                                            [{"name", Pkg},
                                                             {"version", tetrapak:get("config:appfile:vsn")},
                                                             {"appname", tetrapak:get("config:appfile:name")},
-                                                            {"appdeps", string:join(Deps, ", ")},
+                                                            {"appdeps", DepString},
                                                             {"section", tetrapak:config("package.deb.section")},
                                                             {"priority", tetrapak:config("package.deb.priority")},
                                                             {"maintainer", tetrapak:config("package.maintainer")},

@@ -22,7 +22,7 @@
              tetrapak_task_doc,
              tetrapak_task_shell
             ]},
-  {applications, [kernel, stdlib, compiler, edoc, tools, parse_tools]},
+  {applications, [kernel, stdlib, compiler, edoc, tools, parsetools]},
   {registered, [tetrapak_io]},
   {tetrapak, [
     {tasks, [
