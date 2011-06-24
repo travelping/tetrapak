@@ -39,6 +39,7 @@
       {"clean:yecc", tetrapak_task_erlc, "Delete compiled yecc parsers"},
       {"clean:leex", tetrapak_task_erlc, "Delete compiled lexical analysers"},
       {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
+      {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
       {"clean:pkg:deb", tetrapak_task_pkg_deb, "Delete debian packages"},
       {"shell", tetrapak_task_shell, "Start the Erlang shell"},
       {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"}

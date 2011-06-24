@@ -1,0 +1,13 @@
+Source: @@name@@
+Maintainer: @@maintainer@@
+Standards-Version: 3.9.1
+Priority: @@priority@@
+Section: @@section@@
+Build-Depends: erlang-base|erlang-base-hipe, erlang-tetrapak (>= 0.3.0)
+
+Package: @@name@@
+Architecture: any
+Priority: @@priority@@
+Section: @@section@@
+Depends: erlang-base|erlang-base-hipe, @@appdeps@@
+Description: @@desc@@

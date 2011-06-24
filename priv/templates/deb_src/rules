@@ -1,0 +1,16 @@
+#!/usr/bin/make -f
+
+build:
+	tetrapak build
+
+clean:
+	tetrapak clean
+	rm -f ./debian/files
+	rm -f ../@@name@@_@@version@@_*.deb
+
+binary:
+	tetrapak pkg:deb
+	for f in dist/@@name@@_@@version@@_*.deb; do \
+		mv "$$f" ..; \
+		echo "$$(basename $$f) @@section@@ @@priority@@" >> ./debian/files; \
+	done
