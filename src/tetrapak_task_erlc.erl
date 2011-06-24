@@ -11,6 +11,8 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
+-include_lib("kernel/include/file.hrl").
+
 -record(erl, {
     file,
     module,
@@ -98,8 +100,9 @@ compile_foreach(Function, List) ->
        true -> ok
     end.
 
-run_compiler(M, F, A) ->
+run_compiler(M, F, A = [File | _]) ->
     BaseDir = tetrapak:dir(),
+    io:format("Compiling ~s~n", [tpk_file:rebase_filename(File, BaseDir, "")]),
     case apply(M, F, A) of
         {ok, _Module} -> ok;
         {ok, _Module, Warnings} ->
@@ -155,7 +158,12 @@ needs_compile(NewCOptions, Ebin, #erl{module = Mod, attributes = Attrs, includes
             BeamMTime    = tpk_file:mtime(Beam),
             ((BeamMTime =< ModMTime)) %% beam is older
             orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
-            orelse lists:any(fun (I) -> tpk_file:mtime(I) >= BeamMTime end, Inc) %% include file changed
+            orelse lists:any(fun (I) ->
+                                     case file:read_file_info(I) of
+                                         {error, _} -> true;
+                                         {ok, Info} -> Info#file_info.mtime >= BeamMTime %% include file changed
+                                     end
+                             end, Inc)
     end.
 
 erlang_source_files(Path) ->
