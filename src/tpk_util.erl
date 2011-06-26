@@ -8,11 +8,10 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk_util).
--export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1]).
--export([check_files/5, check_files_mtime/4, check_files_exist/4]).
--export([fold_tree/3]).
--export([varsubst/2, varsubst_file/2]).
--export([parse_cmdline/3]).
+-export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1, fold_tree/3]).
+-export([check_files/5, check_files_mtime/4, check_files_exist/4, varsubst/2, varsubst_file/2]).
+-export([cmd/3, parse_cmdline/3]).
+-export([format_error/1]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -81,7 +80,7 @@ varsubst(Text, Variables) ->
 
 varsubst_file(Infile, Variables) ->
     {ok, Content} = file:read_file(Infile),
-    tpk_util:varsubst(Content, Variables).
+    varsubst(Content, Variables).
 
 vs_replace([], _Offset, TextRest, Result, _Vars) -> <<Result/bytes, TextRest/bytes>>;
 vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
@@ -89,8 +88,7 @@ vs_replace([[{Start, Len}, {VStart, VLen}] | RM], Offset, Text, Result, Vars) ->
     <<Before:BStart/bytes, _:VDLen/bytes, Var:VLen/bytes, _:VDLen/bytes, After/bytes>> = Text,
     NewResult = case proplists:get_value(binary_to_list(Var), Vars) of
                     undefined ->
-                        tpk_log:warn("varsubst: undefined variable ~s", [Var]),
-                        <<Result/bytes, Before/bytes>>;
+                        tetrapak:fail("varsubst: undefined variable ~s", [Var]);
                     Value ->
                         PP = list_to_binary(f("~s", [Value])),
                         <<Result/bytes, Before/bytes, PP/bytes>>
@@ -105,6 +103,43 @@ fold_tree1(Fun, Acc, Iterator) ->
         none              -> Acc;
         {Key, Val, Iter2} -> fold_tree1(Fun, Fun({Key, Val}, Acc), Iter2)
     end.
+
+cmd(Dir, Command, Args) ->
+    case os:find_executable(Command) of
+        false ->
+            return_einfo({cmd_spawn, Command, not_found});
+        Executable ->
+            PortOptions = [{cd, Dir}, {args, Args}, stream, binary, use_stdio, in, exit_status, hide],
+            case catch erlang:open_port({spawn_executable, Executable}, PortOptions) of
+                {'EXIT', Reason} ->
+                    return_einfo({cmd_spawn, Command, Reason});
+                Port when is_port(Port) ->
+                    capture_output(Command, Port, <<>>)
+            end
+    end.
+
+capture_output(Command, Port, Buffer) ->
+    receive
+        {'EXIT', Port, Reason} ->
+            port_close(Port),
+            return_einfo({cmd_port_exit, Command, Reason});
+        {Port, {data, Data}} ->
+            capture_output(Command, Port, <<Buffer/binary, Data/binary>>);
+        {Port, {exit_status, ExitStatus}} ->
+            {ok, ExitStatus, Buffer};
+        OtherMsg ->
+            io:format("other msg: ~p~n", [OtherMsg])
+    end.
+
+return_einfo(Error) ->
+    {error, {undefined, ?MODULE, Error}}.
+
+format_error({cmd_spawn, Cmd, not_found}) ->
+    "command not found: " ++ Cmd;
+format_error({cmd_spawn, Cmd, Error}) ->
+    Cmd ++ ": " ++ file:format_error(Error);
+format_error({cmd_port_exit, Cmd, Error}) ->
+    Cmd ++ ": " ++ file:format_error(Error).
 
 %% ------------------------------------------------------------
 %% -- getopt-style option parsing

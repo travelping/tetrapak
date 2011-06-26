@@ -10,7 +10,7 @@
 -module(tetrapak).
 -export([version/0, run/2, cli_main/0]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2,
-         config/1, config/2, config_path/1, config_path/2]).
+         config/1, config/2, config_path/1, config_path/2, cmd/2]).
 -compile({no_auto_import, [get/1]}).
 
 -include("tetrapak.hrl").
@@ -105,3 +105,13 @@ config(Key)               -> get("config:ini:" ++ Key).
 config(Key, Default)      -> get("config:ini:" ++ Key, Default).
 config_path(Key)          -> subdir(config(Key)).
 config_path(Key, Default) -> subdir(config(Key, Default)).
+
+cmd(Cmd, Args) ->
+    case tpk_util:cmd(dir(), Cmd, Args) of
+        {ok, 0, Output} ->
+            Output;
+        {ok, _Other, _Output} ->
+            fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
+        {error, {_L, Mod, Error}} ->
+            fail("error running command ~s: ", [Cmd, Mod:format_error(Error)])
+    end.

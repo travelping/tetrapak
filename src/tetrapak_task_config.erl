@@ -10,7 +10,10 @@
 -module(tetrapak_task_config).
 -behaviour(tetrapak_task).
 -export([read_ini_file/1]).
--export([run/2]).
+-export([run/2, check/1]).
+
+check("config:vcs") ->
+    {needs_run, tetrapak:config("build.vcs_type")}.
 
 run("config:appfile", _) ->
     Dir  = tetrapak:dir(),
@@ -33,8 +36,34 @@ run("config:ini", _) ->
     BaseConfig = gb_trees:from_orddict(lists:keysort(1, tetrapak:get("tetrapak:appdata:defaults"))),
     HomeConfig = read_config(home_config_path("config.ini"), BaseConfig),
     ProjectConfig = read_config(project_config_path("config.ini"), HomeConfig),
-    % io:format("~p~n", [ProjectConfig]),
-    {done, ProjectConfig}.
+    {done, ProjectConfig};
+
+run("config:vcs", git) ->
+    case run_git("symbolic-ref", ["--quiet", "HEAD"]) of
+        <<"refs/heads/", Branch/binary>>   -> ok;
+        <<"refs/remotes/", Branch/binary>> -> ok
+    end,
+    Describe = run_git("describe", ["--tags", "--dirty=-dirty", "--long", "--always"]),
+    case re:run(Describe, "^(.*)-([0-9]+)-g([0-9a-f]+)(-dirty)?\n$", [{capture, all_but_first, list}]) of
+        {match, [LastTag, Offset, LastCommit]} ->
+            Data = [{last_tag, LastTag}, {offset, Offset}, {commit, LastCommit}, {dirty, false}];
+        {match, [LastTag, Offset, LastCommit, _Dirty]} ->
+            Data = [{last_tag, LastTag}, {offset, Offset}, {commit, LastCommit}, {dirty, true}];
+        nomatch ->
+            case re:run(Describe, "^([0-9a-f]+)(-dirty)?\n$", [{capture, all_but_first, list}]) of
+                {match, [LastCommit]} ->
+                    Data = [{last_tag, ""}, {offset, "0"}, {commit, LastCommit}, {dirty, false}];
+                {match, [LastCommit, _Dirty]} ->
+                    Data = [{last_tag, ""}, {offset, "0"}, {commit, LastCommit}, {dirty, true}];
+                nomatch ->
+                    Data = [],
+                    tetrapak:fail("failed to parse the output of git-describe(1)")
+            end
+    end,
+    {done, [{branch, string:strip(binary_to_list(Branch), right, $\n)} | Data]};
+
+run("config:vcs", Unknown) ->
+    tetrapak:fail("unknown VCS type: ~p", [Unknown]).
 
 %% ------------------------------------------------------------
 %% -- Project info
@@ -125,3 +154,7 @@ fmt_error(File, {Line, Module, ErrorDesc}) ->
 fmt_error(File, {file, Error}) ->
     English = file:format_error(Error),
     io:format("~s: Error: ~s~n", [File, English]).
+
+run_git(Cmd, Args) ->
+    DirArg = "--git-dir=" ++ tetrapak:subdir(".git"),
+    tetrapak:cmd("git", [DirArg, Cmd | Args]).

@@ -32,6 +32,7 @@
       {"check:appmodules", tetrapak_task_check, "Check app file module list"},
       {"config:appfile", tetrapak_task_config, "Read the application resource file"},
       {"config:ini", tetrapak_task_config, "Read the tetrapak config file"},
+      {"config:vcs", tetrapak_task_config, "Gather information from the VCS"},
       {"build:erlang", tetrapak_task_erlc, "Compile Erlang modules"},
       {"build:yecc", tetrapak_task_erlc, "Compile yecc parsers (.yrl) to Erlang"},
       {"build:leex", tetrapak_task_erlc, "Compile lexical analysers (.xrl) to Erlang"},
@@ -46,6 +47,7 @@
     ]},
     {config, [
       {"build.erlc_options", []},
+      {"build.vcs_type", git},
       {"package.outdir", "dist"},
       {"package.maintainer", "Joe User <joe@example.com>"},
       {"package.exclude", undefined},
