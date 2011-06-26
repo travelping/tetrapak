@@ -15,6 +15,7 @@
 
              %% tasks
              tetrapak_task_boot,
+             tetrapak_task_appsrc,
              tetrapak_task_config,
              tetrapak_task_erlc,
              tetrapak_task_check,
@@ -36,6 +37,7 @@
       {"build:erlang", tetrapak_task_erlc, "Compile Erlang modules"},
       {"build:yecc", tetrapak_task_erlc, "Compile yecc parsers (.yrl) to Erlang"},
       {"build:leex", tetrapak_task_erlc, "Compile lexical analysers (.xrl) to Erlang"},
+      {"build:appfile", tetrapak_task_appsrc, "Generate the application resource file"},
       {"clean:erlang", tetrapak_task_erlc, "Delete compiled Erlang modules"},
       {"clean:yecc", tetrapak_task_erlc, "Delete compiled yecc parsers"},
       {"clean:leex", tetrapak_task_erlc, "Delete compiled lexical analysers"},
@@ -48,6 +50,7 @@
     {config, [
       {"build.erlc_options", []},
       {"build.vcs_type", git},
+      {"build.version", undefined},
       {"package.outdir", "dist"},
       {"package.maintainer", "Joe User <joe@example.com>"},
       {"package.exclude", undefined},

@@ -9,16 +9,14 @@
 
 -module(tetrapak_task_config).
 -behaviour(tetrapak_task).
--export([read_ini_file/1]).
+-export([read_ini_file/1, find_app_file/2]).
 -export([run/2, check/1]).
 
 check("config:vcs") ->
     {needs_run, tetrapak:config("build.vcs_type")}.
 
 run("config:appfile", _) ->
-    Dir  = tetrapak:dir(),
-    Ebin = filename:join(Dir, "ebin"),
-    case find_app_file(Dir, Ebin) of
+    case find_app_file("ebin", ".app") of
         {ok, Appfile} ->
             tpk_log:debug("found application resource file ~s", [Appfile]),
             case file:consult(Appfile) of
@@ -84,13 +82,14 @@ app_attr(File, Key, Attrs) ->
         Val -> Val
     end.
 
-find_app_file(OrigDir, Ebin) ->
-    Candidates = filelib:wildcard(filename:join(Ebin, "*.app")),
+find_app_file(Dir, Extension) ->
+    OrigDir = tetrapak:dir(),
+    Candidates = filelib:wildcard(filename:join(tetrapak:subdir(Dir), "*" ++ Extension)),
     case {Candidates, dir_to_appname(OrigDir)} of
         {[], _} ->
             {error, no_app_file};
         {Files, nomatch} ->
-            tpk_log:warn("project directory name not OTP-compliant"),
+            io:format("Warning: project directory name not OTP-compliant~n", []),
             {ok, hd(Files)};
         {Files, Appname} ->
             case lists:filter(fun (F) -> filename:rootname(F) =:= Appname end, Files) of
@@ -101,7 +100,7 @@ find_app_file(OrigDir, Ebin) ->
 
 dir_to_appname(Dir) ->
     Base = tpk_file:basename(Dir),
-    case re:run(Base,"([a-z_]+)(-.*)?", [caseless,{capture,first,list}]) of
+    case re:run(Base,"([a-z_])(-.*)?", [caseless,{capture,first,list}]) of
         {match, [Appname]} -> Appname;
         nomatch            -> nomatch
     end.
