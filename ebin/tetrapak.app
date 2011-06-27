@@ -41,6 +41,7 @@
       {"clean:erlang", tetrapak_task_erlc, "Delete compiled Erlang modules"},
       {"clean:yecc", tetrapak_task_erlc, "Delete compiled yecc parsers"},
       {"clean:leex", tetrapak_task_erlc, "Delete compiled lexical analysers"},
+      {"clean:appfile", tetrapak_task_appsrc, "Delete generated application resource file"},
       {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
       {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
       {"clean:pkg:deb", tetrapak_task_pkg_deb, "Delete debian packages"},

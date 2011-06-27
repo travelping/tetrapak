@@ -11,19 +11,26 @@
 -export([check/1, run/2]).
 
 check("build:appfile") ->
-    case tetrapak_task_config:find_app_file("src", ".app.src") of
-        {error, no_app_file} ->
+    case find_files() of
+        undefined ->
             done;
-        {ok, File} ->
-            AppFile = filename:join(tetrapak:subdir("ebin"), filename:rootname(filename:basename(File), ".app.src") ++ ".app"),
+        {AppSrc, AppFile} ->
             case filelib:is_regular(AppFile) of
-                false -> {needs_run, {File, AppFile}};
+                false -> {needs_run, {AppSrc, AppFile}};
                 true  ->
-                    case tpk_file:mtime(File) >= tpk_file:mtime(AppFile) of
-                        true  -> {needs_run, {File, AppFile}};
+                    case tpk_file:mtime(AppSrc) >= tpk_file:mtime(AppFile) of
+                        true  -> {needs_run, {AppSrc, AppFile}};
                         false -> done
                     end
             end
+    end;
+
+check("clean:appfile") ->
+    case find_files() of
+        undefined ->
+            done;
+        {_, AppFile} ->
+            {needs_run, AppFile}
     end.
 
 run("build:appfile", {AppSrc, AppFile}) ->
@@ -39,7 +46,7 @@ run("build:appfile", {AppSrc, AppFile}) ->
             end,
             Vsn = get_app_vsn(AppSrcDisplayPath, proplists:get_value(vsn, Keys), tetrapak:config("build.version")),
             NewKeys1 = lists:keystore(vsn, 1, Keys, {vsn, Vsn}),
-            store = lists:keystore(modules, 1, NewKeys1, {modules, get_app_modules()}),
+            NewKeys2 = lists:keystore(modules, 1, NewKeys1, {modules, get_app_modules()}),
             write_appfile(AppFile, AppName, NewKeys2);
         {ok, _} ->
             tetrapak:fail("~s has invalid term structure", [AppSrcDisplayPath]);
@@ -48,7 +55,11 @@ run("build:appfile", {AppSrc, AppFile}) ->
         {error, Error = {_Line, _Mod, _EInfo}} ->
             tpk_util:show_error_info(Error),
             tetrapak:fail()
-    end.
+    end;
+
+run("clean:appfile", AppFile) ->
+    tpk_file:delete(AppFile),
+    ok.
 
 get_app_vsn(_AppSrc, _AppVsn, CfgVsn) when is_list(CfgVsn) ->
     expand_vsn(CfgVsn);
@@ -81,6 +92,15 @@ expand_vsn("~D{" ++ R) ->
     expand_condition(R, "config:vcs:dirty", false);
 expand_vsn([C | R]) ->
     [C | expand_vsn(R)].
+
+find_files() ->
+    case tetrapak_task_config:find_app_file("src", ".app.src") of
+        {error, no_app_file} ->
+            undefined;
+        {ok, AppSrc} ->
+            AppFile = filename:join(tetrapak:subdir("ebin"), filename:rootname(filename:basename(AppSrc), ".app.src") ++ ".app"),
+            {AppSrc, AppFile}
+    end.
 
 expand_condition(Str, CheckKey, EmptyValue) ->
     case re:run(Str, "([^\\}]*)\\}(.*)", [{capture, all_but_first, list}]) of
