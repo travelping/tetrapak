@@ -124,14 +124,7 @@ show_errors(BaseDir, Prefix, Errors) ->
                               false ->
                                   Path = FileName
                           end,
-                          lists:foreach(fun ({Line, Module, Error}) ->
-                                                if
-                                                   is_integer(Line) ->
-                                                       io:format("~s:~b: ~s~s~n", [Path, Line, Prefix, Module:format_error(Error)]);
-                                                   true ->
-                                                       io:format("~s: ~s~s~n", [Path, Prefix, Module:format_error(Error)])
-                                                end
-                                        end, FileErrors)
+                          lists:foreach(fun (Error) -> tpk_util:show_error_info(Path, Prefix, Error) end, FileErrors)
                   end, Errors).
 
 compile_order(File1, _File2) ->

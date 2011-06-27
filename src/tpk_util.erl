@@ -11,10 +11,20 @@
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1, fold_tree/3]).
 -export([check_files/5, check_files_mtime/4, check_files_exist/4, varsubst/2, varsubst_file/2]).
 -export([cmd/3, parse_cmdline/3]).
--export([format_error/1]).
+-export([format_error/1, show_error_info/2, show_error_info/3]).
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
+
+show_error_info(File, Error) ->
+    show_error_info(File, "", Error).
+show_error_info(File, Prefix, {Line, Mod, Einfo}) ->
+    if
+        is_integer(Line) ->
+            io:format("~s:~b: ~s~s~n", [File, Line, Prefix, Mod:format_error(Einfo)]);
+        true ->
+            io:format("~s: ~s~s~n", [File, Prefix, Mod:format_error(Einfo)])
+    end.
 
 match(Fun, String) when is_function(Fun) ->
     Fun(String);

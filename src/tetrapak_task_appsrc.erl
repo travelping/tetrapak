@@ -53,7 +53,7 @@ run("build:appfile", {AppSrc, AppFile}) ->
         {error, Error} when is_atom(Error) ->
             tetrapak:fail("could not open ~s: ~s", [AppSrcDisplayPath, file:format_error(Error)]);
         {error, Error = {_Line, _Mod, _EInfo}} ->
-            tpk_util:show_error_info(Error),
+            tpk_util:show_error_info(AppSrcDisplayPath, Error),
             tetrapak:fail()
     end;
 
