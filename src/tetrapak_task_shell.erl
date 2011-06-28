@@ -15,6 +15,7 @@ run("shell", _) ->
     code:ensure_loaded(tpk),
     case tetrapak_io:can_start_shell() of
         true ->
+            tetrapak:require("tetrapak:reload"),
             tetrapak_io:start_shell(),
             timer:sleep(infinity);
         false ->
