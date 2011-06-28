@@ -10,6 +10,7 @@
 -module(tetrapak_task_erlc).
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
+-export([check_mtimes/2, show_errors/3]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -151,13 +152,15 @@ needs_compile(NewCOptions, Ebin, #erl{module = Mod, attributes = Attrs, includes
             BeamMTime    = tpk_file:mtime(Beam),
             ((BeamMTime =< ModMTime)) %% beam is older
             orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
-            orelse lists:any(fun (I) ->
-                                     case file:read_file_info(I) of
-                                         {error, _} -> true;
-                                         {ok, Info} -> Info#file_info.mtime >= BeamMTime %% include file changed
-                                     end
-                             end, Inc)
-    end.
+            orelse check_mtimes(BeamMTime, Inc) end.
+
+check_mtimes(FileMTime, Files) ->
+    lists:any(fun (F) ->
+                      case file:read_file_info(F) of
+                          {error, _} -> true;
+                          {ok, Info} -> Info#file_info.mtime >= FileMTime
+                      end
+              end, Files).
 
 erlang_source_files(Path) ->
     case filelib:is_dir(Path) of
