@@ -11,29 +11,22 @@
 -export([check/1, run/2]).
 
 check("build:appfile") ->
-    case find_files() of
-        undefined ->
+    case tetrapak_task_config:find_app_file("src", ".app.src") of
+        {error, no_app_file} ->
             done;
-        {AppSrc, AppFile} ->
-            case filelib:is_regular(AppFile) of
-                false -> {needs_run, {AppSrc, AppFile}};
-                true  ->
-                    case tpk_file:mtime(AppSrc) >= tpk_file:mtime(AppFile) of
-                        true  -> {needs_run, {AppSrc, AppFile}};
-                        false -> done
-                    end
-            end
+        {ok, AppSrc} ->
+            {needs_run, AppSrc}
     end;
 
 check("clean:appfile") ->
-    case find_files() of
-        undefined ->
+    case tetrapak_task_config:find_app_file("ebin", ".app") of
+        {error, no_app_file} ->
             done;
-        {_, AppFile} ->
+        {ok, AppFile} ->
             {needs_run, AppFile}
     end.
 
-run("build:appfile", {AppSrc, AppFile}) ->
+run("build:appfile", AppSrc) ->
     tetrapak:require("build:erlang"),
     AppSrcDisplayPath = tpk_file:rebase_filename(AppSrc, tetrapak:dir(), ""),
     case file:consult(AppSrc) of
@@ -47,7 +40,7 @@ run("build:appfile", {AppSrc, AppFile}) ->
             Vsn = get_app_vsn(AppSrcDisplayPath, proplists:get_value(vsn, Keys), tetrapak:config("build.version")),
             NewKeys1 = lists:keystore(vsn, 1, Keys, {vsn, Vsn}),
             NewKeys2 = lists:keystore(modules, 1, NewKeys1, {modules, get_app_modules()}),
-            write_appfile(AppFile, AppName, NewKeys2);
+            write_appfile(AppName, NewKeys2);
         {ok, _} ->
             tetrapak:fail("~s has invalid term structure", [AppSrcDisplayPath]);
         {error, Error} when is_atom(Error) ->
@@ -95,15 +88,6 @@ expand_vsn("~D{" ++ R) ->
 expand_vsn([C | R]) ->
     [C | expand_vsn(R)].
 
-find_files() ->
-    case tetrapak_task_config:find_app_file("src", ".app.src") of
-        {error, no_app_file} ->
-            undefined;
-        {ok, AppSrc} ->
-            AppFile = filename:join(tetrapak:subdir("ebin"), filename:rootname(filename:basename(AppSrc), ".app.src") ++ ".app"),
-            {AppSrc, AppFile}
-    end.
-
 expand_condition(Str, CheckKey, EmptyValue) ->
     case re:run(Str, "([^\\}]*)\\}(.*)", [{capture, all_but_first, list}]) of
         {match, [Insert, Rest]} ->
@@ -118,5 +102,6 @@ expand_condition(Str, CheckKey, EmptyValue) ->
 get_app_modules() ->
     [list_to_atom(filename:rootname(F, ".beam")) || F <- filelib:wildcard("*.beam", tetrapak:subdir("ebin"))].
 
-write_appfile(OutputFile, AppName, Keys) ->
+write_appfile(AppName, Keys) ->
+    OutputFile = filename:join(tetrapak:subdir("ebin"), atom_to_list(AppName) ++ ".app"),
     file:write_file(OutputFile, io_lib:fwrite("{application, ~s,~n  ~p~n}.", [AppName, Keys])).
