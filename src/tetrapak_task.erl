@@ -180,11 +180,12 @@ str(Lis)                     -> Lis.
 -define(LineWidth, 30).
 
 output_collector(Context, TaskName, TaskProcess) ->
+    tpk_log:debug("output_collector for ~s", [TaskName]),
     process_flag(trap_exit, true),
     tetrapak_context:register_io_worker(Context),
     receive
         Req = {io_request, _, _, _} ->
-            tetrapak_context:task_wants_output(Context, TaskProcess),
+            tetrapak_context:task_wants_output(Context),
             Buffer = handle_io(Req, <<>>),
             output_collector_loop(Context, TaskName, TaskProcess, Buffer);
         {'EXIT', TaskProcess, _Reason} ->
@@ -203,18 +204,22 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
         {'EXIT', TaskProcess, _Reason} ->
             case Buffer of
                 console ->
-                    tetrapak_context:task_output_done(Context, TaskProcess);
+                    tetrapak_context:task_output_done(Context);
+                <<>> ->
+                    tetrapak_context:task_output_done(Context);
                 _ ->
-                    wait_output_ok(Context, TaskName, TaskProcess, Buffer)
+                    wait_output_ok(Context, TaskName, Buffer)
             end
     end.
 
-wait_output_ok(Context, TaskName, TaskProcess, Buffer) ->
+wait_output_ok(Context, TaskName, Buffer) ->
     receive
         {reply, Context, output_ok} ->
             print_output_header(TaskName),
             io:put_chars(Buffer),
-            tetrapak_context:task_output_done(Context, TaskProcess)
+            tetrapak_context:task_output_done(Context);
+        _Other ->
+            tpk_log:debug("wait_output_ok other ~p", [_Other])
     end.
 
 handle_io(Req, console) ->

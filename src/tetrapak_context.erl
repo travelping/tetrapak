@@ -10,7 +10,7 @@
 -module(tetrapak_context).
 -export([new/1, run_sequentially/2, shutdown/1,
          get_cached/2, wait_for/2, wait_shutdown/1,
-         task_done/3, task_wants_output/2, task_output_done/2,
+         task_done/3, task_wants_output/1, task_output_done/1,
          register_io_worker/1,
          register_tasks/2, get_tasks/1]).
 -export([init/1, loop/1]).
@@ -21,11 +21,11 @@
 task_done(Ctx, Task, Result) ->
     cast(Ctx, {done, Task, Result}).
 
-task_wants_output(Ctx, WorkerPid) ->
-    cast(Ctx, {want_output, WorkerPid}).
+task_wants_output(Ctx) ->
+    cast(Ctx, want_output).
 
-task_output_done(Ctx, WorkerPid) ->
-    cast(Ctx, {output_done, WorkerPid}).
+task_output_done(Ctx) ->
+    cast(Ctx, output_done).
 
 register_io_worker(Ctx) ->
     link(Ctx),
@@ -133,14 +133,13 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
                     loop(NewLoopState)
             end;
 
-        {cast, FromPid, {want_output, TaskWorker}} ->
-            loop(LoopState#st{io_queue = push_ioqueue(IOQueue, FromPid, TaskWorker)});
+        {cast, FromPid, want_output} ->
+            loop(LoopState#st{io_queue = push_ioqueue(IOQueue, FromPid)});
 
-        {cast, _FromPid, {output_done, _TaskWorker}} ->
-            loop(LoopState#st{io_queue = pop_ioqueue(IOQueue)});
+        {cast, FromPid, output_done} ->
+            loop(LoopState#st{io_queue = pop_ioqueue(IOQueue, FromPid)});
 
         {cast, FromPid, register_io_worker} ->
-            tpk_log:debug("register_io_worker ~p", [FromPid]),
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
 
         {cast, _FromPid, {done, Task, Variables}} ->
@@ -182,28 +181,35 @@ shutdown_loop(Workers, Running, IOQueue) ->
     receive
         {'EXIT', Pid, _Reason} ->
             shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue);
-        {cast, _FromPid, {output_done, _TaskWorker}} ->
-            shutdown_loop(Workers, Running, pop_ioqueue(IOQueue));
-        {cast, FromPid, {want_output, TaskWorker}} ->
-            shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid, TaskWorker));
+        {cast, FromPid, output_done} ->
+            shutdown_loop(Workers, Running, pop_ioqueue(IOQueue, FromPid));
+        {cast, FromPid, want_output} ->
+            shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid));
         Other ->
             tpk_log:debug("shutdown other ~p", [Other]),
             shutdown_loop(Workers, Running, IOQueue)
     end.
 
-pop_ioqueue(IOQueue) ->
+pop_ioqueue(IOQueue, DoneIOProc) ->
     case queue:out(IOQueue) of
-        {empty, NewIOQueue}                              -> ok;
-        {{value, {_NextWorker, NextIOProc}}, NewIOQueue} -> reply(NextIOProc, output_ok)
-    end,
-    NewIOQueue.
+        {empty, NewIOQueue}               -> NewIOQueue;
+        {{value, DoneIOProc}, NewIOQueue} ->
+            case queue:out(NewIOQueue) of
+                {empty, ReturnIOQueue}    -> ReturnIOQueue;
+                {{value, NextIOProc}, _Q} ->
+                    tpk_log:debug("popped: ~p", [NextIOProc]),
+                    reply(NextIOProc, output_ok),
+                    NewIOQueue %% Next stays in the queue!!
+            end
+    end.
 
-push_ioqueue(IOQueue, FromPid, TaskWorker) ->
+push_ioqueue(IOQueue, FromPid) ->
     case queue:is_empty(IOQueue) of
         true  -> reply(FromPid, output_ok);
         false -> ok
     end,
-    queue:in({TaskWorker, FromPid}, IOQueue).
+    tpk_log:debug("push ioqueue ~p ~p", [FromPid, queue:to_list(IOQueue)]),
+    queue:in(FromPid, IOQueue).
 
 maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
     case dict:find(TaskName, State#st.running) of
