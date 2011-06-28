@@ -9,9 +9,12 @@
 
 -module(tpk_util).
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1, fold_tree/3]).
--export([check_files/5, check_files_mtime/4, check_files_exist/4, varsubst/2, varsubst_file/2]).
+-export([check_files/2, check_files/5, check_files_mtime/1, check_files_mtime/4,
+         check_files_exist/4, varsubst/2, varsubst_file/2]).
 -export([cmd/3, parse_cmdline/3]).
 -export([format_error/1, show_error_info/2, show_error_info/3]).
+
+-include_lib("kernel/include/file.hrl").
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -74,11 +77,32 @@ check_files(Dir1, Suffix1, Dir2, Suffix2, CheckFunction) ->
         _  -> {needs_run, Files}
     end.
 
+check_files(Files, Fun) ->
+    FilterFun = fun ({P1, P2}) -> Fun(P1, P2) end,
+    case lists:filter(FilterFun, Files) of
+        []       -> done;
+        Filtered -> {needs_run, Filtered}
+    end.
+
 check_files_mtime(Dir1, Suffix1, Dir2, Suffix2) ->
-    check_files(Dir1, Suffix1, Dir2, Suffix2, fun (P1, P2) -> tpk_file:mtime(P2) =< tpk_file:mtime(P1) end).
+    check_files(Dir1, Suffix1, Dir2, Suffix2, fun check_mtime/2).
+
+check_files_mtime(Files) ->
+    check_files(Files, fun check_mtime/2).
 
 check_files_exist(Dir1, Suffix1, Dir2, Suffix2) ->
     check_files(Dir1, Suffix1, Dir2, Suffix2, fun (_, _) -> true end).
+
+check_mtime(File1, File2) ->
+    case file:read_file_info(File1) of
+        {error, _} -> false;
+        {ok, #file_info{mtime = MTime1}} ->
+            case file:read_file_info(File2) of
+                {error, _} -> true;
+                {ok, #file_info{mtime = MTime2}} ->
+                    MTime1 >= MTime2
+            end
+    end.
 
 varsubst(Text, Variables) ->
     BinText = iolist_to_binary(Text),
