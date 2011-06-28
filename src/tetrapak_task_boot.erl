@@ -12,10 +12,9 @@
 -export([initial_tmap/0, run/2]).
 
 -include("tetrapak.hrl").
--define(LOCAL_CACHE, ".local.cache").
 
 initial_tmap() ->
-    [{["clean", "taskcache"],  #task{name = "clean:taskcache", module = ?MODULE, description = "Remove the local task cache"}},
+    [{["clean", "taskcache"],  #task{name = "clean:taskcache", module = ?MODULE, description = "Delete the local task cache"}},
      {["tetrapak", "appdata"], #task{name = "tetrapak:appdata", module = ?MODULE, description = "Read tetrapak's app file"}},
      {["tetrapak", "boot"],    #task{name = "tetrapak:boot", module = ?MODULE, description = "Gather tasks"}},
      {["tetrapak", "info"],    #task{name = "tetrapak:info", module = ?MODULE, description = "Show version and tasks"}}].

@@ -6,3 +6,4 @@
 
 -define(TASK_FAIL, '$__tetrapak_task_fail').
 -define(TASK_DONE, '$__tetrapak_task_done').
+-define(LOCAL_CACHE, ".local.cache").

@@ -11,6 +11,8 @@
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
+-include("tetrapak.hrl").
+
 %% ------------------------------------------------------------
 %% -- Task API
 check("clean:pkg:deb") ->
@@ -40,6 +42,7 @@ is_useless(Filename) ->
     or tpk_util:match("\\..*\\.sw[po]", Name) %% vim swap files
     or tpk_util:match("\\.#.*", Name) %% emacs swap files
     or tpk_util:match("erl_crash.dump", Name) %% you know those...
+    or (in_dir("tetrapak", Filename) and tpk_util:match(?LOCAL_CACHE, Name)) %% tetrapak task cache
     or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
