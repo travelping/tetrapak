@@ -15,19 +15,6 @@
 
 -include("tetrapak.hrl").
 
-% increase_version(#tep_project{vsn = Version, app_file = AppFile}) ->
-%    VComps = re:split(Version, "\\.", [{return, list}]),
-%    NewLast = integer_to_list(list_to_integer(lists:last(VComps)) + 1),
-%    NewVL = lists:append(lists:sublist(VComps, length(VComps) - 1), [NewLast]),
-%    NewV = string:join(NewVL, "."),
-%    tep_log:info("increasing version in project app file from ~s to ~s", [Version, NewV]),
-%    {ok, AppContents} = file:read_file(AppFile),
-%    NewContents = re:replace(AppContents,
-%                             "(\\{\\s*vsn\\s*,\\s*)(\"[^\"]+\")(\\s*\\})",
-%                             "\\1\"" ++ NewV ++ "\"\\3",
-%                             [{return, binary}]),
-%    file:write_file(AppFile, NewContents).
-
 %% ------------------------------------------------------------
 %% -- Ext API
 run(Directory, TaskCmds) ->
