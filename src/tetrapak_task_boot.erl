@@ -37,7 +37,8 @@ run("tetrapak:info", _) ->
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
 
 run("clean:taskcache", _) ->
-    tpk_file:delete(filename:join(tetrapak:subdir("tetrapak"), ?LOCAL_CACHE)).
+    tpk_file:delete(filename:join(tetrapak:subdir("tetrapak"), ?LOCAL_CACHE)),
+    ok.
 
 show_tmap(TMap) ->
     Lis = [{Task#task.name, Task#task.description} ||
