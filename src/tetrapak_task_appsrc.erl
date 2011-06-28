@@ -19,10 +19,11 @@ check("build:appfile") ->
     end;
 
 check("clean:appfile") ->
-    case tetrapak_task_config:find_app_file("ebin", ".app") of
+    case tetrapak_task_config:find_app_file("ebin", ".app.src") of
         {error, no_app_file} ->
             done;
-        {ok, AppFile} ->
+        {ok, AppSrc} ->
+            AppFile = filename:join(tetrapak:subdir("ebin"), filename:rootname(filename:basename(AppSrc), ".app.src") ++ ".app"),
             {needs_run, AppFile}
     end.
 
