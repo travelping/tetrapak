@@ -13,6 +13,7 @@
          check_files_exist/4, varsubst/2, varsubst_file/2]).
 -export([cmd/3, parse_cmdline/3]).
 -export([format_error/1, show_error_info/2, show_error_info/3]).
+-export([debug_log_to_stderr/2]).
 
 -include_lib("kernel/include/file.hrl").
 
@@ -231,4 +232,14 @@ find_option(Option, [Opt = {_, _Name, Flags, _Default} | Rest]) ->
     case lists:member(Option, Flags) of
         false -> find_option(Option, Rest);
         true -> Opt
+    end.
+
+%% @hidden
+debug_log_to_stderr(Fmt, Args) ->
+    case application:get_env(tetrapak, debug) of
+        {ok, true} ->
+            io:fwrite(standard_error, "---- ~s -- " ++ Fmt ++ "\n",
+                      [io_lib:write(self()) | Args]);
+        _ ->
+            ok
     end.

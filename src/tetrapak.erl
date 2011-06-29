@@ -28,6 +28,14 @@ run(Directory, TaskCmds) ->
 cli_main() ->
     {ok, Cwd} = file:get_cwd(),
 
+    application:load(tetrapak), %% ensure the app file is loaded
+    case os:getenv("DEBUG") of
+        Value when (Value == "1") or (Value == "true") ->
+            application:set_env(tetrapak, debug, true);
+        _ ->
+            ok
+    end,
+
     EbinDir = filename:join(Cwd, "ebin"),
     case filelib:is_dir(EbinDir) of
         true ->

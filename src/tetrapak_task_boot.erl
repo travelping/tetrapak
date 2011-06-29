@@ -20,14 +20,14 @@ initial_tmap() ->
      {["tetrapak", "info"],    #task{name = "tetrapak:info", module = ?MODULE, description = "Show version and tasks"}}].
 
 run("tetrapak:boot", _) ->
+    application:load(tetrapak), %% ensure the app file is loaded
     tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks()),
     tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
     ok;
 
 run("tetrapak:appdata", _) ->
-    application:load(tetrapak), %% ensure tetrapak is loaded
     {ok, Props} = application:get_all_key(tetrapak),
-    Info = proplists:get_value(env, Props),
+    Info        = proplists:get_value(env, Props),
     {done, [{version,  proplists:get_value(vsn, Props)},
             {defaults, proplists:get_value(config, Info)}]};
 
@@ -51,7 +51,6 @@ show_tmap(TMap) ->
                 end, [], Lis).
 
 builtin_tasks() ->
-    application:load(tetrapak), %% ensure tetrapak is loaded
     Props = application:get_all_env(tetrapak),
     Tasks = proplists:get_value(tasks, Props),
     lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->

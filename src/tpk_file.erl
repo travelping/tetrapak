@@ -60,7 +60,6 @@ with_temp_dir(DoSomething) ->
     file:make_dir(Temp),
     try DoSomething(Temp)
     after
-        tpk_log:debug("deleting directory ~s", [Temp]),
         delete(Temp)
     end.
 

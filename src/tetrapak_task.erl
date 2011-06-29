@@ -37,7 +37,7 @@ directory() ->
     end.
 
 worker(#task{name = TaskName, module = TaskModule}, Context, Directory) ->
-    tpk_log:debug("worker: task ~s starting", [TaskName]),
+    ?DEBUG("worker: task ~s starting", [TaskName]),
 
     OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
     group_leader(OutputCollector, self()),
@@ -46,13 +46,13 @@ worker(#task{name = TaskName, module = TaskModule}, Context, Directory) ->
     erlang:put(?DIRECTORY, Directory),
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
-            tpk_log:debug("worker: check/1 -> done"),
+            ?DEBUG("worker: check/1 -> done"),
             tetrapak_context:task_done(Context, TaskName, Variables),
             exit({?TASK_DONE, TaskName});
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
-                    tpk_log:debug("worker: run/2 -> done"),
+                    ?DEBUG("worker: run/2 -> done"),
                     tetrapak_context:task_done(Context, TaskName, Variables),
                     exit({?TASK_DONE, TaskName})
             end
@@ -180,7 +180,7 @@ str(Lis)                     -> Lis.
 -define(LineWidth, 30).
 
 output_collector(Context, TaskName, TaskProcess) ->
-    tpk_log:debug("output_collector for ~s", [TaskName]),
+    ?DEBUG("output_collector for ~s", [TaskName]),
     process_flag(trap_exit, true),
     tetrapak_context:register_io_worker(Context),
     receive
@@ -219,7 +219,7 @@ wait_output_ok(Context, TaskName, Buffer) ->
             io:put_chars(Buffer),
             tetrapak_context:task_output_done(Context);
         _Other ->
-            tpk_log:debug("wait_output_ok other ~p", [_Other])
+            ?DEBUG("wait_output_ok other ~p", [_Other])
     end.
 
 handle_io(Req, console) ->

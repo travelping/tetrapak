@@ -144,7 +144,7 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
 
         {cast, _FromPid, {done, Task, Variables}} ->
             NewCache  = dict:merge(fun (Key, _V1, V2) ->
-                                           tpk_log:debug("ctx var merge conflict ~p", [Key]),
+                                           ?DEBUG("ctx var merge conflict ~p", [Key]),
                                            V2
                                    end, Cache, Variables),
             NewRunning = dict:erase(Task, Running),
@@ -162,11 +162,11 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             do_shutdown(LoopState, DeadPid);
 
         {'EXIT', DeadPid, Reason} ->
-            tpk_log:debug("ctx EXIT ~p ~p", [DeadPid, Reason]),
+            ?DEBUG("ctx EXIT ~p ~p", [DeadPid, Reason]),
             loop(LoopState#st{io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
 
         Other ->
-            tpk_log:debug("ctx other ~p", [Other])
+            ?DEBUG("ctx other ~p", [Other])
     end.
 
 do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, FailedPid) ->
@@ -177,7 +177,7 @@ do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, 
 shutdown_loop([], _, _) ->
     ok;
 shutdown_loop(Workers, Running, IOQueue) ->
-    tpk_log:debug("shutdown: ~p", [Workers]),
+    ?DEBUG("shutdown: ~p", [Workers]),
     receive
         {'EXIT', Pid, _Reason} ->
             shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue);
@@ -186,7 +186,7 @@ shutdown_loop(Workers, Running, IOQueue) ->
         {cast, FromPid, want_output} ->
             shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid));
         Other ->
-            tpk_log:debug("shutdown other ~p", [Other]),
+            ?DEBUG("shutdown other ~p", [Other]),
             shutdown_loop(Workers, Running, IOQueue)
     end.
 
@@ -197,7 +197,7 @@ pop_ioqueue(IOQueue, DoneIOProc) ->
             case queue:out(NewIOQueue) of
                 {empty, ReturnIOQueue}    -> ReturnIOQueue;
                 {{value, NextIOProc}, _Q} ->
-                    tpk_log:debug("popped: ~p", [NextIOProc]),
+                    ?DEBUG("popped: ~p", [NextIOProc]),
                     reply(NextIOProc, output_ok),
                     NewIOQueue %% Next stays in the queue!!
             end
@@ -208,7 +208,7 @@ push_ioqueue(IOQueue, FromPid) ->
         true  -> reply(FromPid, output_ok);
         false -> ok
     end,
-    tpk_log:debug("push ioqueue ~p ~p", [FromPid, queue:to_list(IOQueue)]),
+    ?DEBUG("push ioqueue ~p ~p", [FromPid, queue:to_list(IOQueue)]),
     queue:in(FromPid, IOQueue).
 
 maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->

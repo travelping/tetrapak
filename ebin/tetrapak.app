@@ -26,7 +26,8 @@
   {applications, [kernel, stdlib, compiler, edoc, tools, parsetools]},
   {registered, [tetrapak_io]},
   {env, 
-   [{tasks, [
+   [{debug, false},
+    {tasks, [
             {"doc:edoc", tetrapak_task_doc, "Generate edoc documentation"},
             {"clean:edoc", tetrapak_task_doc, "Delete generated documentation"},
             {"check:xref", tetrapak_task_check, "Check inter-module calls"},

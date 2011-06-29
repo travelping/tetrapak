@@ -11,6 +11,7 @@
 -export([start/0, can_start_shell/0, start_shell/0, start_shell/1]).
 -export([ioreq_output/1]).
 
+-include("tetrapak.hrl").
 -define(SERVER, tetrapak_io).
 
 start() ->
@@ -53,11 +54,10 @@ server_loop(Port, Group) ->
             port_command(Port, Chars),
             server_loop(Port, Group);
         {start_shell, Shell} ->
-            tpk_log:debug("io: starting shell: ~p", Shell),
             erlang:unregister(?SERVER),
             user_drv:server('tty_sl -c -e', Shell);
         _Other ->
-            tpk_log:debug("io other: ~p", [_Other]),
+            ?DEBUG("io other: ~p", [_Other]),
             server_loop(Port, Group)
     end.
 

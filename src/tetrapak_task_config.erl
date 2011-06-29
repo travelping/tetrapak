@@ -18,7 +18,6 @@ check("config:vcs") ->
 run("config:appfile", _) ->
     case find_app_file("ebin", ".app") of
         {ok, Appfile} ->
-            tpk_log:debug("found application resource file ~s", [Appfile]),
             case file:consult(Appfile) of
                 {ok, [Attrs]} ->
                     {done, appfile_info(Appfile, Attrs)};
@@ -76,8 +75,7 @@ appfile_info(File, {application, Name, Attrs}) ->
 app_attr(File, Key, Attrs) ->
     case proplists:get_value(Key, Attrs) of
         undefined ->
-            tpk_log:warn("required property ~s missing in app file ~s",
-                [Key, File]),
+            io:format("~s: required property missing: ~s~n", [Key, File]),
             throw({error, application_prop_missing});
         Val -> Val
     end.
