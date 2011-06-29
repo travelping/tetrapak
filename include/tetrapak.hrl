@@ -1,7 +1,8 @@
 -record(task, {
     name             :: string(),
     module           :: atom(),
-    description = "" :: string()
+    description = "" :: string(),
+    origin = builtin :: local | library | builtin
 }).
 
 -define(TASK_FAIL, '$__tetrapak_task_fail').

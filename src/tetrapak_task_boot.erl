@@ -41,14 +41,18 @@ run("clean:taskcache", _) ->
     ok.
 
 show_tmap(TMap) ->
-    Lis = [{Task#task.name, Task#task.description} ||
+    Lis = [{Task#task.name, Task#task.description, Task#task.origin} ||
              {Key, Task} <- lists:keysort(1, TMap),
              hd(Key) /= "tetrapak"], %% exclude internal tasks
-    MaxWidth = lists:foldl(fun ({K, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),
-    lists:foldr(fun ({Name, Desc}, Acc) ->
+    MaxWidth = lists:foldl(fun ({K, _, _}, Max) -> erlang:max(iolist_size(K), Max) end, 0, Lis),
+    lists:foldr(fun ({Name, Desc, Origin}, Acc) ->
                    Space = lists:duplicate(MaxWidth - iolist_size(Name), $ ),
-                   ["  " ++ Name  ++ "  " ++ Space ++ "- " ++ Desc ++ "\n" | Acc]
+                   ["  " ++ Name  ++ "  " ++ Space ++ ostr(Origin) ++ " - " ++ Desc ++ "\n" | Acc]
                 end, [], Lis).
+
+ostr(builtin) -> " ";
+ostr(local)   -> "*";
+ostr(library) -> "+".
 
 builtin_tasks() ->
     Props = application:get_all_env(tetrapak),
@@ -56,7 +60,8 @@ builtin_tasks() ->
     lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
                         NewTask   = #task{name = tetrapak_task:normalize_name(TaskName),
                                           module = Module,
-                                          description = Desc},
+                                          description = Desc,
+                                          origin = builtin},
                         AddModule = fun (_) -> NewTask end,
                         pl_update(tetrapak_task:split_name(TaskName), AddModule, NewTask, Acc)
                 end, [], Tasks).
@@ -121,7 +126,7 @@ load_local_task(File, #tmod{module = ModuleName, tasks = Tasks, code = Code}) ->
     code:purge(ModuleName),
     case code:load_binary(ModuleName, File, Code) of
         {module, ModuleName} ->
-            [{tetrapak_task:split_name(TN), #task{module = ModuleName, name = TN, description = TD}} || {TN, TD} <- Tasks];
+            [{tetrapak_task:split_name(TN), #task{module = ModuleName, name = TN, description = TD, origin = local}} || {TN, TD} <- Tasks];
         {error, Error} ->
             tetrapak:fail("failed to load local task ~s: ~p", [tpk_file:rebase_filename(File, tetrapak:dir(), ""), Error])
     end.
