@@ -48,6 +48,7 @@
             {"clean:dist", tetrapak_task_pkg_deb, "Delete packages"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
+            {"tetrapak:startapp", tetrapak_task_shell, "Start the current application"},
             {"tetrapak:tpk-help", tetrapak_task_shell, "Show help for the tpk module"}
            ]},
    {config, [

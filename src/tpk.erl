@@ -8,7 +8,7 @@
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
 -module(tpk).
--export([r/1, h/0, l/0, b/0, bl/0, c/0]).
+-export([r/1, h/0, l/0, s/0, b/0, bl/0, c/0]).
 
 r(Cmd) -> run([Cmd]).
 h()    -> run(["tetrapak:info", "tetrapak:tpk-help"]).
@@ -16,6 +16,7 @@ c()    -> r("check").
 l()    -> r("tetrapak:reload").
 b()    -> r("build").
 bl()   -> run(["build", "tetrapak:reload"]).
+s()    -> r("tetrapak:startapp").
 
 run(Tasks) ->
     {ok, Cwd} = file:get_cwd(),
