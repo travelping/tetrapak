@@ -47,7 +47,8 @@
             {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
             {"clean:dist", tetrapak_task_pkg_deb, "Delete packages"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
-            {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"}
+            {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
+            {"tetrapak:tpk-help", tetrapak_task_shell, "Show help for the tpk module"}
            ]},
    {config, [
              {"build.erlc_options", []},

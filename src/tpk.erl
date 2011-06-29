@@ -11,7 +11,7 @@
 -export([r/1, h/0, l/0, b/0, bl/0, c/0]).
 
 r(Cmd) -> run([Cmd]).
-h()    -> r("tetrapak:info").
+h()    -> run(["tetrapak:info", "tetrapak:tpk-help"]).
 c()    -> r("check").
 l()    -> r("tetrapak:reload").
 b()    -> r("build").

@@ -35,7 +35,15 @@ run("tetrapak:reload", _) ->
                               false ->
                                   load(Mod)
                           end
-                  end, Modules).
+                  end, Modules);
+
+run("tetrapak:tpk-help", _) ->
+    io:format("tpk:r(Task)  -- runs the given task\n"
+              "tpk:h()      -- shows this help\n"
+              "tpk:l()      -- reloads changed modules\n"
+              "tpk:c()      -- runs \"check\"\n"
+              "tpk:b()      -- runs \"build\"\n"
+              "tpk:bl()     -- runs \"build\" and reloads modules\n").
 
 loaded_mtime(Mod) ->
     {Y,Mon,D,H,Min,S} = proplists:get_value(time, Mod:module_info(compile)),
