@@ -63,17 +63,17 @@ wait_for(Ctx, Keys) ->
         {unknown_key, Key} ->
             {error, {unknown_key, Key}};
         {wait, WaitList} ->
-            wait_loop(Ctx, [monitor(process, Pid) || Pid <- WaitList])
+            wait_loop(Ctx, [monitor(process, Pid) || Pid <- WaitList], ok)
     end.
 
-wait_loop(_Ctx, []) ->
-    ok;
-wait_loop(Ctx, WaitList) ->
+wait_loop(_Ctx, [], Result) ->
+    Result;
+wait_loop(Ctx, WaitList, Result) ->
     receive
         {'DOWN', MRef, process, _DownPid, {?TASK_DONE, _Name}} ->
-            wait_loop(Ctx, lists:delete(MRef, WaitList));
-        {'DOWN', _MRef, process, _DownPid, {?TASK_FAIL, Name}} ->
-            {error, {failed, Name}}
+            wait_loop(Ctx, lists:delete(MRef, WaitList), Result);
+        {'DOWN', MRef, process, _DownPid, {?TASK_FAIL, Name}} ->
+            wait_loop(Ctx, lists:delete(MRef, WaitList), {error, {failed, Name}})
     end.
 
 wait_shutdown(Process) ->
