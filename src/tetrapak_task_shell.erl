@@ -16,7 +16,9 @@ run("shell", _) ->
     case tetrapak_io:can_start_shell() of
         true ->
             tetrapak:require("tetrapak:reload"),
+            tetrapak_task:print_output_header(user, "shell"),
             tetrapak_io:start_shell(),
+
             timer:sleep(infinity);
         false ->
             tetrapak:fail("Cannot start shell")

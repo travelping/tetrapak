@@ -14,7 +14,7 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([worker/3, context/0, directory/0, fail/0, fail/2, get/1, require_all/1]).
--export([output_collector/3]).
+-export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
 
@@ -198,7 +198,7 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
             NewBuffer = handle_io(Req, Buffer),
             output_collector_loop(Context, TaskName, TaskProcess, NewBuffer);
         {reply, Context, output_ok} ->
-            print_output_header(TaskName),
+            print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
             output_collector_loop(Context, TaskName, TaskProcess, console);
         {'EXIT', TaskProcess, _Reason} ->
@@ -215,7 +215,7 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
 wait_output_ok(Context, TaskName, Buffer) ->
     receive
         {reply, Context, output_ok} ->
-            print_output_header(TaskName),
+            print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
             tetrapak_context:task_output_done(Context);
         _Other ->
@@ -234,5 +234,5 @@ handle_io({io_request, From, ReplyAs, Request}, Buffer) ->
 do_output(Buffer, Chars) ->
     <<Buffer/binary, (iolist_to_binary(Chars))/binary>>.
 
-print_output_header(TaskName) ->
-    io:put_chars(["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
+print_output_header(IODev, TaskName) ->
+    io:put_chars(IODev, ["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
