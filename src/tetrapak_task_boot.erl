@@ -25,9 +25,9 @@ run("tetrapak:boot", _) ->
     ok;
 
 run("tetrapak:appdata", _) ->
-    AppFile = code:where_is_file("tetrapak.app"),
-    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
-    Info = proplists:get_value(tetrapak, Props),
+    application:load(tetrapak), %% ensure tetrapak is loaded
+    {ok, Props} = application:get_all_key(tetrapak),
+    Info = proplists:get_value(env, Props),
     {done, [{version,  proplists:get_value(vsn, Props)},
             {defaults, proplists:get_value(config, Info)}]};
 
@@ -51,9 +51,9 @@ show_tmap(TMap) ->
                 end, [], Lis).
 
 builtin_tasks() ->
-    AppFile = code:where_is_file("tetrapak.app"),
-    {ok, [{application, tetrapak, Props}]} = file:consult(AppFile),
-    Tasks = proplists:get_value(tasks, proplists:get_value(tetrapak, Props, [])),
+    application:load(tetrapak), %% ensure tetrapak is loaded
+    Props = application:get_all_env(tetrapak),
+    Tasks = proplists:get_value(tasks, Props),
     lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
                         NewTask   = #task{name = tetrapak_task:normalize_name(TaskName),
                                           module = Module,
