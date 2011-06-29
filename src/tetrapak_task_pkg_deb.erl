@@ -15,11 +15,11 @@
 
 %% ------------------------------------------------------------
 %% -- Task API
-check("clean:pkg:deb") ->
-    filelib:wildcard("*.deb", tetrapak:config_path("package.outdir")) /= [].
+check("clean:dist") ->
+    filelib:is_dir(tetrapak:config_path("package.outdir")).
 
-run("clean:pkg:deb", _) ->
-    tpk_file:delete("\\.deb$", tetrapak:config_path("package.outdir"));
+run("clean:dist", _) ->
+    tpk_file:delete(tetrapak:config_path("package.outdir"));
 
 run("pkg:deb", _) ->
     case tetrapak:config("package.include_doc") of
