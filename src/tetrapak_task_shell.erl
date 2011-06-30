@@ -58,7 +58,9 @@ start_deps(App) ->
             ok;
         {error, {not_started, DepApp}} ->
             start_deps(DepApp),
-            start_deps(App)
+            start_deps(App);
+        {error, _Error} ->
+            io:format("Failed: ~s~n", [App])
     end.
 
 loaded_mtime(Mod) ->
