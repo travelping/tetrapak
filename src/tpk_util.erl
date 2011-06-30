@@ -22,6 +22,8 @@ f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
 
 show_error_info(File, Error) ->
     show_error_info(File, "", Error).
+show_error_info(File, Prefix, {Mod, Einfo}) ->
+    io:format("~s: ~s~s~n", [File, Prefix, Mod:format_error(Einfo)]);
 show_error_info(File, Prefix, {Line, Mod, Einfo}) ->
     if
         is_integer(Line) ->
