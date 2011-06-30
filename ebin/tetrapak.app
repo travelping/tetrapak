@@ -21,9 +21,10 @@
              tetrapak_task_check,
              tetrapak_task_pkg_deb,
              tetrapak_task_doc,
-             tetrapak_task_shell
+             tetrapak_task_shell,
+             tetrapak_task_common_test
             ]},
-  {applications, [kernel, stdlib, compiler, edoc, tools, parsetools]},
+  {applications, [kernel, stdlib, compiler, edoc, tools, parsetools, common_test]},
   {registered, [tetrapak_io]},
   {env, 
    [{debug, false},
@@ -49,7 +50,9 @@
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
             {"tetrapak:startapp", tetrapak_task_shell, "Start the current application"},
-            {"tetrapak:tpk-help", tetrapak_task_shell, "Show help for the tpk module"}
+            {"tetrapak:tpk-help", tetrapak_task_shell, "Show help for the tpk module"},
+            {"test:ct", tetrapak_task_common_test, "Run unit tests with common_test"},
+            {"clean:testlog", tetrapak_task_common_test, "Delete common_test HTML logs"}
            ]},
    {config, [
              {"build.erlc_options", []},
@@ -67,7 +70,9 @@
              {"edoc.outdir", "doc"},
              {"edoc.private", false},
              {"edoc.hidden", false},
-             {"edoc.todo", false}
+             {"edoc.todo", false},
+             {"test.ct.srcdir", "test"},
+             {"test.ct.logdir", "test-log"}
             ]}]}
   
 ]}.

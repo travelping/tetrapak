@@ -43,6 +43,7 @@ is_useless(Filename) ->
     or tpk_util:match("\\.#.*", Name) %% emacs swap files
     or tpk_util:match("erl_crash.dump", Name) %% you know those...
     or (in_dir("tetrapak", Filename) and tpk_util:match(?LOCAL_CACHE, Name)) %% tetrapak task cache
+    or in_dir(tetrapak:config_path("test.ct.logdir"), Filename)
     or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)

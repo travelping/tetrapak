@@ -36,6 +36,7 @@ cli_main() ->
             ok
     end,
 
+    %% add the current project's ebin to the front
     EbinDir = filename:join(Cwd, "ebin"),
     case filelib:is_dir(EbinDir) of
         true ->
