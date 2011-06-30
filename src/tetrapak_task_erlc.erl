@@ -63,6 +63,7 @@ check("clean:leex") ->
     tpk_util:check_files_exist(SrcDir, ".xrl", SrcDir, ".erl").
 
 run("build:erlang", ErlFiles) ->
+    file:make_dir(tetrapak:subdir("ebin")),
     compile_foreach(fun ({File, CompileOptions}) ->
                             try_load(tetrapak:subdir("ebin"), File#erl.behaviours),
                             run_compiler(compile, file, [File#erl.file, CompileOptions])
