@@ -20,6 +20,7 @@ run("doc:edoc", _) ->
     edoc:application(tetrapak:get("config:appfile:name"),
                      tetrapak:subdir("src"),
                      [{dir, DD},
+                      {includes, [tetrapak:subdir("include")]},
                       {private, tetrapak:config("edoc.private")},
                       {hidden, tetrapak:config("edoc.hidden")},
                       {todo, tetrapak:config("edoc.todo")}]);
