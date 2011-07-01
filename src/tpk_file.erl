@@ -108,9 +108,9 @@ delete_if_match(Mask, Path) ->
         true ->
             case filelib:is_dir(Path) of
                 true  ->
-                    file:del_dir(Path);
+                    file:del_dir(Path), ok;
                 false ->
-                    file:delete(Path)
+                    file:delete(Path), ok
             end;
         false -> ok
     end.
