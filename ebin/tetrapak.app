@@ -10,7 +10,6 @@
              tetrapak_ini_lexer,
              tpk_util,
              tpk_file,
-             tpk_log,
              tpk,
 
              %% tasks
