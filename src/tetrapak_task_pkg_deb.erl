@@ -145,7 +145,7 @@ make_debsrc() ->
     {ok, OrigMd5} = tpk_file:md5sum(OrigTarballPath),
     {ok, Dsc} = file:open(DscFile, [write]),
     Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- tetrapak:get("config:appfile:deps"), not in_erlang_base(S)],
-    BuildDeps = ["erlang-tetrapak (>= 0.3.0)" | Deps],
+    BuildDeps = ["erlang-tetrapak (>= 0.3.0), erlang-dev" | Deps],
     io:format(Dsc, "Format: 1.0~n", []),
     io:format(Dsc, "Architecture: any~n", []),
     io:format(Dsc, "Source: ~s~nBinary: ~s~n", [Pkg, Pkg]),
