@@ -173,7 +173,7 @@ split_name(Key) ->
 
 str(Atom) when is_atom(Atom) -> atom_to_list(Atom);
 str(Bin) when is_binary(Bin) -> binary_to_list(Bin);
-str(Lis)                     -> Lis.
+str(Lis) when is_list(Lis)   -> Lis.
 
 %% ------------------------------------------------------------
 %% -- Output handler

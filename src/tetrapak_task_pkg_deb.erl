@@ -132,6 +132,8 @@ make_debsrc() ->
     copy_files(OrigTarball, ExtractDir,
                fun (Path) ->
                        is_useless(Path)
+                       orelse (in_dir("src", Path) and tpk_util:match("\\.app\\.src$", filename:basename(Path)))
+                       orelse (in_dir("ebin", Path) and tpk_util:match("\\.beam$", filename:basename(Path)))
                        orelse in_dir("debian", Path)
                        orelse in_dir(tetrapak:config("package.outdir"), Path)
                end),
@@ -142,11 +144,14 @@ make_debsrc() ->
     DscFile = filename:join(tetrapak:config_path("package.outdir"), DscFileName),
     {ok, OrigMd5} = tpk_file:md5sum(OrigTarballPath),
     {ok, Dsc} = file:open(DscFile, [write]),
+    Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- tetrapak:get("config:appfile:deps"), not in_erlang_base(S)],
+    BuildDeps = ["erlang-tetrapak (>= 0.3.0)" | Deps],
     io:format(Dsc, "Format: 1.0~n", []),
     io:format(Dsc, "Architecture: any~n", []),
     io:format(Dsc, "Source: ~s~nBinary: ~s~n", [Pkg, Pkg]),
     io:format(Dsc, "Version: ~s~n", [Version]),
     io:format(Dsc, "Maintainer: ~s~n", [tetrapak:config("package.maintainer")]),
+    io:format(Dsc, "Build-Depends: ~s~n", [string:join(BuildDeps, ", ")]),
     io:format(Dsc, "Standards-Version: 3.9.1~n", []),
     io:format(Dsc, "Files:~n ~s ~b ~s~n", [OrigMd5, tpk_file:size(OrigTarballPath), OrigTarballName]),
     file:close(Dsc),

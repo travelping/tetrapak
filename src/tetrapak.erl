@@ -109,5 +109,5 @@ cmd(Cmd, Args) ->
         {ok, _Other, _Output} ->
             fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
         {error, {_L, Mod, Error}} ->
-            fail("error running command ~s: ", [Cmd, Mod:format_error(Error)])
+            fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
     end.

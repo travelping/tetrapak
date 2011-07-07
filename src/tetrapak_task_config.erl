@@ -16,6 +16,7 @@ check("config:vcs") ->
     {needs_run, tetrapak:config("build.vcs_type")}.
 
 run("config:appfile", _) ->
+    tetrapak:require("build:appfile"),
     case find_app_file("ebin", ".app") of
         {ok, Appfile} ->
             case file:consult(Appfile) of

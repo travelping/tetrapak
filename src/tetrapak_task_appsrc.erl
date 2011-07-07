@@ -61,7 +61,7 @@ get_app_vsn(_AppSrc, AppVsn, undefined) when is_list(AppVsn) ->
     expand_vsn(AppVsn);
 get_app_vsn(_AppSrc, git, undefined) ->
     %% match what git describe outputs, for rebar compatibility
-    expand_vsn("~T{~t-}~O{-~o-}~T{g}~c~D{-dirty}");
+    expand_vsn("~T{~t}~O{-~o}~T{-g}~c~D{-dirty}");
 get_app_vsn(_AppSrc, undefined, AppVsn) when is_list(AppVsn) ->
     expand_vsn(AppVsn);
 get_app_vsn(AppSrc, undefined, undefined) ->
