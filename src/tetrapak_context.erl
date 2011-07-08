@@ -62,18 +62,23 @@ wait_for(Ctx, Keys) ->
     case call(Ctx, {wait_for, Keys}) of
         {unknown_key, Key} ->
             {error, {unknown_key, Key}};
-        {wait, WaitList} ->
-            wait_loop(Ctx, [monitor(process, Pid) || Pid <- WaitList], ok)
+        {wait, WaitPids} ->
+            wait_loop(Ctx, [monitor(process, Pid) || Pid <- WaitPids], ok)
     end.
 
 wait_loop(_Ctx, [], Result) ->
     Result;
-wait_loop(Ctx, WaitList, Result) ->
+wait_loop(Ctx, [MRef | WaitRefs], Result) ->
     receive
+        {'DOWN', MRef, process, DownPid, noproc} ->
+            %% we got this because we started monitoring before the task process
+            %% was there, let's monitor again
+            NewMRef = monitor(process, DownPid),
+            wait_loop(Ctx, WaitRefs ++ [NewMRef], Result);
         {'DOWN', MRef, process, _DownPid, {?TASK_DONE, _Name}} ->
-            wait_loop(Ctx, lists:delete(MRef, WaitList), Result);
+            wait_loop(Ctx, WaitRefs, Result);
         {'DOWN', MRef, process, _DownPid, {?TASK_FAIL, Name}} ->
-            wait_loop(Ctx, lists:delete(MRef, WaitList), {error, {failed, Name}})
+            wait_loop(Ctx, WaitRefs, {error, {failed, Name}})
     end.
 
 wait_shutdown(Process) ->
