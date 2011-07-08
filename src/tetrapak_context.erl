@@ -85,11 +85,11 @@ wait_shutdown(Process) ->
 %% ------------------------------------------------------------
 %% -- server loop
 -record(st, {
-    directory                 :: string(),
-    tasks                     :: [{string(), #task{}}],
-    cache     = dict:new()    :: dict(),
-    running   = dict:new()    :: dict(),
-    done      = gb_sets:new() :: set(),
+    directory                  :: string(),
+    tasks                      :: [{string(), #task{}}],
+    cache      = dict:new()    :: dict(),
+    running    = dict:new()    :: dict(),
+    done       = gb_sets:new() :: set(),
     io_queue   = queue:new()   :: queue(),
     io_workers = ordsets:new() :: queue()
 }).
@@ -107,7 +107,7 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
     receive
         {request, FromPid, {register_tasks, TList}} ->
             reply(FromPid, ok),
-            loop(LoopState#st{tasks = TList ++ TaskMap});
+            loop(LoopState#st{tasks = lists:keymerge(1, lists:ukeysort(1, TList), TaskMap)});
 
         {request, FromPid, get_tasks} ->
             reply(FromPid, TaskMap),
@@ -126,10 +126,11 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
                     reply(FromPid, {unknown_key, Key}),
                     loop(LoopState);
                 TaskList ->
-                    {NewLoopState, Wait} = lists:foldl(fun ({_, Task}, {LS, S}) ->
-                                                              maybe_start_task(Task, LS, S)
-                                                       end, {LoopState, []}, TaskList),
-                    reply(FromPid, {wait, Wait}),
+                    {NewLoopState, WaitList} =
+                        lists:foldl(fun (Task, {LoopSt, WaitListAcc}) ->
+                                            maybe_start_task(Task, LoopSt, WaitListAcc)
+                                    end, {LoopState, []}, TaskList),
+                    reply(FromPid, {wait, WaitList}),
                     loop(NewLoopState)
             end;
 
@@ -177,7 +178,6 @@ do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, 
 shutdown_loop([], _, _) ->
     ok;
 shutdown_loop(Workers, Running, IOQueue) ->
-    ?DEBUG("shutdown: ~p", [Workers]),
     receive
         {'EXIT', Pid, _Reason} ->
             shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue);
@@ -197,7 +197,6 @@ pop_ioqueue(IOQueue, DoneIOProc) ->
             case queue:out(NewIOQueue) of
                 {empty, ReturnIOQueue}    -> ReturnIOQueue;
                 {{value, NextIOProc}, _Q} ->
-                    ?DEBUG("popped: ~p", [NextIOProc]),
                     reply(NextIOProc, output_ok),
                     NewIOQueue %% Next stays in the queue!!
             end
@@ -208,7 +207,6 @@ push_ioqueue(IOQueue, FromPid) ->
         true  -> reply(FromPid, output_ok);
         false -> ok
     end,
-    ?DEBUG("push ioqueue ~p ~p", [FromPid, queue:to_list(IOQueue)]),
     queue:in(FromPid, IOQueue).
 
 maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
@@ -232,10 +230,8 @@ resolve_keys(TaskMap, Keys) ->
     try
         lists:foldl(fun (Key, Acc) ->
                           [First | Rest] = tetrapak_task:split_name(Key),
-                          case descending_lookup(TaskMap, [First], Rest) of
-                              error  -> throw({unknown, Key});
-                              Assocs -> lists:keymerge(1, Assocs, Acc)
-                          end
+                          NewTasks = descending_lookup(TaskMap, [First], Rest),
+                          lists:keymerge(#task.name, NewTasks, Acc)
                     end, [], Keys)
     catch
         throw:{unknown, Key} ->
@@ -243,13 +239,12 @@ resolve_keys(TaskMap, Keys) ->
     end.
 
 descending_lookup(TaskMap, Prefix, KeyRest) ->
-    Matches = lists:filter(fun ({Name, _}) -> lists:prefix(Prefix, Name) end, TaskMap),
+    Matches = [{SKey, Task} || {SKey, Task} <- TaskMap, lists:prefix(Prefix, SKey)],
     case {Matches, KeyRest} of
-        {[], _}      -> error;
-        {_, []}      -> Matches;
-        {[Match], _} -> [Match]; %% required key is in output variables
-        {_, [Next | KR]} ->
-            descending_lookup(Matches, Prefix ++ [Next], KR)
+        {[], _}           -> throw({unknown, string:join(Prefix ++ KeyRest, ":")});
+        {_, []}           -> [Task || {_K, Task} <- Matches];
+        {[{_K, Task}], _} -> [Task]; %% required key is in output variables
+        {_, [Next | KR]}  -> descending_lookup(Matches, Prefix ++ [Next], KR)
     end.
 
 %% ------------------------------------------------------------
