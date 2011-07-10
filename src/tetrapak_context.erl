@@ -11,8 +11,7 @@
 -export([new/1, run_sequentially/2, shutdown/1,
          get_cached/2, wait_for/2, wait_shutdown/1,
          task_done/3, task_wants_output/1, task_output_done/1,
-         register_io_worker/1,
-         register_tasks/2, get_tasks/1]).
+         register_io_worker/1, register_tasks/2, get_tasks/1]).
 -export([init/1, loop/1]).
 
 -include("tetrapak.hrl").
@@ -62,18 +61,31 @@ wait_for(Ctx, Keys) ->
     case call(Ctx, {wait_for, Keys}) of
         {unknown_key, Key} ->
             {error, {unknown_key, Key}};
-        {wait, WaitList} ->
-            wait_loop(Ctx, [monitor(process, Pid) || Pid <- WaitList], ok)
+        {wait, Running, Started} ->
+            RunningMRefs = [monitor(process, Pid) || Pid <- Running],
+            AllMRefs = wait_tasks_started(Started, RunningMRefs),
+            wait_tasks_down(Ctx, AllMRefs, ok)
     end.
 
-wait_loop(_Ctx, [], Result) ->
-    Result;
-wait_loop(Ctx, WaitList, Result) ->
+wait_tasks_started([], MRefAcc) ->
+    MRefAcc;
+wait_tasks_started([Pid | Rest], MRefAcc) ->
     receive
+        {Pid, task_started} ->
+            Pid ! {self(), proceed},
+            wait_tasks_started(Rest, [monitor(process, Pid) | MRefAcc])
+    end.
+
+wait_tasks_down(_Ctx, [], Result) ->
+    Result;
+wait_tasks_down(Ctx, [MRef | WaitRefs], Result) ->
+    receive
+        {'DOWN', MRef, process, _DownPid, noproc} ->
+            exit(badmonitor);
         {'DOWN', MRef, process, _DownPid, {?TASK_DONE, _Name}} ->
-            wait_loop(Ctx, lists:delete(MRef, WaitList), Result);
+            wait_tasks_down(Ctx, WaitRefs, Result);
         {'DOWN', MRef, process, _DownPid, {?TASK_FAIL, Name}} ->
-            wait_loop(Ctx, lists:delete(MRef, WaitList), {error, {failed, Name}})
+            wait_tasks_down(Ctx, WaitRefs, {error, {failed, Name}})
     end.
 
 wait_shutdown(Process) ->
@@ -126,11 +138,11 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
                     reply(FromPid, {unknown_key, Key}),
                     loop(LoopState);
                 TaskList ->
-                    {NewLoopState, WaitList} =
-                        lists:foldl(fun (Task, {LoopSt, WaitListAcc}) ->
-                                            maybe_start_task(Task, LoopSt, WaitListAcc)
-                                    end, {LoopState, []}, TaskList),
-                    reply(FromPid, {wait, WaitList}),
+                    {NewLoopState, ReplyRunning, ReplyStarted} =
+                        lists:foldl(fun (Task, {LoopStateAcc, RunningAcc, StartedAcc}) ->
+                                            maybe_start_task(Task, FromPid, LoopStateAcc, RunningAcc, StartedAcc)
+                                    end, {LoopState, [], []}, TaskList),
+                    reply(FromPid, {wait, ReplyRunning, ReplyStarted}),
                     loop(NewLoopState)
             end;
 
@@ -144,10 +156,7 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
 
         {cast, _FromPid, {done, Task, Variables}} ->
-            NewCache  = dict:merge(fun (Key, _V1, V2) ->
-                                           ?DEBUG("ctx var merge conflict ~p", [Key]),
-                                           V2
-                                   end, Cache, Variables),
+            NewCache   = dict:merge(fun (_Key, _V1, V2) -> V2 end, Cache, Variables),
             NewRunning = dict:erase(Task, Running),
             NewDone    = gb_sets:insert(Task, Done),
 
@@ -209,20 +218,21 @@ push_ioqueue(IOQueue, FromPid) ->
     end,
     queue:in(FromPid, IOQueue).
 
-maybe_start_task(Task = #task{name = TaskName}, State, CallerWaitList) ->
+maybe_start_task(Task = #task{name = TaskName}, CallerPid, State, RunningAcc, StartedAcc) ->
     case dict:find(TaskName, State#st.running) of
         {ok, WorkerPid} ->
-            {State, [WorkerPid | CallerWaitList]};
+            {State, [WorkerPid | RunningAcc], StartedAcc};
         error ->
             case gb_sets:is_member(TaskName, State#st.done) of
                 false ->
                     %% task has not been run yet, the caller needs to wait
-                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self(), State#st.directory]),
+                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self(), CallerPid, State#st.directory]),
                     NewRunning = dict:store(TaskName, WorkerPid, State#st.running),
-                    {State#st{running = NewRunning}, [WorkerPid | CallerWaitList]};
+                    NewState = State#st{running = NewRunning},
+                    {NewState, RunningAcc, [WorkerPid | StartedAcc]};
                 true ->
                     %% task already did it's job so it's not added to the wait list
-                    {State, CallerWaitList}
+                    {State, RunningAcc, StartedAcc}
             end
     end.
 

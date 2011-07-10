@@ -13,7 +13,7 @@
 
 %% task behaviour functions
 -export([behaviour_info/1]).
--export([worker/3, context/0, directory/0, fail/0, fail/2, get/1, require_all/1]).
+-export([worker/4, context/0, directory/0, fail/0, fail/2, get/1, require_all/1]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
@@ -36,8 +36,14 @@ directory() ->
         _AnythingElse         -> error(not_inside_task)
     end.
 
-worker(#task{name = TaskName, module = TaskModule}, Context, Directory) ->
+worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Directory) ->
     ?DEBUG("worker: task ~s starting", [TaskName]),
+
+    %% synchronize with the caller
+    CallerPid ! {self(), task_started},
+    receive
+        {CallerPid, proceed} -> ok
+    end,
 
     OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
     group_leader(OutputCollector, self()),
