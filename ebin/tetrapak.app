@@ -64,7 +64,7 @@
              {"package.include_doc", false},
              {"package.use_erlrc", false},
              {"package.deb.section", "misc"},
-             {"package.deb.priority", "extra"},
+             {"package.deb.priority", "optional"},
              {"package.deb.erlang_base_apps", [kernel, stdlib, compiler, sasl]},
              {"edoc.outdir", "doc"},
              {"edoc.private", false},
@@ -73,5 +73,4 @@
              {"test.ct.srcdir", "test"},
              {"test.ct.logdir", "test-log"}
             ]}]}
-  
 ]}.
