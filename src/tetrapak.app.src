@@ -1,28 +1,6 @@
 % vim: filetype=erlang
 {application, tetrapak,
  [{description, "Erlang application packaging tool"},
-  {vsn, "0.3.0"},
-  {modules, [tetrapak,
-             tetrapak_context,
-             tetrapak_task,
-             tetrapak_io,
-             tetrapak_ini_parser,
-             tetrapak_ini_lexer,
-             tpk_util,
-             tpk_file,
-             tpk,
-
-             %% tasks
-             tetrapak_task_boot,
-             tetrapak_task_appsrc,
-             tetrapak_task_config,
-             tetrapak_task_erlc,
-             tetrapak_task_check,
-             tetrapak_task_pkg_deb,
-             tetrapak_task_doc,
-             tetrapak_task_shell,
-             tetrapak_task_common_test
-            ]},
   {applications, [kernel, stdlib, compiler, edoc, tools, parsetools, common_test]},
   {registered, [tetrapak_io]},
   {env, 

@@ -20,15 +20,15 @@ initial_tmap() ->
      {["tetrapak", "info"],    #task{name = "tetrapak:info", module = ?MODULE, description = "Show version and tasks"}}].
 
 run("tetrapak:boot", _) ->
-    application:load(tetrapak), %% ensure the app file is loaded
-    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks()),
+    Props = load_appdata(),
+    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(Props)),
     tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
     ok;
 
 run("tetrapak:appdata", _) ->
-    {ok, Props} = application:get_all_key(tetrapak),
-    Info        = proplists:get_value(env, Props),
-    {done, [{version,  proplists:get_value(vsn, Props)},
+    Props = load_appdata(),
+    Info  = proplists:get_value(env, Props),
+    {done, [{version,  proplists:get_value(vsn, Props, "UNKNOWN")},
             {defaults, proplists:get_value(config, Info)}]};
 
 run("tetrapak:info", _) ->
@@ -54,9 +54,9 @@ ostr(builtin) -> " ";
 ostr(local)   -> "*";
 ostr(library) -> "+".
 
-builtin_tasks() ->
-    Props = application:get_all_env(tetrapak),
-    Tasks = proplists:get_value(tasks, Props),
+builtin_tasks(Props) ->
+    Env   = proplists:get_value(env, Props),
+    Tasks = proplists:get_value(tasks, Env),
     lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
                         NewTask   = #task{name = tetrapak_task:normalize_name(TaskName),
                                           module = Module,
@@ -71,6 +71,20 @@ pl_update(Key, AddItem, NewItem, Proplist) ->
         undefined -> [{Key, NewItem} | Proplist];
         Value     -> [{Key, AddItem(Value)} | proplists:delete(Key, Proplist)]
     end.
+
+load_appdata() ->
+    case application:load(tetrapak) of
+        {error, {already_loaded, tetrapak}} ->
+            {ok, Props} = application:get_all_key(tetrapak);
+        ok ->
+            {ok, Props} = application:get_all_key(tetrapak);
+        {error, _} ->
+            %% fallback to .app.src
+            Dir = filename:join([filename:dirname(code:which(?MODULE)), ".."]),
+            AppSrcPath = filename:join([Dir, "src", "tetrapak.app.src"]),
+            {ok, [{application, tetrapak, Props}]} = file:consult(AppSrcPath)
+    end,
+    Props.
 
 %% --------------------------------------------------------------------------------
 %% -- LOCAL TASKS

@@ -2,3 +2,4 @@
 *.log
 /src/tetrapak_ini_*.erl
 /dist
+/ebin/*.app
