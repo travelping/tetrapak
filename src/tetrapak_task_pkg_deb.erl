@@ -144,14 +144,12 @@ make_debsrc() ->
     DscFile = filename:join(tetrapak:config_path("package.outdir"), DscFileName),
     {ok, OrigMd5} = tpk_file:md5sum(OrigTarballPath),
     {ok, Dsc} = file:open(DscFile, [write]),
-    Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- tetrapak:get("config:appfile:deps"), not in_erlang_base(S)],
-    BuildDeps = ["erlang-tetrapak (>= 0.3.0), erlang-dev" | Deps],
     io:format(Dsc, "Format: 1.0~n", []),
     io:format(Dsc, "Architecture: any~n", []),
     io:format(Dsc, "Source: ~s~nBinary: ~s~n", [Pkg, Pkg]),
     io:format(Dsc, "Version: ~s~n", [Version]),
     io:format(Dsc, "Maintainer: ~s~n", [tetrapak:config("package.maintainer")]),
-    io:format(Dsc, "Build-Depends: ~s~n", [string:join(BuildDeps, ", ")]),
+    io:format(Dsc, "Build-Depends: ~s~n", [string:join(debian_build_deps(), ", ")]),
     io:format(Dsc, "Standards-Version: 3.9.1~n", []),
     io:format(Dsc, "Files:~n ~s ~b ~s~n", [OrigMd5, tpk_file:size(OrigTarballPath), OrigTarballName]),
     file:close(Dsc),
@@ -160,6 +158,14 @@ make_debsrc() ->
 
 in_dir(Dir, Path) ->
     lists:prefix(filename:split(Dir), filename:split(Path)).
+
+debian_deps() ->
+    Deps = lists:merge(lists:sort(tetrapak:get("config:appfile:deps")), lists:sort(tetrapak:config("package.extra_deps", []))),
+    [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- Deps, not in_erlang_base(S)].
+
+debian_build_deps() ->
+    DebianBuildDeps = [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- tetrapak:config("package.extra_build_deps", []), not in_erlang_base(S)],
+    ["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ lists:merge(lists:sort(DebianBuildDeps), debian_deps()).
 
 in_erlang_base(Application) ->
     lists:member(Application, tetrapak:config("package.deb.erlang_base_apps")).
@@ -191,12 +197,9 @@ copy_files(Tarball, InstallDir, IsExcludedFunction) ->
 
 copy_control_template(Tarball, Template, ExtractDir, Variables) ->
     Pkg = "erlang-" ++ no_underscores(atom_to_list(tetrapak:get("config:appfile:name"))),
-    Deps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
-                S <- tetrapak:get("config:appfile:deps"),
-                not in_erlang_base(S)],
-    case Deps of
-        [] -> DepString = "";
-        _  -> DepString = ", " ++ string:join(Deps, ", ")
+    case debian_deps() of
+        []   -> DepString = "";
+        Deps -> DepString = ", " ++ string:join(Deps, ", ")
     end,
     FileOptions = [{mode, 8#0744}, {owner, "root"}, {group, "root"}],
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", Template]),

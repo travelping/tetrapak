@@ -3,7 +3,7 @@
  [{description, "Erlang application packaging tool"},
   {applications, [kernel, stdlib, compiler, edoc, tools, parsetools, common_test]},
   {registered, [tetrapak_io]},
-  {env, 
+  {env,
    [{debug, false},
     {tasks, [
             {"doc:edoc", tetrapak_task_doc, "Generate edoc documentation"},
@@ -38,6 +38,8 @@
              {"package.outdir", "dist"},
              {"package.maintainer", "Joe User <joe@example.com>"},
              {"package.exclude", undefined},
+             {"package.extra_deps", []},
+             {"package.extra_build_deps", []},
              {"package.include_src", false},
              {"package.include_doc", false},
              {"package.use_erlrc", false},

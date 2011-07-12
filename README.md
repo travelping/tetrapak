@@ -91,6 +91,33 @@ from packages.
 
 -------------------------------------------------------------------------
 
+    package.extra_deps :: [atom()]
+
+List of OTP applications the application depends on in addition to
+the ones specified in the application resource file.
+Defaults to `[]`.
+
+-------------------------------------------------------------------------
+
+    package.extra_build_deps :: [atom()]
+
+List of OTP applications the application depends on _at build time_,
+in addition to the applications specified in the application resource file and
+through the `package.extra_deps` option.
+Defaults to `[]`.
+
+One case where this might be useful is when your application uses eunit
+for testing and some of the application's runtime modules include the eunit header.
+You obviously don't want to depend on eunit on the target system, but the build will
+fail when eunit is not installed. In that case, adding
+
+    [package]
+    extra_build_deps = [eunit]
+
+to the configuration file will make the build work.
+
+-------------------------------------------------------------------------
+
     package.include_src :: boolean()
 
 Whether the source code of the application shall be included in the package.
@@ -149,4 +176,4 @@ Defaults to `"test"`.
 The entries of this list specify functions ({Module, Function, Arity}).
 The 'check:xref' task will fail if there are any calls to undefined
 functions that are not a member of this list.
-Defaults to [].
+Defaults to `[]`.
