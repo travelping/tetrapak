@@ -101,9 +101,9 @@ Defaults to `false`.
 
     package.use_erlrc :: boolean()
 
-If this flag is set, the package will have a dependency on the erlrc application.  
+If this flag is set, the package will have a dependency on the erlrc application.
 The package scripts will try to start or upgrade the application at
-installation time. 
+installation time.
 
 -------------------------------------------------------------------------
 
@@ -113,7 +113,7 @@ The debian section in which the package is placed. Defaults to `"misc"`.
 
 -------------------------------------------------------------------------
 
-    package.deb.priority :: string() 
+    package.deb.priority :: string()
 
 The priority of the package. Valid values are `"required"`, `"important"`,
 `"standard"`, `"optional"`, `"extra"`.
@@ -132,7 +132,7 @@ package. You probably don't want to change this.
 
     test.ct.logdir :: string()
 
-The directory where common test's HTML reports are placed.  
+The directory where common test's HTML reports are placed.
 Defaults to `"test-log"`.
 
 -------------------------------------------------------------------------
@@ -141,3 +141,12 @@ Defaults to `"test-log"`.
 
 The directory in which to look for common test suite modules.
 Defaults to `"test"`.
+
+-------------------------------------------------------------------------
+
+    xref.ignore_undef :: [{atom(), atom(), integer()}]
+
+The entries of this list specify functions ({Module, Function, Arity}).
+The 'check:xref' task will fail if there are any calls to undefined
+functions that are not a member of this list.
+Defaults to [].

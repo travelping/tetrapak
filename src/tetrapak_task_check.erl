@@ -60,7 +60,12 @@ xref_result({_, []}) ->
 xref_result({undefined, Functions}) ->
     io:format("Undefined Functions called:~n"),
     fmt_functions(Functions),
-    tetrapak:fail();
+
+    UndefAllowed = tetrapak:config("xref.ignore_undef"),
+    DontFail     = lists:all(fun ({_, {M, F, A}}) -> lists:member({M, F, A}, UndefAllowed);
+                                 ({M, F, A})      -> lists:member({M, F, A}, UndefAllowed)
+                             end, Functions),
+    DontFail orelse tetrapak:fail("xref error");
 xref_result({deprecated, Functions}) ->
     io:format("Deprecated Functions called:~n"),
     fmt_functions(Functions);

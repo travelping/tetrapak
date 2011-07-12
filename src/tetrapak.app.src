@@ -49,6 +49,7 @@
              {"edoc.hidden", false},
              {"edoc.todo", false},
              {"test.ct.srcdir", "test"},
-             {"test.ct.logdir", "test-log"}
+             {"test.ct.logdir", "test-log"},
+             {"xref.ignore_undef", []}
             ]}]}
 ]}.
