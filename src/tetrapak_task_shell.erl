@@ -60,7 +60,7 @@ start_deps(App) ->
             start_deps(DepApp),
             start_deps(App);
         {error, _Error} ->
-            io:format("Failed: ~s~n", [App])
+            tetrapak:fail("failed to start ~s", [App])
     end.
 
 loaded_mtime(Mod) ->
