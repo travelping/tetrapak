@@ -124,16 +124,19 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
     case {Walk, filelib:is_dir(Path)} of
         {walk, true} ->
             {ok, List} = file:list_dir(Path),
-            AddPaths = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
-            [Next|Rest] = case DirOpt of
-                              no_dir -> AddPaths ++ Queue;
-                              dir_first -> [{nowalk, Path}|AddPaths] ++ Queue;
-                              dir_last -> AddPaths ++ [{nowalk, Path}|Queue]
-                          end,
-            walk(Fun, Next, Acc, Rest, DirOpt);
+            AddPaths   = lists:map(fun (Name) -> {walk, filename:join(Path, Name)} end, List),
+            case DirOpt of
+                no_dir    -> NewQueue = AddPaths ++ Queue;
+                dir_first -> NewQueue = [{nowalk, Path} | AddPaths] ++ Queue;
+                dir_last  -> NewQueue = AddPaths ++ [{nowalk, Path} | Queue]
+            end,
+            case NewQueue of
+                []            -> Acc;
+                [Next | Rest] -> walk(Fun, Next, Acc, Rest, DirOpt)
+            end;
         {_, _} ->
             case Queue of
-                [] -> Fun(Path,Acc);
+                []          -> Fun(Path,Acc);
                 [Next|Rest] -> walk(Fun, Next, Fun(Path, Acc), Rest, DirOpt)
             end
     end.
