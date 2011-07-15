@@ -18,7 +18,7 @@ run("doc:edoc", _) ->
     DD = tetrapak:config_path("edoc.outdir"),
     tpk_file:mkdir(DD),
     edoc:application(tetrapak:get("config:appfile:name"),
-                     tetrapak:subdir("src"),
+                     tetrapak:dir(),
                      [{dir, DD},
                       {includes, [tetrapak:subdir("include")]},
                       {private, tetrapak:config("edoc.private")},
