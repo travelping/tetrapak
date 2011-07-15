@@ -11,11 +11,12 @@
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1, fold_tree/3]).
 -export([check_files/2, check_files/5, check_files_mtime/1, check_files_mtime/4,
          check_files_exist/4, varsubst/2, varsubst_file/2]).
--export([cmd/3, parse_cmdline/3]).
+-export([cmd/3, outputcmd/3, parse_cmdline/3]).
 -export([format_error/1, show_error_info/2, show_error_info/3]).
 -export([debug_log_to_stderr/2]).
 
 -include_lib("kernel/include/file.hrl").
+-include("tetrapak.hrl").
 
 f(Str) -> f(Str,[]).
 f(Str, Args) -> lists:flatten(io_lib:format(Str, Args)).
@@ -142,17 +143,36 @@ fold_tree1(Fun, Acc, Iterator) ->
     end.
 
 cmd(Dir, Command, Args) ->
+    run_cmd(Dir, Command, Args, fun (Port) -> capture_output(Command, Port, <<>>) end).
+outputcmd(Dir, Command, Args) ->
+    run_cmd(Dir, Command, Args, fun (Port) -> relay_output(Command, Port) end).
+
+run_cmd(Dir, Command, Args, OutputHandler) ->
     case os:find_executable(Command) of
         false ->
             return_einfo({cmd_spawn, Command, not_found});
         Executable ->
-            PortOptions = [{cd, Dir}, {args, Args}, stream, binary, use_stdio, in, exit_status, hide],
+            PortOptions = [{cd, Dir}, {args, Args}, stream, binary, use_stdio, stderr_to_stdout, in, exit_status, hide],
             case catch erlang:open_port({spawn_executable, Executable}, PortOptions) of
                 {'EXIT', Reason} ->
                     return_einfo({cmd_spawn, Command, Reason});
                 Port when is_port(Port) ->
-                    capture_output(Command, Port, <<>>)
+                    OutputHandler(Port)
             end
+    end.
+
+relay_output(Command, Port) ->
+    receive
+        {'EXIT', Port, Reason} ->
+            port_close(Port),
+            return_einfo({cmd_port_exit, Command, Reason});
+        {Port, {data, Data}} ->
+            io:put_chars(Data),
+            relay_output(Command, Port);
+        {Port, {exit_status, ExitStatus}} ->
+            {ok, ExitStatus};
+        OtherMsg ->
+            ?DEBUG("relay_output other msg: ~p", [OtherMsg])
     end.
 
 capture_output(Command, Port, Buffer) ->
@@ -165,7 +185,7 @@ capture_output(Command, Port, Buffer) ->
         {Port, {exit_status, ExitStatus}} ->
             {ok, ExitStatus, Buffer};
         OtherMsg ->
-            io:format("other msg: ~p~n", [OtherMsg])
+            ?DEBUG("capture_output other msg: ~p", [OtherMsg])
     end.
 
 return_einfo(Error) ->
