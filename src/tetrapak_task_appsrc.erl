@@ -80,6 +80,8 @@ expand_vsn("~o" ++ R) ->
     tetrapak:get("config:vcs:offset") ++ expand_vsn(R);
 expand_vsn("~b" ++ R) ->
     tetrapak:get("config:vcs:branch") ++ expand_vsn(R);
+expand_vsn("~d" ++ R) ->
+    build_timestamp() ++ expand_vsn(R);
 expand_vsn("~O{" ++ R) ->
     expand_condition(R, "config:vcs:offset", "0");
 expand_vsn("~T{" ++ R) ->
@@ -99,6 +101,10 @@ expand_condition(Str, CheckKey, EmptyValue) ->
                     expand_vsn(Insert) ++ expand_vsn(Rest)
             end
     end.
+
+build_timestamp() ->
+    {{Y,Mo,D},{H,Min,S}} = calendar:universal_time(),
+    tpk_util:f("~4..0B~2..0B~2..0B~2..0B~2..0B~2..0B", [Y, Mo, D, H, Min, S]).
 
 get_app_modules() ->
     [list_to_atom(filename:rootname(F, ".beam")) || F <- filelib:wildcard("*.beam", tetrapak:subdir("ebin"))].

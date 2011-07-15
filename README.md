@@ -22,6 +22,7 @@ from the VCS (like git). The directives are:
     ~c       -- the last commit's abbreviated name
     ~o       -- the last commit's offset from the tag
     ~b       -- the current branch
+    ~d       -- a timestamp (YYYYMMDDhhmmss)
 
 In addition to the directives above, the version string may also include
 the following conditional directives:
