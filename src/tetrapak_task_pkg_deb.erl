@@ -103,7 +103,7 @@ make_deb(PkgDir) ->
         false -> Template = "deb";
         true  -> Template = "deb_erlrc"
     end,
-    copy_control_template(ControlTarball, Template, "./", [{arch, Arch}]),
+    copy_control_template(ControlTarball, Template, "./", []),
 
     %% generate md5sums
     Md5 = lists:foldl(fun ({P, Target}, Acc) ->
@@ -130,7 +130,7 @@ make_debsrc() ->
     {ok, OrigTarball} = tpk_file:tarball_create(OrigTarballPath),
     tpk_file:tarball_mkdir(OrigTarball, ExtractDir, [{mode, 8#744}, {owner, "root"}, {group, "root"}]),
 
-    ControlVars = [{"date", rfc_date(calendar:universal_time())}, {"arch", tetrapak:config("package.architecture")}],
+    ControlVars = [{"date", rfc_date(calendar:universal_time())}],
     copy_control_template(OrigTarball, "deb_src", ExtractDir ++ "debian", ControlVars),
 
     copy_files(OrigTarball, ExtractDir,
@@ -220,6 +220,7 @@ copy_control_template(Tarball, Template, ExtractDir, Variables) ->
                                                            Variables ++
                                                            [{"name", Pkg},
                                                             {"version", tetrapak:get("config:appfile:vsn")},
+                                                            {"arch", tetrapak:config("package.architecture")},
                                                             {"appname", tetrapak:get("config:appfile:name")},
                                                             {"appdeps", DepString},
                                                             {"section", tetrapak:config("package.deb.section")},

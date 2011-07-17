@@ -9,7 +9,7 @@ clean:
 	rm -f ../@@name@@_@@version@@_*.deb
 
 binary:
-	if [ '@@arch@@' == 'host' ]; then \
+	if [ '@@arch@@' = 'host' ]; then \
 	  eval $$(dpkg-architecture); \
 	  tetrapak pkg:deb -o 'package.architecture' "$$DEB_HOST_ARCH"; \
 	else \
