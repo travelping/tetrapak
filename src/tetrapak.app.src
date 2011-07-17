@@ -36,6 +36,7 @@
              {"build.erlc_options", []},
              {"build.vcs_type", git},
              {"build.version", undefined},
+             {"package.architecture", "all"},
              {"package.outdir", "dist"},
              {"package.maintainer", "Joe User <joe@example.com>"},
              {"package.exclude", undefined},

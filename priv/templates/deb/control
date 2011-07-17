@@ -1,6 +1,6 @@
 Package: @@name@@
 Version: @@version@@
-Architecture: all
+Architecture: @@arch@@
 Section: @@section@@
 Priority: @@priority@@
 Maintainer: @@maintainer@@

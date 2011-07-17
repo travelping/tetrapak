@@ -57,7 +57,7 @@ make_deb(PkgDir) ->
     Name    = atom_to_list(tetrapak:get("config:appfile:name")),
     Vsn     = tetrapak:get("config:appfile:vsn"),
     PkgName = "erlang-" ++ Name,
-    Arch    = "all",
+    Arch    = tetrapak:config("package.architecture"),
     DebianName = no_underscores(PkgName),
 
     %% debian-binary
@@ -70,6 +70,7 @@ make_deb(PkgDir) ->
     IsExcluded = fun (Path) ->
                          is_useless(Path) orelse
                          (in_dir("tetrapak", Path) and not tetrapak:config("package.include_src")) orelse
+                         (in_dir("tetrapak", Path) and tpk_util:match("local\\.ini", filename:basename(Path))) orelse
                          (in_dir("src", Path)      and not tetrapak:config("package.include_src")) orelse
                          (in_dir(tetrapak:config("edoc.outdir"), Path) and not tetrapak:config("package.include_doc")) orelse
                          in_dir(tetrapak:config("package.outdir"), Path) orelse
@@ -102,7 +103,7 @@ make_deb(PkgDir) ->
         false -> Template = "deb";
         true  -> Template = "deb_erlrc"
     end,
-    copy_control_template(ControlTarball, Template, "./", []),
+    copy_control_template(ControlTarball, Template, "./", [{arch, Arch}]),
 
     %% generate md5sums
     Md5 = lists:foldl(fun ({P, Target}, Acc) ->
@@ -128,7 +129,10 @@ make_debsrc() ->
     OrigTarballPath = filename:join(tetrapak:config_path("package.outdir"), OrigTarballName),
     {ok, OrigTarball} = tpk_file:tarball_create(OrigTarballPath),
     tpk_file:tarball_mkdir(OrigTarball, ExtractDir, [{mode, 8#744}, {owner, "root"}, {group, "root"}]),
-    copy_control_template(OrigTarball, "deb_src", ExtractDir ++ "debian", [{"date", rfc_date(calendar:universal_time())}]),
+
+    ControlVars = [{"date", rfc_date(calendar:universal_time())}, {"arch", tetrapak:config("package.architecture")}],
+    copy_control_template(OrigTarball, "deb_src", ExtractDir ++ "debian", ControlVars),
+
     copy_files(OrigTarball, ExtractDir,
                fun (Path) ->
                        is_useless(Path)
@@ -255,5 +259,5 @@ rfc_date({{Year, Month, Day},{Hours, Minutes, Seconds}}) ->
                          ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]),
      MonthNa = lists:nth(Month - 1,
                          ["Jan","Feb","Mar","Apr","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]),
-     io_lib:format("~s, ~2..0b ~s ~4..0b ~2..0b:~2..0b:~2..0b +0000",
-                   [DayName, Day, MonthNa, Year, Hours, Minutes, Seconds]).
+     tpk_util:f("~s, ~2..0b ~s ~4..0b ~2..0b:~2..0b:~2..0b +0000",
+                [DayName, Day, MonthNa, Year, Hours, Minutes, Seconds]).

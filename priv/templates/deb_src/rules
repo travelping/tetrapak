@@ -9,7 +9,13 @@ clean:
 	rm -f ../@@name@@_@@version@@_*.deb
 
 binary:
-	tetrapak pkg:deb
+	if [ '@@arch@@' == 'host' ]; then \
+	  eval $$(dpkg-architecture); \
+	  tetrapak pkg:deb -o 'package.architecture' "$$DEB_HOST_ARCH"; \
+	else \
+		tetrapak pkg:deb; \
+	fi
+
 	for f in dist/@@name@@_@@version@@_*.deb; do \
 		mv "$$f" ..; \
 		echo "$$(basename $$f) @@section@@ @@priority@@" >> ./debian/files; \
