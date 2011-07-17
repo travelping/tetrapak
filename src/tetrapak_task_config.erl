@@ -9,7 +9,7 @@
 
 -module(tetrapak_task_config).
 -behaviour(tetrapak_task).
--export([read_ini_file/1, find_app_file/2]).
+-export([find_app_file/2]).
 -export([run/2, check/1]).
 
 check("config:vcs") ->
@@ -29,12 +29,6 @@ run("config:appfile", _) ->
         {error, FileError} ->
             tetrapak:fail("app file could not be found: ~p", [FileError])
     end;
-
-run("config:ini", _) ->
-    BaseConfig = gb_trees:from_orddict(lists:keysort(1, tetrapak:get("tetrapak:appdata:defaults"))),
-    HomeConfig = read_config(home_config_path("config.ini"), BaseConfig),
-    ProjectConfig = read_config(project_config_path("config.ini"), HomeConfig),
-    {done, ProjectConfig};
 
 run("config:vcs", git) ->
     case run_git("symbolic-ref", ["--quiet", "HEAD"]) of
@@ -103,55 +97,6 @@ dir_to_appname(Dir) ->
         {match, [Appname]} -> Appname;
         nomatch            -> nomatch
     end.
-
-%% ------------------------------------------------------------
-%% -- Config files
-home_config_path(File) ->
-    HomeDir = os:getenv("HOME"),
-    filename:join([HomeDir, ".tetrapak", File]).
-
-project_config_path(Filename) ->
-    filename:join(tetrapak:subdir("tetrapak"), Filename).
-
-read_config(File, Tree) ->
-    case read_ini_file(File, Tree) of
-        {error, {file, enoent}} ->
-            Tree;
-        {ok, ConfigTree} ->
-            ConfigTree;
-        {error, Error} ->
-            fmt_error(File, Error),
-            tetrapak:fail()
-    end.
-
-read_ini_file(Filename) ->
-    read_ini_file(Filename, gb_trees:empty()).
-read_ini_file(Filename, Tree) ->
-    case tetrapak_ini_lexer:file(Filename) of
-        {ok, Tokens, _Endl} ->
-            case tetrapak_ini_parser:parse(Tokens) of
-                {ok, Sections} -> {ok, do_sections(Sections, Tree)};
-                Error          -> Error
-            end;
-        Error -> Error
-    end.
-
-do_sections(SList, Tree) ->
-    lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
-                        lists:foldl(fun ({Key, Value}, InnerAcc) ->
-                                            gb_trees:enter(ckey(SName, Key), Value, InnerAcc)
-                                    end, OuterAcc, Props)
-                end, Tree, SList).
-
-ckey("", Key) -> Key;
-ckey(Section, Key) -> Section ++ "." ++ Key.
-
-fmt_error(File, {Line, Module, ErrorDesc}) ->
-    English = Module:format_error(ErrorDesc),
-    io:format("~s:~b: Error: ~s~n", [File, Line, English]);
-fmt_error(File, {file, Error}) ->
-    English = file:format_error(Error),
-    io:format("~s: Error: ~s~n", [File, English]).
 
 run_git(Cmd, Args) ->
     DirArg = "--git-dir=" ++ tetrapak:subdir(".git"),

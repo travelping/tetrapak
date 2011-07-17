@@ -11,9 +11,9 @@
 -export([f/1, f/2, match/2, unix_time/0, unix_time/1, to_hex/1, fold_tree/3]).
 -export([check_files/2, check_files/5, check_files_mtime/1, check_files_mtime/4,
          check_files_exist/4, varsubst/2, varsubst_file/2]).
--export([cmd/3, outputcmd/3, parse_cmdline/3]).
+-export([cmd/3, outputcmd/3]).
 -export([format_error/1, show_error_info/2, show_error_info/3]).
--export([debug_log_to_stderr/2]).
+-export([parse_cmdline/2, debug_log_to_stderr/2]).
 
 -include_lib("kernel/include/file.hrl").
 -include("tetrapak.hrl").
@@ -196,67 +196,15 @@ format_error({cmd_spawn, Cmd, not_found}) ->
 format_error({cmd_spawn, Cmd, Error}) ->
     Cmd ++ ": " ++ file:format_error(Error);
 format_error({cmd_port_exit, Cmd, Error}) ->
-    Cmd ++ ": " ++ file:format_error(Error).
+    Cmd ++ ": " ++ file:format_error(Error);
+format_error({option_args, Option, 1}) ->
+    io_lib:format("command-line option ~s requires one argument", [Option]);
+format_error({option_args, Option, ArgSize}) ->
+    io_lib:format("command-line option ~s requires ~b arguments", [Option, ArgSize]);
+format_error({unknown_option, Option}) ->
+    io_lib:format("unknown command-line option: ~s", [Option]).
 
-%% ------------------------------------------------------------
-%% -- getopt-style option parsing
-parse_cmdline(Args, OptionDesc, ArgDesc) ->
-    Defaults = [{Key, Value} || {_Type, Key, _Flags, Value} <- OptionDesc],
-    case parse_options(Args, OptionDesc, ArgDesc, false, Defaults) of
-        {Result, []} ->
-            {ok, Result};
-        {_Result, Missing} ->
-            MissingNames = lists:map(fun ({arg, Name}) -> f("~s", [Name]) end, Missing),
-            io:format("error: missing arguments: ~s~n", [string:join(MissingNames, ", ")]),
-            {error, {missing, MissingNames}}
-    end.
-
-parse_options([], _OptDesc, ArgDesc, _NextIsArg, Result) ->
-    {Result, ArgDesc};
-parse_options([Arg | Rest], OptDesc, ArgDesc, NextIsArg, Result) ->
-    case Arg of
-        "--" ->
-            parse_options(Rest, OptDesc, ArgDesc, true, Result);
-        "-"  ++ _Name when not NextIsArg ->
-            {{Key, Val}, TheRest} = parse_option(Arg, Rest, OptDesc),
-            NewResult = lists:keyreplace(1, Key, Result, {Key, Val}),
-            parse_options(TheRest, OptDesc, ArgDesc, NextIsArg, NewResult);
-        _ ->
-            case ArgDesc of
-                [{arg, Name} | ArgDescRest] ->
-                    NewResult = lists:keyreplace(1, Name, Result, {Name, Arg}),
-                    parse_options(Rest, OptDesc, ArgDescRest, NextIsArg, NewResult);
-                [] ->
-                    io:format("error: superfluous argument: ~p~n", [Arg]),
-                    throw({error, {superfluous_argument, Arg}})
-            end
-    end.
-
-parse_option(Option, Rest, OptDesc) ->
-    case find_option(Option, OptDesc) of
-        {option_arg, Name, _Flags, _Default} ->
-            case Rest of
-                [Value | TheRest] ->
-                    {{Name, Value}, TheRest};
-                [] ->
-                    io:format("error: option ~s requires an argument~n", [Option]),
-                    throw({error, {missing_option_arg, Name}})
-            end;
-        {flag, Name, _Flags, _Default} ->
-            {{Name, true}, Rest};
-        undefined ->
-            io:format("error: unknown option ~s~n", [Option]),
-            throw({error, {unknown_option, Option}})
-    end.
-
-find_option(_Option, []) -> undefined;
-find_option(Option, [Opt = {_, _Name, Flags, _Default} | Rest]) ->
-    case lists:member(Option, Flags) of
-        false -> find_option(Option, Rest);
-        true -> Opt
-    end.
-
-%% @hidden
+% @private
 debug_log_to_stderr(Fmt, Args) ->
     case application:get_env(tetrapak, debug) of
         {ok, true} ->
@@ -264,4 +212,55 @@ debug_log_to_stderr(Fmt, Args) ->
                       [io_lib:write(self()) | Args]);
         _ ->
             ok
+    end.
+
+%% ------------------------------------------------------------
+%% -- getopt-style option parsing
+-type option() :: {option, Name::atom(), ArgSize::pos_integer(), [string()]}.
+-type flag()   :: {flag, Name::atom(), [string()]}.
+-spec parse_cmdline([string()], [option() | flag()]) -> {{atom(), term()}, [string()]}.
+
+parse_cmdline(Args, OptionDesc) ->
+    try parse_options(Args, OptionDesc, false, [], []) of
+        {Options, RemainingArgs} ->
+            {ok, Options, RemainingArgs}
+    catch
+        throw:{error, Error} ->
+            {error, {undefined, ?MODULE, Error}}
+    end.
+
+parse_options([], _OptDesc, _NextIsArg, Result, Args) ->
+    {Result, lists:reverse(Args)};
+parse_options([Arg | Rest], OptDesc, NextIsArg, Result, Args) ->
+    case Arg of
+        "--" ->
+            parse_options(Rest, OptDesc, true, Result, Args);
+        "-"  ++ _Name when not NextIsArg ->
+            {ThisOption, TheRest} = parse_option(Arg, Rest, OptDesc),
+            NewResult = [ThisOption | Result],
+            parse_options(TheRest, OptDesc, NextIsArg, NewResult, Args);
+        _ ->
+            parse_options(Rest, OptDesc, NextIsArg, Result, [Arg | Args])
+    end.
+
+parse_option(Option, Rest, OptDefs) ->
+    case find_option(Option, OptDefs) of
+        {option, Name, ArgSize, _Flags} ->
+            case catch lists:split(ArgSize, Rest) of
+                {'EXIT', _} ->
+                    throw({error, {option_args, Option, ArgSize}});
+                {OptionArgs, Remaining} ->
+                    {list_to_tuple([Name | OptionArgs]), Remaining}
+            end;
+        {flag, Name, _Flags} ->
+            {{Name, true}, Rest};
+        undefined ->
+            throw({error, {unknown_option, Option}})
+    end.
+
+find_option(_Option, []) -> undefined;
+find_option(Option, [OptDef | Rest]) ->
+    case lists:member(Option, element(tuple_size(OptDef), OptDef)) of
+        false -> find_option(Option, Rest);
+        true  -> OptDef
     end.

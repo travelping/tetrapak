@@ -2,4 +2,4 @@
 
 HERE=`dirname $0`
 
-exec erl -pa "$HERE/../ebin" -noinput -noshell -user tetrapak_io -smp auto -run tetrapak cli_main -- $@
+exec erl -pa "$HERE/../ebin" -noinput -noshell -user tetrapak_io -smp auto -run tetrapak cli_main -extra $@

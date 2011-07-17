@@ -26,6 +26,7 @@ run(Directory, TaskCmds) ->
         {error, _}                  -> error
     end.
 
+%% @private
 cli_main() ->
     {ok, Cwd} = file:get_cwd(),
 
@@ -37,6 +38,8 @@ cli_main() ->
             ok
     end,
 
+    application:set_env(tetrapak, run_from_cli, true),
+
     %% add the current project's ebin to the front
     EbinDir = filename:join(Cwd, "ebin"),
     case filelib:is_dir(EbinDir) of
@@ -46,11 +49,19 @@ cli_main() ->
             ok
     end,
 
-    case init:get_plain_arguments() of
-        [] ->
+    %% process command-line options
+    CliDef = [{option, config, 2, ["-o"]}],
+
+    case tpk_util:parse_cmdline(init:get_plain_arguments(), CliDef) of
+        {error, {_L, Mod, EInfo}} ->
+            io:format(standard_error, "Error: ~s~n", [Mod:format_error(EInfo)]),
+            halt(255);
+        {ok, CliOptions, []} ->
+            application:set_env(tetrapak, cli_options, CliOptions),
             run(Cwd, ["tetrapak:info"]),
             halt(1);
-        Cmds ->
+        {ok, CliOptions, Cmds} ->
+            application:set_env(tetrapak, cli_options, CliOptions),
             case tetrapak:run(Cwd, Cmds) of
                 {unknown, Key} ->
                     io:format(standard_error, "Error: no such command: ~s~n", [Key]),
@@ -65,7 +76,7 @@ cli_main() ->
 %% ------------------------------------------------------------
 %% -- Task API
 version() ->
-    get("tetrapak:info:version").
+    get("tetrapak:boot:version").
 
 dir() ->
     tetrapak_task:directory().
@@ -98,8 +109,8 @@ fail(Reason) ->
 fail(Fmt, Args) ->
     tetrapak_task:fail(Fmt, Args).
 
-config(Key)               -> get("config:ini:" ++ Key).
-config(Key, Default)      -> get("config:ini:" ++ Key, Default).
+config(Key)               -> get("tetrapak:boot:config:" ++ Key).
+config(Key, Default)      -> get("tetrapak:boot:config:" ++ Key, Default).
 config_path(Key)          -> subdir(config(Key)).
 config_path(Key, Default) -> subdir(config(Key, Default)).
 

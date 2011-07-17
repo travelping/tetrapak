@@ -15,24 +15,41 @@
 
 initial_tmap() ->
     [{["clean", "taskcache"],  #task{name = "clean:taskcache", module = ?MODULE, description = "Delete the local task cache"}},
-     {["tetrapak", "appdata"], #task{name = "tetrapak:appdata", module = ?MODULE, description = "Read tetrapak's app file"}},
-     {["tetrapak", "boot"],    #task{name = "tetrapak:boot", module = ?MODULE, description = "Gather tasks"}},
-     {["tetrapak", "info"],    #task{name = "tetrapak:info", module = ?MODULE, description = "Show version and tasks"}}].
+     {["tetrapak", "boot"],    #task{name = "tetrapak:boot", module = ?MODULE,   description = "The root of all evil"}},
+     {["tetrapak", "info"],    #task{name = "tetrapak:info", module = ?MODULE,   description = "Show version and tasks"}}].
 
 run("tetrapak:boot", _) ->
-    Props = load_appdata(),
-    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(Props)),
-    tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
-    ok;
+    Props   = load_appdata(),
+    Version = proplists:get_value(vsn, Props, "UNKNOWN"),
+    Env     = proplists:get_value(env, Props),
 
-run("tetrapak:appdata", _) ->
-    Props = load_appdata(),
-    Info  = proplists:get_value(env, Props),
-    {done, [{version,  proplists:get_value(vsn, Props, "UNKNOWN")},
-            {defaults, proplists:get_value(config, Info)}]};
+    BaseConfig     = lists:foldl(fun ({Key, Value}, Acc) ->
+                                         gb_trees:enter(ckey("", Key), Value, Acc)
+                                 end, gb_trees:empty(), proplists:get_value(config, Env)),
+    ProjectConfig1 = read_config(project_config_path("config.ini"), BaseConfig),
+    ProjectConfig2 = read_config(project_config_path("local.ini"), ProjectConfig1),
+
+    case application:get_env(tetrapak, run_from_cli) of
+        {ok, true} ->
+            {ok, CliOptions} = application:get_env(tetrapak, cli_options),
+            TheConfig = lists:foldl(fun ({config, Key, Value}, ConfAcc) ->
+                                            gb_trees:enter(ckey("", Key), Value, ConfAcc);
+                                        (_Other, ConfAcc) ->
+                                            ConfAcc
+                                    end, ProjectConfig2, CliOptions);
+        _ ->
+            TheConfig = ProjectConfig2
+    end,
+
+    %% scan tasks
+    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(proplists:get_value(tasks, Env))),
+    tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
+
+    RetVars = gb_trees:enter("version", Version, TheConfig),
+    {done, RetVars};
 
 run("tetrapak:info", _) ->
-    io:format("** version ~s~n~n", [tetrapak:get("tetrapak:appdata:version")]),
+    io:format("** version ~s~n~n", [tetrapak:get("tetrapak:boot:version")]),
     Tasks = tetrapak_context:get_tasks(tetrapak_task:context()),
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
 
@@ -54,9 +71,7 @@ ostr(builtin) -> " ";
 ostr(local)   -> "*";
 ostr(library) -> "+".
 
-builtin_tasks(Props) ->
-    Env   = proplists:get_value(env, Props),
-    Tasks = proplists:get_value(tasks, Env),
+builtin_tasks(Tasks) ->
     lists:foldl(fun ({TaskName, Module, Desc}, Acc) ->
                         NewTask   = #task{name = tetrapak_task:normalize_name(TaskName),
                                           module = Module,
@@ -201,3 +216,39 @@ do_form(_File, {attribute, _L, task, {TaskName, TaskDesc}}, FoundM, TMod, Code) 
     {FoundM, NewTMod, Code};
 do_form(_File, OtherForm, FoundM, TMod, Code) ->
     {FoundM, TMod, [OtherForm | Code]}.
+
+%% ------------------------------------------------------------
+%% -- Config files
+project_config_path(Filename) ->
+    filename:join(tetrapak:subdir("tetrapak"), Filename).
+
+read_config(File, Tree) ->
+    case read_ini_file(File, Tree) of
+        {error, {file, enoent}} ->
+            Tree;
+        {ok, ConfigTree} ->
+            ConfigTree;
+        {error, Error} ->
+            tpk_util:show_error_info(File, "Error: ", Error),
+            tetrapak:fail()
+    end.
+
+read_ini_file(Filename, Tree) ->
+    case tetrapak_ini_lexer:file(Filename) of
+        {ok, Tokens, _Endl} ->
+            case tetrapak_ini_parser:parse(Tokens) of
+                {ok, Sections} -> {ok, do_sections(Sections, Tree)};
+                Error          -> Error
+            end;
+        Error -> Error
+    end.
+
+do_sections(SList, Tree) ->
+    lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
+                        lists:foldl(fun ({Key, Value}, InnerAcc) ->
+                                            gb_trees:enter(ckey(SName, Key), Value, InnerAcc)
+                                    end, OuterAcc, Props)
+                end, Tree, SList).
+
+ckey("", Key)      -> "config:" ++ Key;
+ckey(Section, Key) -> "config:" ++ Section ++ "." ++ Key.
