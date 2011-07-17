@@ -92,7 +92,7 @@ from packages.
 
 -------------------------------------------------------------------------
 
-    package.extra_deps :: [atom()]
+    package.extra_apps :: [atom()]
 
 List of OTP applications the application depends on in addition to
 the ones specified in the application resource file.
@@ -100,11 +100,11 @@ Defaults to `[]`.
 
 -------------------------------------------------------------------------
 
-    package.extra_build_deps :: [atom()]
+    package.extra_build_apps :: [atom()]
 
 List of OTP applications the application depends on _at build time_,
 in addition to the applications specified in the application resource file and
-through the `package.extra_deps` option.
+through the `package.extra_apps` option.
 Defaults to `[]`.
 
 One case where this might be useful is when your application uses eunit
@@ -113,7 +113,7 @@ You obviously don't want to depend on eunit on the target system, but the build 
 fail when eunit is not installed. In that case, adding
 
     [package]
-    extra_build_deps = [eunit]
+    extra_build_apps = [eunit]
 
 to the configuration file will make the build work.
 
@@ -155,6 +155,20 @@ Defaults to `"optional"`.
 
 This list contains the OTP applications that are included in the `erlang-base`
 package. You probably don't want to change this.
+
+-------------------------------------------------------------------------
+
+    package.deb.dependencies :: [string()]
+
+A list of additional debian packages this application depends on at runtime.
+Don't specify Erlang dependencies here, use `package.extra_apps` for that.
+
+-------------------------------------------------------------------------
+
+    package.deb.build_dependencies :: [string()]
+
+A list of additional debian packages this application depends on _at build time_.
+Don't specify Erlang build dependencies here, use `package.extra_build_apps` for that.
 
 -------------------------------------------------------------------------
 

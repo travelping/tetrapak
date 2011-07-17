@@ -165,13 +165,16 @@ in_dir(Dir, Path) ->
     lists:prefix(filename:split(Dir), filename:split(Path)).
 
 debian_deps() ->
-    Deps = tetrapak:get("config:appfile:deps") ++ tetrapak:config("package.extra_deps"),
-    lists:usort([no_underscores(tpk_util:f("erlang-~s", [S])) || S <- Deps, not in_erlang_base(S)]).
+    AppDeps   = tetrapak:get("config:appfile:deps") ++ tetrapak:config("package.extra_apps", []),
+    OtherDeps = tetrapak:config("package.deb.dependencies", []),
+    lists:usort(OtherDeps ++ [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- AppDeps, not in_erlang_base(S)]).
 
 debian_build_deps() ->
     DebianDeps = debian_deps(),
-    DebianBuildDeps = [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- tetrapak:config("package.extra_build_deps"), not in_erlang_base(S)],
-    lists:usort(["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ DebianBuildDeps ++ DebianDeps).
+    DebianBuildApps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
+                        S <- tetrapak:config("package.extra_build_apps", []), not in_erlang_base(S)],
+    DebianBuildDeps = tetrapak:config("package.deb.build_dependencies", []),
+    lists:usort(["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ DebianBuildApps ++ DebianBuildDeps ++ DebianDeps).
 
 in_erlang_base(Application) ->
     lists:member(Application, tetrapak:config("package.deb.erlang_base_apps")).
