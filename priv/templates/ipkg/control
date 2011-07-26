@@ -1,0 +1,7 @@
+Package: @@name@@
+Version: @@version@@
+Architecture: @@arch@@
+Section: @@section@@
+Priority: @@priority@@
+Maintainer: @@maintainer@@
+Description: @@desc@@
