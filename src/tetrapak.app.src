@@ -5,7 +5,6 @@
   {registered, [tetrapak_io]},
   {env,
    [{debug, false},
-    {run_from_cli, false},
     {cli_options, []},
     {tasks, [
             {"doc:edoc", tetrapak_task_doc, "Generate edoc documentation"},

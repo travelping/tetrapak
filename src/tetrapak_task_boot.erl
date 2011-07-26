@@ -29,17 +29,12 @@ run("tetrapak:boot", _) ->
     ProjectConfig1 = read_config(project_config_path("config.ini"), BaseConfig),
     ProjectConfig2 = read_config(project_config_path("local.ini"), ProjectConfig1),
 
-    case application:get_env(tetrapak, run_from_cli) of
-        {ok, true} ->
-            {ok, CliOptions} = application:get_env(tetrapak, cli_options),
-            TheConfig = lists:foldl(fun ({config, Key, Value}, ConfAcc) ->
-                                            gb_trees:enter(ckey("", Key), Value, ConfAcc);
-                                        (_Other, ConfAcc) ->
-                                            ConfAcc
-                                    end, ProjectConfig2, CliOptions);
-        _ ->
-            TheConfig = ProjectConfig2
-    end,
+    {ok, CliOptions} = application:get_env(tetrapak, cli_options),
+    TheConfig = lists:foldl(fun ({config, Key, Value}, ConfAcc) ->
+                                    gb_trees:enter(ckey("", Key), Value, ConfAcc);
+                                (_Other, ConfAcc) ->
+                                    ConfAcc
+                            end, ProjectConfig2, CliOptions),
 
     %% scan tasks
     tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(proplists:get_value(tasks, Env))),

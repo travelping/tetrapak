@@ -38,8 +38,6 @@ cli_main() ->
             ok
     end,
 
-    application:set_env(tetrapak, run_from_cli, true),
-
     %% add the current project's ebin to the front
     EbinDir = filename:join(Cwd, "ebin"),
     case filelib:is_dir(EbinDir) of
