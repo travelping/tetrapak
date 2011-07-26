@@ -49,10 +49,26 @@ run("config:vcs", git) ->
                     Data = [{last_tag, ""}, {offset, "0"}, {commit, LastCommit}, {dirty, true}];
                 nomatch ->
                     Data = [],
-                    tetrapak:fail("failed to parse the output of git-describe(1)")
+                    tetrapak:fail("failed to parse the output of 'git describe'")
             end
     end,
     {done, [{branch, string:strip(binary_to_list(Branch), right, $\n)} | Data]};
+
+run("config:vcs", hg) ->
+    IdentOutput = run_hg("identify", ["-i", "-n", "-b", "-t"]),
+    case re:split(IdentOutput, " ", [{return, list}])  of
+        [Rev, Num, Branch, Tag] ->
+            Data = [{branch, Branch}, {last_tag, Tag}],
+            case strip_plus(Rev) of
+                Rev ->
+                    %% Rev is unchanged, no '+' at the end
+                    {done, [{commit, Rev}, {offset, Num}, {dirty, false} | Data]};
+                RevHash ->
+                    {done, [{commit, RevHash}, {offset, strip_plus(Num)}, {dirty, true} | Data]}
+            end;
+        _Other ->
+            tetrapak:fail("could not parse the output of 'hg identify'")
+    end;
 
 run("config:vcs", Unknown) ->
     tetrapak:fail("unknown VCS type: ~p", [Unknown]).
@@ -98,6 +114,12 @@ dir_to_appname(Dir) ->
         nomatch            -> nomatch
     end.
 
+strip_plus(String) ->
+    lists:filter(fun (C) -> C /= $+ end, String).
+
 run_git(Cmd, Args) ->
     DirArg = "--git-dir=" ++ tetrapak:subdir(".git"),
     tetrapak:cmd("git", [DirArg, Cmd | Args]).
+
+run_hg(Cmd, Args) ->
+    tetrapak:cmd("hg", ["--noninteractive", "--repository", tetrapak:dir(), Cmd | Args]).
