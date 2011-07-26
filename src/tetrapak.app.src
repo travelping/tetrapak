@@ -56,6 +56,7 @@
              {"edoc.todo", false},
              {"test.ct.srcdir", "test"},
              {"test.ct.logdir", "test-log"},
+             {"test.ct.suite", "all"},
              {"xref.ignore_undef", []}
             ]}]}
 ]}.

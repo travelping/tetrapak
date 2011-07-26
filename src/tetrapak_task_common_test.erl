@@ -23,7 +23,7 @@ run("test:ct", _) ->
     file:make_dir(LogDir),
     ct:run_test([{dir, tetrapak:config_path("test.ct.srcdir")},
                  {logdir, LogDir},
-                 {suite, all},
+                 {suite, tetrapak:config("test.ct.suite")},
                  {auto_compile, true},
                  {include, [tetrapak:subdir("include")]}]);
 

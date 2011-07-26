@@ -186,6 +186,18 @@ Defaults to `"test"`.
 
 -------------------------------------------------------------------------
 
+    test.ct.suite :: string()
+
+The common test suite that should be run. The main purpose of this
+config option is running a specific suite from the command line,
+as in
+
+    $ tetrapak test -o 'test.ct.suite' 'my_SUITE'
+
+Defaults to `"all"`.
+
+-------------------------------------------------------------------------
+
     xref.ignore_undef :: [{atom(), atom(), integer()}]
 
 The entries of this list specify functions ({Module, Function, Arity}).
