@@ -23,6 +23,7 @@
             {"clean:appfile", tetrapak_task_appsrc, "Delete generated application resource file"},
             {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
             {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
+            {"pkg:ipkg", tetrapak_task_pkg_ipkg, "Create a binary ipkg"},
             {"clean:dist", tetrapak_task_pkg_deb, "Delete packages"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
