@@ -229,13 +229,9 @@ read_config(File, Tree) ->
     end.
 
 read_ini_file(Filename, Tree) ->
-    case tetrapak_ini_lexer:file(Filename) of
-        {ok, Tokens, _Endl} ->
-            case tetrapak_ini_parser:parse(Tokens) of
-                {ok, Sections} -> {ok, do_sections(Sections, Tree)};
-                Error          -> Error
-            end;
-        Error -> Error
+    case tetrapak_ini_parser:file(Filename) of
+        {ok, Sections} -> {ok, do_sections(Sections, Tree)};
+        Error          -> Error
     end.
 
 do_sections(SList, Tree) ->

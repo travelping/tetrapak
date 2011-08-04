@@ -1,3 +1,4 @@
+% vim: ft=erlang
 %    __                        __      _
 %   / /__________ __   _____  / /___  (_)___  ____ _
 %  / __/ ___/ __ `/ | / / _ \/ / __ \/ / __ \/ __ `/
@@ -7,15 +8,18 @@
 %
 % Copyright (c) Travelping GmbH <info@travelping.com>
 
-Nonterminals config section sectionhdr assignment assignments identifier value list tuple elements.
+Nonterminals config section sectionhdr confobj confobjhdr assignment assignments identifier value list tuple elements.
 Terminals '=' '[' ']' '{' '}' ',' '.' atom quoted_atom string number.
 Rootsymbol config.
 
 config      -> '$empty'                    : [].
 config      -> assignments config          : [{section, "", '$1'} | '$2'].
 config      -> section config              : ['$1' | '$2'].
+config      -> confobj config              : ['$1' | '$2'].
 section     -> sectionhdr assignments      : {section, '$1', '$2'}.
 sectionhdr  -> '[' identifier ']'          : '$2'.
+confobj     -> confobjhdr assignments      : {object, '$1', '$2'}.
+confobjhdr  -> '[' identifier string ']'   : {'$2', value_of('$3')}.
 assignments -> assignment                  : ['$1'].
 assignments -> assignment assignments      : ['$1' | '$2'].
 assignment  -> identifier '=' value        : {'$1', '$3'}.
@@ -35,5 +39,12 @@ elements    -> value                       : ['$1'].
 elements    -> value ',' elements          : ['$1' | '$3'].
 
 Erlang code.
+-export([file/1]).
 value_of(Token) ->
     element(3, Token).
+
+file(Filename) ->
+    case tetrapak_ini_lexer:file(Filename) of
+        {ok, Tokens, _Endl} -> ?MODULE:parse(Tokens);
+        Error               -> Error
+    end.
