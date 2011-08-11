@@ -103,8 +103,8 @@ make_ipkg(PkgDir) ->
     tpk_file:tarball_close(ControlTarball),
 
     %% write the actual .deb as an AR archive (sic!)
-    IpkgFile = filename:join(tetrapak:config_path("package.outdir"), tpk_util:f("~s_~s_~s.ipkg", [DebianName, Vsn, Arch])),
-	tar_ipkg_files(IpkgFile, PkgDir, ["debian-binary", "control.tar.gz", "data.tar.gz"]),
+    IpkgFile = filename:join(tetrapak:config_path("package.outdir"), tpk_util:f("~s_~s_~s.ipk", [DebianName, Vsn, Arch])),
+	tar_ipkg_files(IpkgFile, PkgDir, ["debian-binary", "data.tar.gz", "control.tar.gz"]),
     io:format("package: ~s~n", [IpkgFile]).
 
 in_dir(Dir, Path) ->
@@ -178,7 +178,7 @@ tar_ipkg_files(IpkgFile, Dir, Entries) ->
 	try
 		lists:foreach(fun (Name) ->
 							  File = filename:join(Dir, Name),
-							  tpk_file:tarball_add_file(Tarball, File, Name, [dereference, {mode, 8#644}, {owner, "root"}, {group, "root"}])
+							  tpk_file:tarball_add_file(Tarball, File, filename:join("./", Name), [dereference, {mode, 8#644}, {owner, "root"}, {group, "root"}])
 					  end, Entries)
 	after
 		tpk_file:tarball_close(Tarball)
