@@ -56,17 +56,24 @@ Defaults to `false`.
 
 -------------------------------------------------------------------------
 
-    edoc.hidden :: boolean()
-
-Whether documentation for hidden functions shall be generated.
-Defaults to `false`.
-
--------------------------------------------------------------------------
-
     edoc.todo :: boolean()
 
 Whether `@todo` notes should be included in the documentation.
 Defaults to `false`.
+
+-------------------------------------------------------------------------
+
+    edoc.sort_functions :: boolean()
+
+Whether functions should be sorted alphabetically.
+Defaults to `false`.
+
+-------------------------------------------------------------------------
+
+    edoc.pretty_print :: boolean()
+
+Whether type specs and signatures should be pretty-printed.
+Defaults to `true`.
 
 -------------------------------------------------------------------------
 
