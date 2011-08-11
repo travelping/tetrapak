@@ -15,6 +15,11 @@ check("clean:edoc") ->
     filelib:is_dir(tetrapak:config_path("edoc.outdir")).
 
 run("doc:edoc", _) ->
+    case tetrapak:config("edoc.pretty_print") of
+        true  -> PPOpts = [{pretty_printer, erl_pp}];
+        false -> PPOpts = []
+    end,
+
     DD = tetrapak:config_path("edoc.outdir"),
     tpk_file:mkdir(DD),
     edoc:application(tetrapak:get("config:appfile:name"),
@@ -23,7 +28,11 @@ run("doc:edoc", _) ->
                       {includes, [tetrapak:subdir("include")]},
                       {private, tetrapak:config("edoc.private")},
                       {hidden, tetrapak:config("edoc.hidden")},
-                      {todo, tetrapak:config("edoc.todo")}]);
+                      {todo, tetrapak:config("edoc.todo")},
+
+                      %% layout options
+                      {sort_functions, tetrapak:config("edoc.sort_functions")}
+                        | PPOpts]);
 
 run("clean:edoc", _) ->
     DD = tetrapak:config_path("edoc.outdir"),

@@ -54,6 +54,8 @@
              {"edoc.private", false},
              {"edoc.hidden", false},
              {"edoc.todo", false},
+             {"edoc.pretty_print", true},
+             {"edoc.sort_functions", false},
              {"test.ct.srcdir", "test"},
              {"test.ct.logdir", "test-log"},
              {"test.ct.suite", "all"},
