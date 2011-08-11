@@ -26,6 +26,12 @@ run("shell", _) ->
     code:ensure_loaded(tpk),
     case tetrapak_io:can_start_shell() of
         true ->
+            TestDir = tetrapak:config_path("test.ct.srcdir"),
+            case filelib:is_dir(TestDir) of
+                true  -> code:add_pathz(TestDir);
+                false -> ok
+            end,
+
             tetrapak:require("tetrapak:reload"),
             tetrapak_task:print_output_header(user, "shell"),
             tetrapak_io:start_shell(),
