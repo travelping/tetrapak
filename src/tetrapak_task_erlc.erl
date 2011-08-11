@@ -178,6 +178,8 @@ erlang_source_files(Path) ->
 
 scan_source(Path) ->
     case epp_dodger:quick_parse_file(Path, []) of
+        {ok, []} ->
+            #erl{mtime = tpk_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")};
         {ok, Forms} ->
             Rec = #erl{mtime = tpk_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")},
             lists:foldl(fun (F, Acc) -> do_form(Path, F, Acc) end, Rec, tl(Forms))
