@@ -61,6 +61,7 @@ run_sequentially(Context, [Task | Rest]) ->
             {error, {unknown_key, Key}};
         {error, {failed, Key}} ->
             wait_shutdown(Context),
+            ?DEBUG("run_sequentially/1: wait shutdown complete"),
             {error, {failed, Key}}
     end.
 
@@ -70,8 +71,8 @@ shutdown(Context) ->
 
 wait_for(Ctx, Keys) ->
     case call(Ctx, {wait_for, Keys}) of
-        {unknown_key, Key} ->
-            {error, {unknown_key, Key}};
+        {error, Error} ->
+            {error, Error};
         {wait, Running, Started} ->
             RunningMRefs = [monitor(process, Pid) || Pid <- Running],
             AllMRefs = wait_tasks_started(Started, RunningMRefs),
@@ -146,7 +147,7 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
         {request, FromPid, {wait_for, Keys}} ->
             case resolve_keys(TaskMap, Keys) of
                 {unknown_key, Key} ->
-                    reply(FromPid, {unknown_key, Key}),
+                    reply(FromPid, {error, {unknown_key, Key}}),
                     loop(LoopState);
                 TaskList ->
                     {NewLoopState, ReplyRunning, ReplyStarted} =
@@ -174,13 +175,13 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             loop(LoopState#st{cache = NewCache, done = NewDone, running = NewRunning});
 
         {cast, _FromPid, shutdown} ->
-            do_shutdown(LoopState, undefined);
+            do_shutdown(LoopState, undefined, undefined);
 
         {'EXIT', _DeadPid, {?TASK_DONE, _Name}} ->
             loop(LoopState);
 
-        {'EXIT', DeadPid, {?TASK_FAIL, _FailedTask}} ->
-            do_shutdown(LoopState, DeadPid);
+        {'EXIT', DeadPid, {?TASK_FAIL, FailedTask}} ->
+            do_shutdown(LoopState, DeadPid, FailedTask);
 
         {'EXIT', DeadPid, Reason} ->
             ?DEBUG("ctx EXIT ~p ~p", [DeadPid, Reason]),
@@ -190,24 +191,27 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             ?DEBUG("ctx other ~p", [Other])
     end.
 
-do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, FailedPid) ->
+do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, FailedPid, FailedTask) ->
    RList   = dict:to_list(Running),
    Workers = [Pid || {_Name, Pid} <- RList, Pid /= FailedPid],
-   shutdown_loop(Workers ++ IOWorkers, Running, IOQueue).
+   shutdown_loop(Workers ++ IOWorkers, Running, IOQueue, FailedTask).
 
-shutdown_loop([], _, _) ->
+shutdown_loop([], _Running, _IOQueue, _FailedTask) ->
     ok;
-shutdown_loop(Workers, Running, IOQueue) ->
+shutdown_loop(Workers, Running, IOQueue, FailedTask) ->
     receive
         {'EXIT', Pid, _Reason} ->
-            shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue);
+            shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue, FailedTask);
         {cast, FromPid, output_done} ->
-            shutdown_loop(Workers, Running, pop_ioqueue(IOQueue, FromPid));
+            shutdown_loop(Workers, Running, pop_ioqueue(IOQueue, FromPid), FailedTask);
         {cast, FromPid, want_output} ->
-            shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid));
+            shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid), FailedTask);
+        {request, FromPid, {wait_for, _Keys}} ->
+            reply(FromPid, {error, {failed, FailedTask}}),
+            shutdown_loop(Workers, Running, IOQueue, FailedTask);
         Other ->
             ?DEBUG("shutdown other ~p", [Other]),
-            shutdown_loop(Workers, Running, IOQueue)
+            shutdown_loop(Workers, Running, IOQueue, FailedTask)
     end.
 
 pop_ioqueue(IOQueue, DoneIOProc) ->
