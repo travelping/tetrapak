@@ -238,7 +238,7 @@ read_config(File, Config) ->
 
 add_cli_config(CliOptions, Config) ->
     lists:foldl(fun ({config, Key, Value}, Cfg = #config{values = ValueAcc}) ->
-                        lists:keystore(Key, 1, ValueAcc, {Key, Value});
+                        Cfg#config{values = lists:keystore(Key, 1, ValueAcc, {Key, Value})};
                     (_Other, ConfAcc) ->
                         ConfAcc
                 end, Config, CliOptions).
@@ -249,15 +249,15 @@ read_ini_file(Filename, Config) ->
         Error          -> Error
     end.
 
-do_sections(SList, Tree) ->
+do_sections(SList, Config) ->
     lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
                         lists:foldl(fun ({Key, Value}, Cfg = #config{values = ValueAcc}) ->
                                             Pair = {TheKey, _} = {ckey(SName, Key), Value},
                                             Cfg#config{values = lists:keystore(TheKey, 1, ValueAcc, Pair)}
                                     end, OuterAcc, Props);
-                    ({object, OKey, OValues}, Acc = #config{objects = ObjAcc}) ->
-                        lists:keystore(OKey, 1, ObjAcc, {OKey, OValues})
-                end, Tree, SList).
+                    ({object, OKey, OValues}, Cfg = #config{objects = ObjAcc}) ->
+                        Cfg#config{objects = lists:keystore(OKey, 1, ObjAcc, {OKey, OValues})}
+                end, Config, SList).
 
 ckey("", Key)      -> Key;
 ckey(Section, Key) -> Section ++ "." ++ Key.

@@ -139,6 +139,9 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
             lists:foreach(fun ({Key, Value}) ->
                                   ets:insert(CacheTable, {{config_value, Key}, Value})
                           end, ConfigValues),
+            lists:foreach(fun ({{ObjType, ObjInstance}, ObjValues}) ->
+                                  ets:insert(CacheTable, {{config_object, ObjType, ObjInstance}, ObjValues})
+                          end, ConfigObjects),
             reply(FromPid, ok),
             loop(LoopState);
 
