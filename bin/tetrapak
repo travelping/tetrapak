@@ -1,5 +1,20 @@
-#!/bin/sh
+#!/usr/bin/env escript
+%% -nouser -smp auto
+%% vim: ft=erlang
 
-HERE=`dirname $0`
+main(Args) ->
+    %% set code path
+    RelBinDir = filename:dirname(resolve_link(escript:script_name())),
+    Here      = filename:dirname(escript:script_name()),
+    EbinDir   = filename:absname(filename:join([Here, RelBinDir, "..", "ebin"])),
+    code:add_path(EbinDir),
 
-exec erl -pa "$HERE/../ebin" -noinput -noshell -user tetrapak_io -smp auto -run tetrapak cli_main -extra $@
+    %% run tetrapak
+    tetrapak_io:start(),
+    tetrapak:cli_main(Args).
+
+resolve_link(Filename) ->
+    case file:read_link(Filename) of
+        {ok, Target} -> Target;
+        {error, _}   -> Filename
+    end.

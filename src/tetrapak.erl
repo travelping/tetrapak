@@ -19,7 +19,7 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tetrapak).
--export([version/0, run/2, cli_main/0]).
+-export([version/0, run/2, cli_main/0, cli_main/1]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2,
          config/1, config/2, config_path/1, config_path/2]).
 -export([cmd/2, cmd/3, outputcmd/2, outputcmd/3]).
@@ -39,6 +39,9 @@ run(Directory, TaskCmds) ->
 
 %% @private
 cli_main() ->
+    cli_main(init:get_plain_arguments()).
+
+cli_main(CliArgs) ->
     {ok, Cwd} = file:get_cwd(),
 
     application:load(tetrapak), %% ensure the app file is loaded
@@ -61,7 +64,7 @@ cli_main() ->
     %% process command-line options
     CliDef = [{option, config, 2, ["-o"]}],
 
-    case tpk_util:parse_cmdline(init:get_plain_arguments(), CliDef) of
+    case tpk_util:parse_cmdline(CliArgs, CliDef) of
         {error, {_L, Mod, EInfo}} ->
             io:format(standard_error, "Error: ~s~n", [Mod:format_error(EInfo)]),
             halt(255);
