@@ -30,7 +30,7 @@
 -define(TIMEOUT, 10000).
 
 task_done(Ctx, Task, Result) ->
-    cast(Ctx, {done, Task, Result}).
+    call(Ctx, {done, Task, Result}).
 
 task_wants_output(Ctx) ->
     cast(Ctx, want_output).
@@ -160,6 +160,16 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
                     loop(NewLoopState)
             end;
 
+        {request, FromPid, {done, Task, Variables}} ->
+            lists:foreach(fun ({Key, Value}) ->
+                                  ets:insert(CacheTable, {{return_value, Key}, Value})
+                          end, Variables),
+            NewRunning = dict:erase(Task, Running),
+            NewDone    = gb_sets:insert(Task, Done),
+
+            reply(FromPid, ok),
+            loop(LoopState#st{done = NewDone, running = NewRunning});
+
         {cast, FromPid, want_output} ->
             loop(LoopState#st{io_queue = push_ioqueue(IOQueue, FromPid)});
 
@@ -168,15 +178,6 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
 
         {cast, FromPid, register_io_worker} ->
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
-
-        {cast, _FromPid, {done, Task, Variables}} ->
-            lists:foreach(fun ({Key, Value}) ->
-                                  ets:insert(CacheTable, {{return_value, Key}, Value})
-                          end, Variables),
-            NewRunning = dict:erase(Task, Running),
-            NewDone    = gb_sets:insert(Task, Done),
-
-            loop(LoopState#st{done = NewDone, running = NewRunning});
 
         {cast, _FromPid, shutdown} ->
             do_shutdown(LoopState, undefined, undefined);

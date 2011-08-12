@@ -58,8 +58,6 @@ cache_table() ->
 worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Directory, CacheTab) ->
     ?DEBUG("worker for ~s", [TaskName]),
 
-    ?DEBUG("~p", [ets:tab2list(CacheTab)]),
-
     %% synchronize with the caller
     CallerPid ! {self(), task_started},
     receive
