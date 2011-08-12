@@ -4,17 +4,18 @@
 
 main(Args) ->
     %% set code path
-    RelBinDir = filename:dirname(resolve_link(escript:script_name())),
-    Here      = filename:dirname(escript:script_name()),
-    EbinDir   = filename:absname(filename:join([Here, RelBinDir, "..", "ebin"])),
-    code:add_path(EbinDir),
+    Script = escript:script_name(),
+    ScriptDir = filename:dirname(Script),
+    case file:read_link(Script) of
+        {ok, Target} ->
+            RelBinDir = filename:dirname(Target),
+            EbinDir = filename:join([ScriptDir, RelBinDir, "..", "ebin"]);
+        {error, _} ->
+            EbinDir = filename:join([ScriptDir, "..", "ebin"])
+    end,
+
+    code:add_path(filename:absname(EbinDir)),
 
     %% run tetrapak
     tetrapak_io:start(),
     tetrapak:cli_main(Args).
-
-resolve_link(Filename) ->
-    case file:read_link(Filename) of
-        {ok, Target} -> Target;
-        {error, _}   -> Filename
-    end.
