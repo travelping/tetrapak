@@ -34,27 +34,24 @@ run("tetrapak:boot", _) ->
     Version = proplists:get_value(vsn, Props, "UNKNOWN"),
     Env     = proplists:get_value(env, Props),
 
-    BaseConfig     = lists:foldl(fun ({Key, Value}, Acc) ->
-                                         gb_trees:enter(ckey("", Key), Value, Acc)
-                                 end, gb_trees:empty(), proplists:get_value(config, Env)),
+    %% configuration
+    BaseConfig     = #config{values = proplists:get_value(config, Env)},
     ProjectConfig1 = read_config(project_config_path("config.ini"), BaseConfig),
     ProjectConfig2 = read_config(project_config_path("local.ini"), ProjectConfig1),
 
     {ok, CliOptions} = application:get_env(tetrapak, cli_options),
-    TheConfig = lists:foldl(fun ({config, Key, Value}, ConfAcc) ->
-                                    gb_trees:enter(ckey("", Key), Value, ConfAcc);
-                                (_Other, ConfAcc) ->
-                                    ConfAcc
-                            end, ProjectConfig2, CliOptions),
+    TheConfig = add_cli_config(CliOptions, ProjectConfig2),
+
+    tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
     %% scan tasks
     tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(proplists:get_value(tasks, Env))),
     tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
 
-    RetVars = gb_trees:enter("version", Version, TheConfig),
-    {done, RetVars};
+    {done, [{version, Version}]};
 
 run("tetrapak:info", _) ->
+    ?DEBUG("version: ~p~n", [tetrapak:get("tetrapak:boot:version")]),
     io:format("** version ~s~n~n", [tetrapak:get("tetrapak:boot:version")]),
     Tasks = tetrapak_context:get_tasks(tetrapak_task:context()),
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
@@ -228,29 +225,39 @@ do_form(_File, OtherForm, FoundM, TMod, Code) ->
 project_config_path(Filename) ->
     filename:join(tetrapak:subdir("tetrapak"), Filename).
 
-read_config(File, Tree) ->
-    case read_ini_file(File, Tree) of
+read_config(File, Config) ->
+    case read_ini_file(File, Config) of
         {error, {file, enoent}} ->
-            Tree;
-        {ok, ConfigTree} ->
-            ConfigTree;
+            Config;
+        {ok, NewConfig} ->
+            NewConfig;
         {error, Error} ->
             tpk_util:show_error_info(File, "Error: ", Error),
             tetrapak:fail()
     end.
 
-read_ini_file(Filename, Tree) ->
+add_cli_config(CliOptions, Config) ->
+    lists:foldl(fun ({config, Key, Value}, Cfg = #config{values = ValueAcc}) ->
+                        lists:keystore(Key, 1, ValueAcc, {Key, Value});
+                    (_Other, ConfAcc) ->
+                        ConfAcc
+                end, Config, CliOptions).
+
+read_ini_file(Filename, Config) ->
     case tetrapak_ini_parser:file(Filename) of
-        {ok, Sections} -> {ok, do_sections(Sections, Tree)};
+        {ok, Sections} -> {ok, do_sections(Sections, Config)};
         Error          -> Error
     end.
 
 do_sections(SList, Tree) ->
     lists:foldl(fun ({section, SName, Props}, OuterAcc) ->
-                        lists:foldl(fun ({Key, Value}, InnerAcc) ->
-                                            gb_trees:enter(ckey(SName, Key), Value, InnerAcc)
-                                    end, OuterAcc, Props)
+                        lists:foldl(fun ({Key, Value}, Cfg = #config{values = ValueAcc}) ->
+                                            Pair = {TheKey, _} = {ckey(SName, Key), Value},
+                                            Cfg#config{values = lists:keystore(TheKey, 1, ValueAcc, Pair)}
+                                    end, OuterAcc, Props);
+                    ({object, OKey, OValues}, Acc = #config{objects = ObjAcc}) ->
+                        lists:keystore(OKey, 1, ObjAcc, {OKey, OValues})
                 end, Tree, SList).
 
-ckey("", Key)      -> "config:" ++ Key;
-ckey(Section, Key) -> "config:" ++ Section ++ "." ++ Key.
+ckey("", Key)      -> Key;
+ckey(Section, Key) -> Section ++ "." ++ Key.

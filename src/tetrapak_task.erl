@@ -24,13 +24,15 @@
 
 %% task behaviour functions
 -export([behaviour_info/1]).
--export([worker/4, context/0, directory/0, fail/0, fail/2, get/1, require_all/1]).
+-export([context/0, directory/0, cache_table/0]).
+-export([worker/5, fail/0, fail/2, get/1, get_config/1, require_all/1]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
 
--define(CTX, '$__tetrapak_task_context').
+-define(CTX,       '$__tetrapak_task_context').
 -define(DIRECTORY, '$__tetrapak_task_directory').
+-define(CACHE_TAB, '$__tetrapak_task_vcache').
 
 behaviour_info(callbacks) -> [{run, 2}];
 behaviour_info(_) -> undefined.
@@ -47,8 +49,16 @@ directory() ->
         _AnythingElse         -> error(not_inside_task)
     end.
 
-worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Directory) ->
-    ?DEBUG("worker: task ~s starting", [TaskName]),
+cache_table() ->
+    case erlang:get(?CACHE_TAB) of
+        undefined -> error(not_inside_task);
+        Table     -> Table
+    end.
+
+worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Directory, CacheTab) ->
+    ?DEBUG("worker for ~s", [TaskName]),
+
+    ?DEBUG("~p", [ets:tab2list(CacheTab)]),
 
     %% synchronize with the caller
     CallerPid ! {self(), task_started},
@@ -61,6 +71,8 @@ worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Director
 
     erlang:put(?CTX, Context),
     erlang:put(?DIRECTORY, Directory),
+    erlang:put(?CACHE_TAB, CacheTab),
+
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
             ?DEBUG("worker: check/1 -> done"),
@@ -84,15 +96,15 @@ try_check(TaskModule, TaskName) ->
             {needs_run, Data} ->
                 {needs_run, Data};
             done ->
-                {done, dict:new()};
+                {done, []};
             {done, Variables} ->
                 {done, do_output_variables(Function, TaskName, Variables)};
             true ->
                 {needs_run, undefined};
             false ->
-                {done, dict:new()};
+                {done, []};
             ok ->
-                {done, dict:new()};
+                {done, []};
             OtherInvalid ->
                 fail("~s returned an invalid value: ~p", [Function, OtherInvalid])
         end
@@ -117,11 +129,11 @@ try_run(TaskModule, TaskName, TaskData) ->
     try
         case TaskModule:run(TaskName, TaskData) of
             done ->
-                {done, dict:new()};
+                {done, []};
             {done, Variables} ->
                 {done, do_output_variables(Function, TaskName, Variables)};
             ok ->
-                {done, dict:new()};
+                {done, []};
             OtherInvalid ->
                 fail("~s returned an invalid value: ~p", [Function, OtherInvalid])
         end
@@ -143,16 +155,16 @@ handle_error(TaskName, Function, Class, Exn) ->
 
 do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
     lists:foldl(fun ({Key, Value}, Acc) ->
-                        dict:store(TaskName ++ ":" ++ str(Key), Value, Acc);
+                        [{TaskName ++ ":" ++ str(Key), Value} | Acc];
                     (Item, _Acc) ->
                         fail("~s returned an invalid proplist (item ~p)", [Fun, Item])
-                end, dict:new(), Vars);
+                end, [], Vars);
 do_output_variables(_Fun, _TaskName, {Size, nil}) when is_integer(Size) ->
-    dict:new();
+    [];
 do_output_variables(_Fun, TaskName, Tree = {Size, {_, _, _, _}}) when is_integer(Size) ->
     tpk_util:fold_tree(fun ({Key, Value}, Acc) ->
-                               dict:store(TaskName ++ ":" ++ str(Key), Value, Acc)
-                       end, dict:new(), Tree);
+                               [{TaskName ++ ":" ++ str(Key), Value} | Acc]
+                       end, [], Tree);
 do_output_variables(Fun, _TaskName, _Variables) ->
     fail("~s returned an invalid key-value structure (not a proplist() | gb_tree())", [Fun]).
 
@@ -164,9 +176,18 @@ fail(Fmt, Args) ->
 get(Key) ->
     case require_all([Key]) of
         ok ->
-            tetrapak_context:get_cached(context(), Key);
+            case ets:lookup(cache_table(), {return_value, Key}) of
+                []            -> {error, unknown_key};
+                [{_K, Value}] -> {ok, Value}
+            end;
         {error, {unknown_key, _}} ->
             {error, unknown_key}
+    end.
+
+get_config(Key) ->
+    case ets:lookup(cache_table(), {config_value, Key}) of
+        []            -> {error, unknown_key};
+        [{_K, Value}] -> {ok, Value}
     end.
 
 require_all(Keys) when is_list(Keys) ->

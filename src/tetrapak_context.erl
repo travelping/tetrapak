@@ -20,9 +20,10 @@
 
 -module(tetrapak_context).
 -export([new/1, run_sequentially/2, shutdown/1,
-         get_cached/2, wait_for/2, wait_shutdown/1,
+         wait_for/2, wait_shutdown/1,
          task_done/3, task_wants_output/1, task_output_done/1,
-         register_io_worker/1, register_tasks/2, get_tasks/1]).
+         register_io_worker/1, register_tasks/2, get_tasks/1,
+         import_config/2]).
 -export([init/1, loop/1]).
 
 -include("tetrapak.hrl").
@@ -47,8 +48,8 @@ register_tasks(Ctx, TList) ->
 get_tasks(Ctx) ->
     call(Ctx, get_tasks).
 
-get_cached(Ctx, Key) ->
-    call(Ctx, {get_cached, Key}, ?TIMEOUT).
+import_config(Ctx, Config = #config{}) ->
+    call(Ctx, {import_config, Config}).
 
 run_sequentially(Context, []) ->
     shutdown(Context);
@@ -111,7 +112,7 @@ wait_shutdown(Process) ->
 -record(st, {
     directory                  :: string(),
     tasks                      :: [{string(), #task{}}],
-    cache      = dict:new()    :: dict(),
+    cache                      :: ets:tid(),
     running    = dict:new()    :: dict(),
     done       = gb_sets:new() :: set(),
     io_queue   = queue:new()   :: queue(),
@@ -124,24 +125,25 @@ new(Directory) ->
 init(Directory) ->
     process_flag(trap_exit, true),
     Tasks        = tetrapak_task_boot:initial_tmap(),
-    InitialState = #st{directory = Directory, tasks = Tasks},
+    CacheTab     = ets:new(?MODULE, [protected, ordered_set, {read_concurrency, true}]),
+    InitialState = #st{directory = Directory, tasks = Tasks, cache = CacheTab},
     loop(InitialState).
 
-loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
+loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
     receive
         {request, FromPid, {register_tasks, TList}} ->
             reply(FromPid, ok),
             loop(LoopState#st{tasks = lists:keymerge(1, lists:ukeysort(1, TList), TaskMap)});
 
-        {request, FromPid, get_tasks} ->
-            reply(FromPid, TaskMap),
+        {request, FromPid, {import_config, #config{values = ConfigValues, objects = ConfigObjects}}} ->
+            lists:foreach(fun ({Key, Value}) ->
+                                  ets:insert(CacheTable, {{config_value, Key}, Value})
+                          end, ConfigValues),
+            reply(FromPid, ok),
             loop(LoopState);
 
-        {request, FromPid, {get_cached, Key}} ->
-            case dict:find(Key, Cache) of
-                {ok, Value} -> reply(FromPid, {ok, Value});
-                error       -> reply(FromPid, {error, unknown_key})
-            end,
+        {request, FromPid, get_tasks} ->
+            reply(FromPid, TaskMap),
             loop(LoopState);
 
         {request, FromPid, {wait_for, Keys}} ->
@@ -168,11 +170,13 @@ loop(LoopState = #st{cache = Cache, tasks = TaskMap, running = Running, done = D
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
 
         {cast, _FromPid, {done, Task, Variables}} ->
-            NewCache   = dict:merge(fun (_Key, _V1, V2) -> V2 end, Cache, Variables),
+            lists:foreach(fun ({Key, Value}) ->
+                                  ets:insert(CacheTable, {{return_value, Key}, Value})
+                          end, Variables),
             NewRunning = dict:erase(Task, Running),
             NewDone    = gb_sets:insert(Task, Done),
 
-            loop(LoopState#st{cache = NewCache, done = NewDone, running = NewRunning});
+            loop(LoopState#st{done = NewDone, running = NewRunning});
 
         {cast, _FromPid, shutdown} ->
             do_shutdown(LoopState, undefined, undefined);
@@ -241,7 +245,7 @@ maybe_start_task(Task = #task{name = TaskName}, CallerPid, State, RunningAcc, St
             case gb_sets:is_member(TaskName, State#st.done) of
                 false ->
                     %% task has not been run yet, the caller needs to wait
-                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self(), CallerPid, State#st.directory]),
+                    WorkerPid = spawn_link(tetrapak_task, worker, [Task, self(), CallerPid, State#st.directory, State#st.cache]),
                     NewRunning = dict:store(TaskName, WorkerPid, State#st.running),
                     NewState = State#st{running = NewRunning},
                     {NewState, RunningAcc, [WorkerPid | StartedAcc]};

@@ -118,8 +118,18 @@ fail(Reason) ->
 fail(Fmt, Args) ->
     tetrapak_task:fail(Fmt, Args).
 
-config(Key)               -> get("tetrapak:boot:config:" ++ Key).
-config(Key, Default)      -> get("tetrapak:boot:config:" ++ Key, Default).
+config(Key) ->
+    case tetrapak_task:get_config(Key) of
+        {ok, Value}          -> Value;
+        {error, unknown_key} -> fail("unknown configuration parameter: ~s", [Key])
+    end.
+
+config(Key, Default)      ->
+    case tetrapak_task:get_config(Key) of
+        {ok, Value}          -> Value;
+        {error, unknown_key} -> Default
+    end.
+
 config_path(Key)          -> subdir(config(Key)).
 config_path(Key, Default) -> subdir(config(Key, Default)).
 
