@@ -1,5 +1,5 @@
 #!/usr/bin/env escript
-%% -nouser -smp auto
+%%! -nouser -smp auto
 %% vim: ft=erlang
 
 main(Args) ->
