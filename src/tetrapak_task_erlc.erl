@@ -23,6 +23,7 @@
 -export([check/1, run/2]).
 -export([check_mtimes/2, show_errors/3]).
 
+-include("tetrapak.hrl").
 -include_lib("kernel/include/file.hrl").
 
 -record(erl, {
@@ -188,7 +189,9 @@ erlang_source_files(Path) ->
     end.
 
 scan_source(Path) ->
-    case epp_dodger:quick_parse_file(Path, []) of
+    IncsFromOptions = [tetrapak:subdir(I) || {i, I} <- tetrapak:config("build.erlc_options")],
+    IncPath = [tetrapak:subdir("src"), tetrapak:subdir("include") | IncsFromOptions],
+    case epp:parse_file(Path, IncPath, []) of
         {ok, []} ->
             #erl{mtime = tpk_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")};
         {ok, Forms} ->
@@ -196,7 +199,8 @@ scan_source(Path) ->
             lists:foldl(fun (F, Acc) -> do_form(Path, F, Acc) end, Rec, tl(Forms))
     end.
 
-do_form(File, {attribute, _, file, {IncludeFile, _}}, R) when File /= IncludeFile ->
+do_form(File, A = {attribute, _, file, {IncludeFile, _}}, R) when File /= IncludeFile ->
+    ?DEBUG("include_attr: ~p", [A]),
     R#erl{includes = [IncludeFile | R#erl.includes]};
 do_form(_File, {attribute, _, module, Module}, R) when is_atom(Module) ->
     R#erl{module = atom_to_list(Module)};
@@ -217,7 +221,7 @@ do_form(_File, {attribute, _, Attr, Value}, R) ->
     end;
 do_form(_File, {error, _}, R) ->
     R#erl{invalid = true};
-do_form(_File, _, R) ->
+do_form(_File, _Form, R) ->
     R.
 
 avalue(Val) when is_list(Val) -> Val;
