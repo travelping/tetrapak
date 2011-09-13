@@ -20,8 +20,7 @@
 
 -module(tetrapak_context).
 -export([new/1, run_sequentially/2, shutdown/1,
-         wait_for/2, wait_shutdown/1,
-         task_done/3, task_wants_output/1, task_output_done/1,
+         wait_for/2, wait_shutdown/1, task_done/3, task_wants_output/1,
          register_io_worker/1, register_tasks/2, get_tasks/1,
          import_config/2]).
 -export([init/1, loop/1]).
@@ -34,9 +33,6 @@ task_done(Ctx, Task, Result) ->
 
 task_wants_output(Ctx) ->
     cast(Ctx, want_output).
-
-task_output_done(Ctx) ->
-    cast(Ctx, output_done).
 
 register_io_worker(Ctx) ->
     link(Ctx),
@@ -176,9 +172,6 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
         {cast, FromPid, want_output} ->
             loop(LoopState#st{io_queue = push_ioqueue(IOQueue, FromPid)});
 
-        {cast, FromPid, output_done} ->
-            loop(LoopState#st{io_queue = pop_ioqueue(IOQueue, FromPid)});
-
         {cast, FromPid, register_io_worker} ->
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
 
@@ -193,8 +186,13 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
 
         {'EXIT', DeadPid, Reason} ->
             ?DEBUG("ctx EXIT ~p ~p", [DeadPid, Reason]),
-            loop(LoopState#st{io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
-
+            case ordsets:is_element(DeadPid, LoopState#st.io_workers) of
+                true ->
+                    loop(LoopState#st{io_queue = pop_ioqueue(IOQueue, DeadPid),
+                                      io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
+                false ->
+                    loop(LoopState)
+            end;
         Other ->
             ?DEBUG("ctx other ~p", [Other])
     end.
@@ -209,9 +207,12 @@ shutdown_loop([], _Running, _IOQueue, _FailedTask) ->
 shutdown_loop(Workers, Running, IOQueue, FailedTask) ->
     receive
         {'EXIT', Pid, _Reason} ->
-            shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue, FailedTask);
-        {cast, FromPid, output_done} ->
-            shutdown_loop(Workers, Running, pop_ioqueue(IOQueue, FromPid), FailedTask);
+            case queue:member(Pid, IOQueue) of
+                true ->
+                    shutdown_loop(lists:delete(Pid, Workers), Running, pop_ioqueue(IOQueue, Pid), FailedTask);
+                false ->
+                    shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue, FailedTask)
+            end;
         {cast, FromPid, want_output} ->
             shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid), FailedTask);
         {request, FromPid, {wait_for, _Keys}} ->
@@ -224,14 +225,19 @@ shutdown_loop(Workers, Running, IOQueue, FailedTask) ->
 
 pop_ioqueue(IOQueue, DoneIOProc) ->
     case queue:out(IOQueue) of
-        {empty, NewIOQueue}               -> NewIOQueue;
+        {empty, NewIOQueue} ->
+            NewIOQueue;
         {{value, DoneIOProc}, NewIOQueue} ->
             case queue:out(NewIOQueue) of
-                {empty, ReturnIOQueue}    -> ReturnIOQueue;
+                {empty, ReturnIOQueue} ->
+                    ReturnIOQueue;
                 {{value, NextIOProc}, _Q} ->
                     reply(NextIOProc, output_ok),
                     NewIOQueue %% Next stays in the queue!!
-            end
+            end;
+        {{value, OtherIOProc}, _} ->
+            %% was not head, but we're removing it anyway
+            queue:filter(fun (X) -> X /= OtherIOProc end, IOQueue)
     end.
 
 push_ioqueue(IOQueue, FromPid) ->

@@ -239,10 +239,8 @@ output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
             output_collector_loop(Context, TaskName, TaskProcess, console);
         {'EXIT', TaskProcess, _Reason} ->
             case Buffer of
-                console ->
-                    tetrapak_context:task_output_done(Context);
-                <<>> ->
-                    tetrapak_context:task_output_done(Context);
+                console -> ok;
+                <<>> -> ok;
                 _ ->
                     wait_output_ok(Context, TaskName, Buffer)
             end
@@ -253,7 +251,7 @@ wait_output_ok(Context, TaskName, Buffer) ->
         {reply, Context, output_ok} ->
             print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
-            tetrapak_context:task_output_done(Context);
+            ok;
         _Other ->
             ?DEBUG("wait_output_ok other ~p", [_Other])
     end.

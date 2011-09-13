@@ -23,53 +23,53 @@
 -export([ioreq_output/1]).
 
 -include("tetrapak.hrl").
--define(SERVER, tetrapak_io).
 
 start() ->
-    proc_lib:spawn(fun () -> server({fd,1,1}) end).
+    Server = proc_lib:spawn(fun () -> server({fd,1,1}) end),
+    register(user, Server).
+
+can_start_shell() ->
+    case process_info(whereis(user), dictionary) of
+        {dictionary, Dict} ->
+            proplists:get_value(?MODULE, Dict, false);
+        _ ->
+            false
+    end.
 
 start_shell() ->
     start_shell({shell, start, [false]}).
 start_shell(Shell = {_M,_F,_A}) ->
-    whereis(?SERVER) ! {start_shell, Shell},
-    ok.
-
-can_start_shell() ->
-    case whereis(?SERVER) of
-        undefined        -> false;
-        P when is_pid(P) -> true
+    whereis(user) ! {io_request, self(), user, {start_shell, Shell}},
+    receive
+        {io_reply, user, ok_shell_started} ->
+            ok;
+        {io_reply, user, _OtherReply} ->
+            {error, notsup}
+    after
+        500 ->
+            {error, timeout}
     end.
 
 server(PortName) ->
-    Group = group:start(self(), {}),
-    register(user, Group),
-    Port = open_port(PortName, [out]),
-    register(?SERVER, self()),
-    server_loop(Port, Group).
+    put(?MODULE, true),
+    group_leader(self(), self()),
+    server_loop(open_port(PortName, [out])).
 
-server_loop(Port, Group) ->
+server_loop(Port) ->
     receive
+        {io_request, From, ReplyAs, {start_shell, Shell}} ->
+            ?DEBUG("io: starting shell as requested"),
+            unregister(user),
+            From ! {io_reply, ReplyAs, ok_shell_started},
+            user_drv:server('tty_sl -c -e', Shell);
         {io_request, From, ReplyAs, Request} when is_pid(From) ->
             {Reply, Chars} = ioreq_output(Request),
             port_command(Port, Chars),
             From ! {io_reply, ReplyAs, Reply},
-            server_loop(Port, Group);
-        {Group, get_unicode_state} ->
-            Group ! {self(), get_unicode_state, true},
-            server_loop(Port, Group);
-        {Group, set_unicode_state} ->
-            Group ! {self(), set_unicode_state, true},
-            server_loop(Port, Group);
-        {Group, Req} ->
-            {_Reply, Chars} = ioreq_output(Req),
-            port_command(Port, Chars),
-            server_loop(Port, Group);
-        {start_shell, Shell} ->
-            erlang:unregister(?SERVER),
-            user_drv:server('tty_sl -c -e', Shell);
+            server_loop(Port);
         _Other ->
             ?DEBUG("io other: ~p", [_Other]),
-            server_loop(Port, Group)
+            server_loop(Port)
     end.
 
 ioreq_output({put_chars, Encoding, Chars}) ->
