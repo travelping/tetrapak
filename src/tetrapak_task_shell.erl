@@ -20,7 +20,7 @@
 
 -module(tetrapak_task_shell).
 -behaviour(tetrapak_task).
--export([run/2]).
+-export([run/2, start_deps/1]).
 
 run("shell", _) ->
     code:ensure_loaded(tpk),
@@ -59,13 +59,18 @@ run("tetrapak:tpk-help", _) ->
               "tpk:h()      -- shows this help\n"
               "tpk:l()      -- reloads changed modules\n"
               "tpk:s()      -- starts the current application\n"
+              "tpk:s(App)   -- starts an application and all its dependencies\n"
               "tpk:c()      -- runs \"check\"\n"
               "tpk:b()      -- runs \"build\"\n"
               "tpk:bl()     -- runs \"build\" and reloads modules\n");
 
 run("tetrapak:startapp", _) ->
-    start_deps(tetrapak:get("config:appfile:name")).
-
+    case start_deps(tetrapak:get("config:appfile:name")) of
+        ok ->
+            done;
+        {failed, App} ->
+            tetrapak:fail("failed to start ~s", [App])
+    end.
 start_deps(App) ->
     case application:start(App) of
         ok ->
@@ -77,7 +82,7 @@ start_deps(App) ->
             start_deps(DepApp),
             start_deps(App);
         {error, _Error} ->
-            tetrapak:fail("failed to start ~s", [App])
+            {failed, App}
     end.
 
 loaded_mtime(Mod) ->
