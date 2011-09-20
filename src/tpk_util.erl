@@ -24,7 +24,7 @@
          check_files_exist/4, varsubst/2, varsubst_file/2]).
 -export([cmd/3, outputcmd/3]).
 -export([format_error/1, show_error_info/2, show_error_info/3]).
--export([parse_cmdline/2, debug_log_to_stderr/2]).
+-export([debug_log_to_stderr/2]).
 
 -include_lib("kernel/include/file.hrl").
 -include("tetrapak.hrl").
@@ -225,53 +225,3 @@ debug_log_to_stderr(Fmt, Args) ->
             ok
     end.
 
-%% ------------------------------------------------------------
-%% -- getopt-style option parsing
--type option() :: {option, Name::atom(), ArgSize::pos_integer(), [string()]}.
--type flag()   :: {flag, Name::atom(), [string()]}.
--spec parse_cmdline([string()], [option() | flag()]) -> {{atom(), term()}, [string()]}.
-
-parse_cmdline(Args, OptionDesc) ->
-    try parse_options(Args, OptionDesc, false, [], []) of
-        {Options, RemainingArgs} ->
-            {ok, Options, RemainingArgs}
-    catch
-        throw:{error, Error} ->
-            {error, {undefined, ?MODULE, Error}}
-    end.
-
-parse_options([], _OptDesc, _NextIsArg, Result, Args) ->
-    {Result, lists:reverse(Args)};
-parse_options([Arg | Rest], OptDesc, NextIsArg, Result, Args) ->
-    case Arg of
-        "--" ->
-            parse_options(Rest, OptDesc, true, Result, Args);
-        "-"  ++ _Name when not NextIsArg ->
-            {ThisOption, TheRest} = parse_option(Arg, Rest, OptDesc),
-            NewResult = [ThisOption | Result],
-            parse_options(TheRest, OptDesc, NextIsArg, NewResult, Args);
-        _ ->
-            parse_options(Rest, OptDesc, NextIsArg, Result, [Arg | Args])
-    end.
-
-parse_option(Option, Rest, OptDefs) ->
-    case find_option(Option, OptDefs) of
-        {option, Name, ArgSize, _Flags} ->
-            case catch lists:split(ArgSize, Rest) of
-                {'EXIT', _} ->
-                    throw({error, {option_args, Option, ArgSize}});
-                {OptionArgs, Remaining} ->
-                    {list_to_tuple([Name | OptionArgs]), Remaining}
-            end;
-        {flag, Name, _Flags} ->
-            {{Name, true}, Rest};
-        undefined ->
-            throw({error, {unknown_option, Option}})
-    end.
-
-find_option(_Option, []) -> undefined;
-find_option(Option, [OptDef | Rest]) ->
-    case lists:member(Option, element(tuple_size(OptDef), OptDef)) of
-        false -> find_option(Option, Rest);
-        true  -> OptDef
-    end.
