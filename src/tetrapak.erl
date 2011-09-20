@@ -19,7 +19,7 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tetrapak).
--export([version/0, run/2, cli_main/0, cli_main/1]).
+-export([version/0, run/2, cli_main/1]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2,
          config/1, config/2, config_path/1, config_path/2]).
 -export([cmd/2, cmd/3, outputcmd/2, outputcmd/3]).
@@ -37,14 +37,12 @@ run(Directory, TaskCmds) ->
         {error, _}                  -> error
     end.
 
-%% @private
-cli_main() ->
-    cli_main(init:get_plain_arguments()).
-
-cli_main(CliArgs) ->
+cli_main([_ | CliArgs]) ->
     {ok, Cwd} = file:get_cwd(),
 
-    application:load(tetrapak), %% ensure the app file is loaded
+    %% ensure the app file is loaded
+    application:load(tetrapak),
+
     case os:getenv("DEBUG") of
         Value when (Value == "1") or (Value == "true") ->
             application:set_env(tetrapak, debug, true);
@@ -62,27 +60,19 @@ cli_main(CliArgs) ->
     end,
 
     %% process command-line options
-    CliDef = [{option, config, 2, ["-o"]}],
+    RunTasks = case CliArgs ++ init:get_plain_arguments() of
+                   [] -> ["tetrapak:info"];
+                   As -> As
+               end,
 
-    case tpk_util:parse_cmdline(CliArgs, CliDef) of
-        {error, {_L, Mod, EInfo}} ->
-            io:format(standard_error, "Error: ~s~n", [Mod:format_error(EInfo)]),
-            halt(255);
-        {ok, CliOptions, []} ->
-            application:set_env(tetrapak, cli_options, CliOptions),
-            run(Cwd, ["tetrapak:info"]),
+    case tetrapak:run(Cwd, RunTasks) of
+        {unknown, Key} ->
+            io:format(standard_error, "Error: no such task: ~s~n", [Key]),
             halt(1);
-        {ok, CliOptions, Cmds} ->
-            application:set_env(tetrapak, cli_options, CliOptions),
-            case tetrapak:run(Cwd, Cmds) of
-                {unknown, Key} ->
-                    io:format(standard_error, "Error: no such command: ~s~n", [Key]),
-                    halt(1);
-                error ->
-                    halt(2);
-                ok ->
-                    halt(0)
-            end
+        error ->
+            halt(2);
+        ok ->
+            halt(0)
     end.
 
 %% ------------------------------------------------------------

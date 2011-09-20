@@ -39,8 +39,8 @@ run("tetrapak:boot", _) ->
     ProjectConfig1 = read_config(project_config_path("config.ini"), BaseConfig),
     ProjectConfig2 = read_config(project_config_path("local.ini"), ProjectConfig1),
 
-    {ok, CliOptions} = application:get_env(tetrapak, cli_options),
-    TheConfig = add_cli_config(CliOptions, ProjectConfig2),
+    CliOptions = getopt(config, o, 2),
+    TheConfig  = add_cli_config(CliOptions, ProjectConfig2),
 
     tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
@@ -261,3 +261,18 @@ do_sections(SList, Config) ->
 
 ckey("", Key)      -> Key;
 ckey(Section, Key) -> Section ++ "." ++ Key.
+
+%% ------------------------------------------------------------
+%% -- option parsing on top of init:get_arguments/0
+getopt(Name, Shortname, Size) ->
+    case init:get_argument(Shortname) of
+        error ->
+            [];
+        {ok, ValueLists} ->
+            [list_to_tuple([Name | check_option(Shortname, Size, VL)]) || VL <- ValueLists]
+    end.
+
+check_option(_Option, Size, Args) when length(Args) =:= Size ->
+    Args;
+check_option(Option, Size, Args) ->
+    tetrapak:fail("option -~s expects ~b arguments, given ~b", [Option, Size, length(Args)]).

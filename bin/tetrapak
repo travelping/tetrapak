@@ -1,21 +1,20 @@
-#!/usr/bin/env escript
-%%! -nouser -smp auto
-%% vim: ft=erlang
+#!/bin/sh
 
-main(Args) ->
-    %% set code path
-    Script = escript:script_name(),
-    ScriptDir = filename:dirname(Script),
-    case file:read_link(Script) of
-        {ok, Target} ->
-            RelBinDir = filename:dirname(Target),
-            EbinDir = filename:join([ScriptDir, RelBinDir, "..", "ebin"]);
-        {error, _} ->
-            EbinDir = filename:join([ScriptDir, "..", "ebin"])
-    end,
+START_CWD=`pwd -P`
 
-    code:add_path(filename:absname(EbinDir)),
+SCRIPT=$0
+cd `dirname $SCRIPT`
+SCRIPT=`basename $SCRIPT`
+# Iterate down a (possible) chain of symlinks
+while [ -L "$SCRIPT" ]; do
+    SCRIPT=`readlink $SCRIPT`
+    cd `dirname $SCRIPT`
+    SCRIPT=`basename $SCRIPT`
+done
 
-    %% run tetrapak
-    tetrapak_io:start(),
-    tetrapak:cli_main(Args).
+PHYS_DIR=`pwd -P`
+EBIN_DIR="$PHYS_DIR/../ebin"
+
+cd $START_CWD
+
+exec erl -pa "$EBIN_DIR" -user tetrapak_io -smp auto -s tetrapak cli_main '' $@

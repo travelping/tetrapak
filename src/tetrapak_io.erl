@@ -25,8 +25,7 @@
 -include("tetrapak.hrl").
 
 start() ->
-    Server = proc_lib:spawn(fun () -> server({fd,1,1}) end),
-    register(user, Server).
+    spawn(fun () -> server({fd,1,1}) end).
 
 can_start_shell() ->
     case process_info(whereis(user), dictionary) of
@@ -51,6 +50,14 @@ start_shell(Shell = {_M,_F,_A}) ->
     end.
 
 server(PortName) ->
+    %% this isn't really necessary but aids debugging
+    %% because init fails with a nasty error if the 'normal' user is enabled
+    case whereis(user) of
+        Pid when is_pid(Pid) -> unregister(user);
+        _                    -> ok
+    end,
+
+    register(user, self()),
     put(?MODULE, true),
     group_leader(self(), self()),
     server_loop(open_port(PortName, [out])).
