@@ -94,7 +94,8 @@ fmt_functions(Functions) ->
                                     LastCall     -> [];
                                     {M2, F2, A2} -> io:format("  ~p:~p/~p~n", [M2,F2,A2])
                                 end,
-                                io:format("    by ~p:~p/~p~n", [M1,F1,A1])
+                                io:format("    by ~p:~p/~p~n", [M1,F1,A1]),
+                                ThisCall
                         end, undefined, SortedFunctions);
         _ ->
             %% no caller info
