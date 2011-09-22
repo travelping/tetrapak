@@ -42,9 +42,10 @@ run("config:appfile", _) ->
     end;
 
 run("config:vcs", git) ->
-    case run_git("symbolic-ref", ["--quiet", "HEAD"]) of
+    case run_git("rev-parse", ["--symbolic-full-name", "HEAD"]) of
         <<"refs/heads/", Branch/binary>>   -> ok;
-        <<"refs/remotes/", Branch/binary>> -> ok
+        <<"refs/remotes/", Branch/binary>> -> ok;
+        <<"HEAD\n">>                       -> Branch = <<"UNKNOWN">>
     end,
     Describe = run_git("describe", ["--tags", "--dirty=-dirty", "--long", "--always"]),
     case re:run(Describe, "^(.*)-([0-9]+)-g([0-9a-f]+)(-dirty)?\n$", [{capture, all_but_first, list}]) of
