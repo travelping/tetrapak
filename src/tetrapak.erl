@@ -30,7 +30,7 @@
 %% ------------------------------------------------------------
 %% -- Ext API
 run(Directory, TaskCmds) ->
-    Context = tetrapak_context:new(Directory),
+    {ok, Context} = tetrapak_context:new(Directory),
     case tetrapak_context:run_sequentially(Context, ["tetrapak:boot" | TaskCmds]) of
         ok                          -> ok;
         {error, {unknown_key, Key}} -> {unknown, Key};

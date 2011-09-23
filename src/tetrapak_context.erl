@@ -23,7 +23,7 @@
          wait_for/2, wait_shutdown/1, task_done/3, task_wants_output/1,
          register_io_worker/1, register_tasks/2, get_tasks/1,
          import_config/2]).
--export([init/1, loop/1]).
+-export([init/2, loop/1]).
 
 -include("tetrapak.hrl").
 -define(TIMEOUT, 10000).
@@ -116,13 +116,14 @@ wait_shutdown(Process) ->
 }).
 
 new(Directory) ->
-    spawn_link(?MODULE, init, [Directory]).
+    proc_lib:start(?MODULE, init, [self(), Directory], 150).
 
-init(Directory) ->
+init(Parent, Directory) ->
     process_flag(trap_exit, true),
     Tasks        = tetrapak_task_boot:initial_tmap(),
     CacheTab     = ets:new(?MODULE, [protected, ordered_set, {read_concurrency, true}]),
     InitialState = #st{directory = Directory, tasks = Tasks, cache = CacheTab},
+    proc_lib:init_ack(Parent, {ok, self()}),
     loop(InitialState).
 
 loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
