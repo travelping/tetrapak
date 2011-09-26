@@ -50,13 +50,6 @@ start_shell(Shell = {_M,_F,_A}) ->
     end.
 
 server(PortName) ->
-    %% this isn't really necessary but aids debugging
-    %% because init fails with a nasty error if the 'normal' user is enabled
-    case whereis(user) of
-        Pid when is_pid(Pid) -> unregister(user);
-        _                    -> ok
-    end,
-
     register(user, self()),
     put(?MODULE, true),
     group_leader(self(), self()),
@@ -66,9 +59,13 @@ server_loop(Port) ->
     receive
         {io_request, From, ReplyAs, {start_shell, Shell}} ->
             ?DEBUG("io: starting shell as requested"),
+            put(?MODULE, false),
             unregister(user),
+            user_drv:start('tty_sl -c -e', Shell),
+            timer:sleep(20),
             From ! {io_reply, ReplyAs, ok_shell_started},
-            user_drv:server('tty_sl -c -e', Shell);
+            NewUser = whereis(user),
+            forwarder_loop(NewUser);
         {io_request, From, ReplyAs, Request} when is_pid(From) ->
             {Reply, Chars} = ioreq_output(Request),
             port_command(Port, Chars),
@@ -77,6 +74,13 @@ server_loop(Port) ->
         _Other ->
             ?DEBUG("io other: ~p", [_Other]),
             server_loop(Port)
+    end.
+
+forwarder_loop(User) ->
+    receive
+        Message ->
+            User ! Message,
+            forwarder_loop(User)
     end.
 
 ioreq_output({put_chars, Encoding, Chars}) ->
