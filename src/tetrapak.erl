@@ -43,6 +43,9 @@ cli_main([_ | CliArgs]) ->
     %% ensure the app file is loaded
     application:load(tetrapak),
 
+    %% start our error logger
+    tetrapak_error_logger:swapin(),
+
     case os:getenv("DEBUG") of
         Value when (Value == "1") or (Value == "true") ->
             application:set_env(tetrapak, debug, true);
