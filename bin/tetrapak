@@ -17,4 +17,4 @@ EBIN_DIR="$PHYS_DIR/../ebin"
 
 cd $START_CWD
 
-exec erl -pa "$EBIN_DIR" -user tetrapak_io -smp auto -s tetrapak cli_main '' $@
+exec ${ERL-erl} -pa "$EBIN_DIR" -user tetrapak_io -smp auto -s tetrapak cli_main '' $@
