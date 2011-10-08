@@ -51,7 +51,6 @@ run("tetrapak:boot", _) ->
     {done, [{version, Version}]};
 
 run("tetrapak:info", _) ->
-    ?DEBUG("version: ~p~n", [tetrapak:get("tetrapak:boot:version")]),
     io:format("** version ~s~n~n", [tetrapak:get("tetrapak:boot:version")]),
     Tasks = tetrapak_context:get_tasks(tetrapak_task:context()),
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
