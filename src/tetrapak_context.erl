@@ -20,7 +20,7 @@
 
 -module(tetrapak_context).
 -export([new/1, run_sequentially/2, shutdown/1,
-         wait_for/2, wait_shutdown/1, task_done/3, task_wants_output/1,
+         wait_for/2, wait_shutdown/1, task_done/3,
          register_io_worker/1, register_tasks/2, get_tasks/1,
          import_config/2]).
 -export([init/2, loop/1]).
@@ -30,9 +30,6 @@
 
 task_done(Ctx, Task, Result) ->
     call(Ctx, {done, Task, Result}).
-
-task_wants_output(Ctx) ->
-    cast(Ctx, want_output).
 
 register_io_worker(Ctx) ->
     link(Ctx),
@@ -111,8 +108,7 @@ wait_shutdown(Process) ->
     cache                      :: ets:tid(),
     running    = dict:new()    :: dict(),
     done       = gb_sets:new() :: set(),
-    io_queue   = queue:new()   :: queue(),
-    io_workers = ordsets:new() :: queue()
+    io_workers = ordsets:new() :: list(pid())
 }).
 
 new(Directory) ->
@@ -126,7 +122,7 @@ init(Parent, Directory) ->
     proc_lib:init_ack(Parent, {ok, self()}),
     loop(InitialState).
 
-loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, done = Done, io_queue = IOQueue}) ->
+loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, done = Done}) ->
     receive
         {request, FromPid, {register_tasks, TList}} ->
             reply(FromPid, ok),
@@ -170,9 +166,6 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
             reply(FromPid, ok),
             loop(LoopState#st{done = NewDone, running = NewRunning});
 
-        {cast, FromPid, want_output} ->
-            loop(LoopState#st{io_queue = push_ioqueue(IOQueue, FromPid)});
-
         {cast, FromPid, register_io_worker} ->
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
 
@@ -187,66 +180,31 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, running = Running, don
 
         {'EXIT', DeadPid, Reason} ->
             ?DEBUG("ctx EXIT ~p ~p", [DeadPid, Reason]),
-            case ordsets:is_element(DeadPid, LoopState#st.io_workers) of
-                true ->
-                    loop(LoopState#st{io_queue = pop_ioqueue(IOQueue, DeadPid),
-                                      io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
-                false ->
-                    loop(LoopState)
-            end;
+            loop(LoopState#st{io_workers = ordsets:del_element(DeadPid, LoopState#st.io_workers)});
+
         Other ->
             ?DEBUG("ctx other ~p", [Other])
     end.
 
-do_shutdown(#st{running = Running, io_workers = IOWorkers, io_queue = IOQueue}, FailedPid, FailedTask) ->
-   RList   = dict:to_list(Running),
-   Workers = [Pid || {_Name, Pid} <- RList, Pid /= FailedPid],
-   shutdown_loop(Workers ++ IOWorkers, Running, IOQueue, FailedTask).
+do_shutdown(#st{running = Running, io_workers = IOWorkers}, FailedPid, FailedTask) ->
+   Workers = [Pid || {_Name, Pid} <- dict:to_list(Running), Pid /= FailedPid],
+   shutdown_loop(Workers ++ IOWorkers, FailedTask).
 
-shutdown_loop([], _Running, _IOQueue, _FailedTask) ->
+shutdown_loop([], _FailedTask) ->
     ok;
-shutdown_loop(Workers, Running, IOQueue, FailedTask) ->
+shutdown_loop(Workers, FailedTask) ->
     receive
         {'EXIT', Pid, _Reason} ->
-            case queue:member(Pid, IOQueue) of
-                true ->
-                    shutdown_loop(lists:delete(Pid, Workers), Running, pop_ioqueue(IOQueue, Pid), FailedTask);
-                false ->
-                    shutdown_loop(lists:delete(Pid, Workers), Running, IOQueue, FailedTask)
-            end;
-        {cast, FromPid, want_output} ->
-            shutdown_loop(Workers, Running, push_ioqueue(IOQueue, FromPid), FailedTask);
+            shutdown_loop(lists:delete(Pid, Workers), FailedTask);
         {request, FromPid, {wait_for, _Keys}} ->
             reply(FromPid, {error, {failed, FailedTask}}),
-            shutdown_loop(Workers, Running, IOQueue, FailedTask);
+            shutdown_loop(Workers, FailedTask);
+        {cast, FromPid, register_io_worker} ->
+            shutdown_loop([FromPid | Workers], FailedTask);
         Other ->
             ?DEBUG("shutdown other ~p", [Other]),
-            shutdown_loop(Workers, Running, IOQueue, FailedTask)
+            shutdown_loop(Workers, FailedTask)
     end.
-
-pop_ioqueue(IOQueue, DoneIOProc) ->
-    case queue:out(IOQueue) of
-        {empty, NewIOQueue} ->
-            NewIOQueue;
-        {{value, DoneIOProc}, NewIOQueue} ->
-            case queue:out(NewIOQueue) of
-                {empty, ReturnIOQueue} ->
-                    ReturnIOQueue;
-                {{value, NextIOProc}, _Q} ->
-                    reply(NextIOProc, output_ok),
-                    NewIOQueue %% Next stays in the queue!!
-            end;
-        {{value, OtherIOProc}, _} ->
-            %% was not head, but we're removing it anyway
-            queue:filter(fun (X) -> X /= OtherIOProc end, IOQueue)
-    end.
-
-push_ioqueue(IOQueue, FromPid) ->
-    case queue:is_empty(IOQueue) of
-        true  -> reply(FromPid, output_ok);
-        false -> ok
-    end,
-    queue:in(FromPid, IOQueue).
 
 maybe_start_task(Task = #task{name = TaskName}, CallerPid, State, RunningAcc, StartedAcc) ->
     case dict:find(TaskName, State#st.running) of

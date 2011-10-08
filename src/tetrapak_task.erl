@@ -221,34 +221,34 @@ output_collector(Context, TaskName, TaskProcess) ->
     tetrapak_context:register_io_worker(Context),
     receive
         Req = {io_request, _, _, _} ->
-            tetrapak_context:task_wants_output(Context),
+            tetrapak_iosched:want_output(self()),
             Buffer = handle_io(Req, <<>>),
-            output_collector_loop(Context, TaskName, TaskProcess, Buffer);
+            output_collector_loop(TaskName, TaskProcess, Buffer);
         {'EXIT', TaskProcess, _Reason} ->
             exit(normal)
     end.
 
-output_collector_loop(Context, TaskName, TaskProcess, Buffer) ->
+output_collector_loop(TaskName, TaskProcess, Buffer) ->
     receive
         Req = {io_request, _, _, _} ->
             NewBuffer = handle_io(Req, Buffer),
-            output_collector_loop(Context, TaskName, TaskProcess, NewBuffer);
-        {reply, Context, output_ok} ->
+            output_collector_loop(TaskName, TaskProcess, NewBuffer);
+        {tetrapak_iosched, output_ok} ->
             print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
-            output_collector_loop(Context, TaskName, TaskProcess, console);
+            output_collector_loop(TaskName, TaskProcess, console);
         {'EXIT', TaskProcess, _Reason} ->
             case Buffer of
                 console -> ok;
                 <<>> -> ok;
                 _ ->
-                    wait_output_ok(Context, TaskName, Buffer)
+                    wait_output_ok(TaskName, Buffer)
             end
     end.
 
-wait_output_ok(Context, TaskName, Buffer) ->
+wait_output_ok(TaskName, Buffer) ->
     receive
-        {reply, Context, output_ok} ->
+        {tetrapak_iosched, output_ok} ->
             print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
             ok;

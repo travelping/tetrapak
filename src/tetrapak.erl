@@ -65,6 +65,8 @@ cli_main([_ | CliArgs]) ->
                    As -> As
                end,
 
+    tetrapak_iosched:ensure_started(),
+
     case tetrapak:run(Cwd, RunTasks) of
         {unknown, Key} ->
             io:format(standard_error, "Error: no such task: ~s~n", [Key]),
