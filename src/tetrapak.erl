@@ -30,6 +30,7 @@
 %% ------------------------------------------------------------
 %% -- Ext API
 run(Directory, TaskCmds) ->
+    tetrapak_iosched:ensure_started(),
     {ok, Context} = tetrapak_context:new(Directory),
     case tetrapak_context:run_sequentially(Context, ["tetrapak:boot" | TaskCmds]) of
         ok                          -> ok;
@@ -64,8 +65,6 @@ cli_main([_ | CliArgs]) ->
                    [] -> ["tetrapak:info"];
                    As -> As
                end,
-
-    tetrapak_iosched:ensure_started(),
 
     case tetrapak:run(Cwd, RunTasks) of
         {unknown, Key} ->
