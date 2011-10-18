@@ -73,7 +73,7 @@ make_ipkg(PkgDir) ->
     %% data.tar.gz
     {ok, DataTarball} = tpk_file:tarball_create(filename:join(PkgDir, "data.tar.gz")),
     InstallDir = "usr/lib/erlang/lib/" ++ tpk_util:f("~s-~s/", [Name, Vsn]),
-    tpk_file:tarball_mkdir_parents(DataTarball, InstallDir, [{mode, 8#755}, {owner, "root"}, {group, "root"}]),
+    tpk_file:tarball_mkdir_parents(DataTarball, InstallDir, [{owner, "root"}, {group, "root"}]),
     IsExcluded = fun (Path) ->
                          is_useless(Path) orelse
                          in_dir("tetrapak", Path) orelse
@@ -142,7 +142,7 @@ copy_files(Tarball, InstallDir, IsExcludedFunction) ->
                                           case Target of
                                               InstallDir -> Acc;
                                               _ ->
-                                                  tpk_file:tarball_mkdir(Tarball, Target, [{mode, 8#755}, {owner, "root"}, {group, "root"}]),
+                                                  tpk_file:tarball_mkdir(Tarball, Target, [{owner, "root"}, {group, "root"}]),
                                                   Acc
                                           end;
                                       false ->

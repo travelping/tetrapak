@@ -222,7 +222,7 @@ tarball_add_link({tar, TarFile}, VirtualPath, LinkTarget, Options) ->
     end.
 
 tarball_mkdir({tar, TarFile}, VirtualPath, Options) ->
-    FileInfo = #file_info{type = directory, size = 0, mtime = calendar:local_time(), mode = 8#664},
+    FileInfo = #file_info{type = directory, size = 0, mtime = calendar:local_time(), mode = 8#755},
     file:write(TarFile, ustar_header(tar_options(FileInfo, VirtualPath, Options))).
 
 tarball_mkdir_parents(Ball = {tar, _TarFile}, VirtualPath, Options) ->
