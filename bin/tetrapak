@@ -1,20 +1,20 @@
 #!/bin/sh
 
-START_CWD=`pwd -P`
+START_CWD="`pwd -P`"
 
-SCRIPT=$0
-cd `dirname $SCRIPT`
-SCRIPT=`basename $SCRIPT`
+SCRIPT="$0"
+cd "`dirname $SCRIPT`"
+SCRIPT="`basename $SCRIPT`"
 # Iterate down a (possible) chain of symlinks
 while [ -L "$SCRIPT" ]; do
-    SCRIPT=`readlink $SCRIPT`
-    cd `dirname $SCRIPT`
-    SCRIPT=`basename $SCRIPT`
+    SCRIPT="`readlink $SCRIPT`"
+    cd "`dirname $SCRIPT`"
+    SCRIPT="`basename $SCRIPT`"
 done
 
-PHYS_DIR=`pwd -P`
+PHYS_DIR="`pwd -P`"
 EBIN_DIR="$PHYS_DIR/../ebin"
 
-cd $START_CWD
+cd "$START_CWD"
 
 exec ${ERL-erl} -pa "$EBIN_DIR" -user tetrapak_io -smp auto -s tetrapak cli_main '' $@
