@@ -25,11 +25,12 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([context/0, directory/0, cache_table/0]).
--export([worker/5, fail/0, fail/2, get/1, get_config/1, require_all/1]).
+-export([worker/4, fail/0, fail/2, get/1, get_config/1, require_all/1]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
 
+-define(TASK_NAME, '$__tetrapak_task_name').
 -define(CTX,       '$__tetrapak_task_context').
 -define(DIRECTORY, '$__tetrapak_task_directory').
 -define(CACHE_TAB, '$__tetrapak_task_vcache').
@@ -55,14 +56,8 @@ cache_table() ->
         Table     -> Table
     end.
 
-worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Directory, CacheTab) ->
+worker(#task{name = TaskName, module = TaskModule}, Context, Directory, CacheTab) ->
     ?DEBUG("worker for ~s", [TaskName]),
-
-    %% synchronize with the caller
-    CallerPid ! {self(), task_started},
-    receive
-        {CallerPid, proceed} -> ok
-    end,
 
     OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
     group_leader(OutputCollector, self()),
@@ -74,14 +69,12 @@ worker(#task{name = TaskName, module = TaskModule}, Context, CallerPid, Director
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
             ?DEBUG("worker: check/1 -> done"),
-            tetrapak_context:task_done(Context, TaskName, Variables),
-            exit({?TASK_DONE, TaskName});
+            tetrapak_context:update_cache(Context, Variables);
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
                     ?DEBUG("worker: run/2 -> done"),
-                    tetrapak_context:task_done(Context, TaskName, Variables),
-                    exit({?TASK_DONE, TaskName})
+                    tetrapak_context:update_cache(Context, Variables)
             end
     end.
 
@@ -116,10 +109,10 @@ try_check(TaskModule, TaskName) ->
                     %% check/1 is defined, but not for this task, treat it as 'needs_run'
                     {needs_run, undefined};
                 _ ->
-                    handle_error(TaskName, Function, error, Exn)
+                    handle_error(Function, error, Exn)
             end;
         Class:Exn ->
-            handle_error(TaskName, Function, Class, Exn)
+            handle_error(Function, Class, Exn)
     end.
 
 try_run(TaskModule, TaskName, TaskData) ->
@@ -137,19 +130,17 @@ try_run(TaskModule, TaskName, TaskData) ->
         end
     catch
         Class:Exn ->
-            handle_error(TaskName, Function, Class, Exn)
+            handle_error(Function, Class, Exn)
     end.
 
-handle_error(TaskName, _Function, throw, {?TASK_FAIL, Message}) ->
-    case Message of
-        undefined -> ok;
-        _ ->
-            io:put_chars(["Error: ", Message, $\n])
-    end,
-    exit({?TASK_FAIL, TaskName});
-handle_error(TaskName, Function, Class, Exn) ->
+handle_error(_Function, throw, {?TASK_FAIL, undefined}) ->
+    exit(failed);
+handle_error(_Function, throw, {?TASK_FAIL, Message}) ->
+    io:put_chars(["Error: ", Message, $\n]),
+    exit(failed);
+handle_error(Function, Class, Exn) ->
     io:format("crashed in ~s:~n~p:~p~n~p~n", [Function, Class, Exn, erlang:get_stacktrace()]),
-    exit({?TASK_FAIL, TaskName}).
+    erlang:raise(Class, Exn).
 
 do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
     lists:foldl(fun ({Key, Value}, Acc) ->
@@ -195,9 +186,14 @@ require_all(Keys) when is_list(Keys) ->
             ok;
         {error, {failed, Other}} ->
             fail("required task '~s' failed", [Other]);
+        {error, {cycle, Cycle}} ->
+            fail("circular dependency: ~s", [format_cycle(Cycle ++ [hd(Cycle)])]);
         {error, Error} ->
             {error, Error}
     end.
+
+format_cycle(Cycle) ->
+    string:join([["'", Name, "'"] || Name <- Cycle], " -> ").
 
 normalize_name(Key) ->
     string:to_lower(string:strip(str(Key))).

@@ -199,8 +199,7 @@ scan_source(Path) ->
             lists:foldl(fun (F, Acc) -> do_form(Path, F, Acc) end, Rec, tl(Forms))
     end.
 
-do_form(File, A = {attribute, _, file, {IncludeFile, _}}, R) when File /= IncludeFile ->
-    ?DEBUG("include_attr: ~p", [A]),
+do_form(File, {attribute, _, file, {IncludeFile, _}}, R) when File /= IncludeFile ->
     R#erl{includes = [IncludeFile | R#erl.includes]};
 do_form(_File, {attribute, _, module, Module}, R) when is_atom(Module) ->
     R#erl{module = atom_to_list(Module)};

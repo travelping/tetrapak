@@ -31,8 +31,9 @@
 %% -- Ext API
 run(Directory, TaskCmds) ->
     tetrapak_iosched:ensure_started(),
-    {ok, Context} = tetrapak_context:new(Directory),
-    case tetrapak_context:run_sequentially(Context, ["tetrapak:boot" | TaskCmds]) of
+    Context = tetrapak_context:new(Directory),
+    RunTasks = ["tetrapak:boot" | TaskCmds],
+    case tetrapak_context:run_sequentially(Context, RunTasks) of
         ok                          -> ok;
         {error, {unknown_key, Key}} -> {unknown, Key};
         {error, _}                  -> error
@@ -132,9 +133,12 @@ cmd(Cmd, Args) ->
     cmd(dir(), Cmd, Args).
 cmd(Dir, Cmd, Args) ->
     case tpk_util:cmd(Dir, Cmd, Args) of
-        {ok, 0, Output}           -> Output;
-        {ok, _Other, _Output}     -> fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
-        {error, {_L, Mod, Error}} -> fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
+        {ok, 0, Output} ->
+            Output;
+        {ok, _Other, _Output} ->
+            fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
+        {error, {_L, Mod, Error}} ->
+            fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
     end.
 
 %% run and display output
@@ -142,7 +146,10 @@ outputcmd(Cmd, Args) ->
     outputcmd(dir(), Cmd, Args).
 outputcmd(Dir, Cmd, Args) ->
     case tpk_util:outputcmd(Dir, Cmd, Args) of
-        {ok, 0}                   -> ok;
-        {ok, _Other}              -> fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
-        {error, {_L, Mod, Error}} -> fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
+        {ok, 0} ->
+            ok;
+        {ok, _Other} ->
+            fail("exit status non-zero: ~s ~s", [Cmd, string:join(Args, " ")]);
+        {error, {_L, Mod, Error}} ->
+            fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
     end.

@@ -16,3 +16,6 @@
 
 -define(DEBUG(Msg), tpk_util:debug_log_to_stderr(Msg, [])).
 -define(DEBUG(Fmt, Args), tpk_util:debug_log_to_stderr(Fmt, Args)).
+
+% -define(DEBUG(Msg), io:format(standard_error, "~p: " Msg "~n", [self()])).
+% -define(DEBUG(Fmt, Args), io:format(standard_error, "~p: " Fmt "~n", [self() | Args])).
