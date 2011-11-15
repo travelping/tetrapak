@@ -39,7 +39,6 @@
 %% ------------------------------------------------------------
 %% -- Task API
 check("build:erlang") ->
-    tetrapak:require(["build:yecc"]),
     EbinDir             = tetrapak:subdir("ebin"),
     SrcDir              = tetrapak:subdir("src"),
     ExtraCompileOptions = tetrapak:config("build.erlc_options", []),
@@ -116,7 +115,7 @@ compile_foreach(Function, List) ->
 
 run_compiler(M, F, A = [File | _]) ->
     BaseDir = tetrapak:dir(),
-    io:format("Compiling ~s~n", [tpk_file:rebase_filename(File, BaseDir, "")]),
+    io:format("Compiling ~s~n", [tpk_file:relative_path(File, BaseDir)]),
     case apply(M, F, A) of
         {ok, _Module} -> ok;
         {ok, _Module, Warnings} ->
@@ -132,13 +131,11 @@ run_compiler(M, F, A = [File | _]) ->
 
 show_errors(BaseDir, Prefix, Errors) ->
     lists:foreach(fun ({FileName, FileErrors}) ->
-                          case lists:prefix(BaseDir, FileName) of
-                              true ->
-                                  Path = tpk_file:rebase_filename(FileName, BaseDir, "");
-                              false ->
-                                  Path = FileName
-                          end,
-                          lists:foreach(fun (Error) -> tpk_util:show_error_info(Path, Prefix, Error) end, FileErrors)
+                          lists:foreach(fun (Error) ->
+                                                DisplayPath = tpk_file:relative_path(FileName, BaseDir),
+                                                ?DEBUG("show error: ~p", [{BaseDir, FileName, DisplayPath}]) ,
+                                                tpk_util:show_error_info(DisplayPath, Prefix, Error)
+                                        end, FileErrors)
                   end, Errors).
 
 compile_order(File1, _File2) ->

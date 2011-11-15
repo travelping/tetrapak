@@ -1,3 +1,4 @@
+
 % Copyright 2010-2011, Travelping GmbH <info@travelping.com>
 
 % Permission is hereby granted, free of charge, to any person obtaining a
@@ -56,25 +57,32 @@ cache_table() ->
         Table     -> Table
     end.
 
-worker(#task{name = TaskName, module = TaskModule}, Context, Directory, CacheTab) ->
+worker(Task = #task{name = TaskName, module = TaskModule}, Context, Directory, CacheTab) ->
     ?DEBUG("worker for ~s", [TaskName]),
-
-    OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
-    group_leader(OutputCollector, self()),
 
     erlang:put(?CTX, Context),
     erlang:put(?DIRECTORY, Directory),
     erlang:put(?CACHE_TAB, CacheTab),
 
+    OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
+    group_leader(OutputCollector, self()),
+
+    ?DEBUG("require pre hooks: ~p", [Task#task.pre_hooks]),
+    run_hooks(Task#task.pre_hooks),
+
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
             ?DEBUG("worker: check/1 -> done"),
-            tetrapak_context:update_cache(Context, Variables);
+            tetrapak_context:update_cache(Context, Variables),
+            ?DEBUG("require post hooks: ~p", [Task#task.post_hooks]),
+            run_hooks(Task#task.post_hooks);
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
                     ?DEBUG("worker: run/2 -> done"),
-                    tetrapak_context:update_cache(Context, Variables)
+                    tetrapak_context:update_cache(Context, Variables),
+                    ?DEBUG("require post hooks: ~p", [Task#task.post_hooks]),
+                    run_hooks(Task#task.post_hooks)
             end
     end.
 
@@ -133,6 +141,14 @@ try_run(TaskModule, TaskName, TaskData) ->
             handle_error(Function, Class, Exn)
     end.
 
+run_hooks(Hooks) ->
+    try
+        require_all(Hooks)
+    catch
+        Class:Exn ->
+            handle_error(tpk_util:f("~s:run_hooks/3", [?MODULE]), Class, Exn)
+    end.
+
 handle_error(_Function, throw, {?TASK_FAIL, undefined}) ->
     exit(failed);
 handle_error(_Function, throw, {?TASK_FAIL, Message}) ->
@@ -179,11 +195,15 @@ get_config(Key) ->
         [{_K, Value}] -> {ok, Value}
     end.
 
+require_all([]) ->
+    ok;
 require_all(Keys) when is_list(Keys) ->
     KList = lists:map(fun str/1, Keys),
     case tetrapak_context:wait_for(context(), KList) of
         ok ->
             ok;
+        {context_exit, _Reason} ->
+            error(context_died);
         {error, {failed, Other}} ->
             fail("required task '~s' failed", [Other]);
         {error, {cycle, Cycle}} ->
@@ -197,6 +217,7 @@ format_cycle(Cycle) ->
 
 normalize_name(Key) ->
     string:to_lower(string:strip(str(Key))).
+
 split_name(Key) ->
     SplitName = re:split(normalize_name(Key), ":", [{return, list}]),
     lists:filter(fun ([]) -> false;

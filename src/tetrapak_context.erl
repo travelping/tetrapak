@@ -44,6 +44,10 @@ get_tasks(Ctx) ->
 import_config(Ctx, Config = #config{}) ->
     call(Ctx, {import_config, Config}).
 
+-spec run_sequentially(pid(), [Key, ...]) -> ok | {error, Error} | CtxExit when
+    Error   :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
+    Key     :: string(),
+    CtxExit :: {context_exit, term()}.
 run_sequentially(Context, []) ->
     shutdown(Context);
 run_sequentially(Context, [Task | Rest]) ->
@@ -55,41 +59,48 @@ run_sequentially(Context, [Task | Rest]) ->
             {error, {unknown_key, Key}};
         {error, {failed, Key}} ->
             wait_shutdown(Context),
-            ?DEBUG("run_sequentially/1: wait shutdown complete"),
-            {error, {failed, Key}}
+            {error, {failed, Key}};
+        Exit = {context_exit, Reason} ->
+            Exit
     end.
 
 -spec shutdown(pid()) -> ok.
-
 shutdown(Context) ->
     cast(Context, shutdown),
     wait_shutdown(Context).
 
--spec wait_for(pid(), [Key, ...]) -> ok | {error, Error} when
-    Error :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
-    Key   :: string().
-
+-spec wait_for(pid(), [Key, ...]) -> ok | {error, Error} | CtxExit when
+    Error   :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
+    Key     :: string(),
+    CtxExit :: {context_exit, term()}.
 wait_for(Ctx, Keys) ->
     case call(Ctx, {wait_for, Keys}) of
         {error, Error} ->
             {error, Error};
         {wait, WaitPids} ->
-            wait_tasks_down(Ctx, ordsets:from_list(WaitPids), ok)
+            wait_tasks_down(Ctx, ordsets:from_list(WaitPids))
     end.
 
-wait_tasks_down(_Ctx, [], Result) ->
+wait_tasks_down(Ctx, WaitPids) ->
+    CtxMRef = monitor(process, Ctx),
+    wait_tasks_down(Ctx, CtxMRef, WaitPids, ok).
+
+wait_tasks_down(_Ctx, CtxMRef, [], Result) ->
+    erlang:demonitor(CtxMRef, [flush]),
     Result;
-wait_tasks_down(Ctx, WaitPids, Result) ->
-    ?DEBUG("wait for: ~p", [{WaitPids, Result}]),
+wait_tasks_down(Ctx, CtxMRef, WaitPids, Result) ->
     receive
         {Ctx, done, Pid} when is_pid(Pid) ->
-            wait_tasks_down(Ctx, ordsets:del_element(Pid, WaitPids), Result);
+            wait_tasks_down(Ctx, CtxMRef, ordsets:del_element(Pid, WaitPids), Result);
         {Ctx, failed, Pid, TaskName} when is_pid(Pid) ->
-            ?DEBUG("got failed: ~p", [{Pid, TaskName}]),
-            wait_tasks_down(Ctx, ordsets:del_element(Pid, WaitPids), {error, {failed, TaskName}})
+            wait_tasks_down(Ctx, CtxMRef, ordsets:del_element(Pid, WaitPids), {error, {failed, TaskName}});
+        {'DOWN', CtxMRef, process, Ctx, Reason} ->
+            ?DEBUG("wait_tasks_down: context died: ~p", [Reason]),
+            {context_exit, Reason}
     end.
 
 wait_shutdown(Process) ->
+    ?DEBUG("wait_shutdown: ~p", [Process]),
     MRef = monitor(process, Process),
     receive
         {'DOWN', MRef, process, Process, _Info} -> ok
@@ -99,6 +110,7 @@ wait_shutdown(Process) ->
 %% -- server loop
 -record(st, {
     directory                  :: string(),
+    parent                     :: pid(),
     tasks                      :: [{string(), #task{}}],
     cache                      :: ets:tid(),
     rungraph                   :: digraph(),
@@ -110,18 +122,19 @@ new(Directory) ->
 
 init(Parent, Directory) ->
     process_flag(trap_exit, true),
-    Tasks = tetrapak_task_boot:initial_tmap(),
-    CacheTab = ets:new(?MODULE, [protected, ordered_set]),
-    RunGraph = digraph:new([acyclic]),
-    digraph:add_vertex(RunGraph, pid_to_list(Parent), Parent),
-    InitialState = #st{directory = Directory, tasks = Tasks, cache = CacheTab, rungraph = RunGraph},
+    InitialState = #st{directory = Directory, parent = Parent,
+                       tasks = tetrapak_task_boot:initial_tmap(),
+                       cache = ets:new(?MODULE, [protected, ordered_set]),
+                       rungraph = digraph:new([acyclic])},
+    digraph:add_vertex(InitialState#st.rungraph, pid_to_list(Parent), Parent),
     loop(InitialState).
 
 loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) ->
     receive
         {request, FromPid, {register_tasks, TList}} ->
             reply(FromPid, ok),
-            loop(LoopState#st{tasks = lists:keymerge(1, lists:ukeysort(1, TList), TaskMap)});
+            NewTasks = import_tasks(TList, TaskMap),
+            loop(LoopState#st{tasks = NewTasks});
 
         {request, FromPid, {import_config, Config}} ->
             lists:foreach(fun ({Key, Value}) ->
@@ -184,7 +197,7 @@ handle_exit(RunGraph, DeadPid, SendDoneMsg) ->
             DepTasks = [digraph:edge(RunGraph, E) || E <- digraph:in_edges(RunGraph, TaskName)],
             lists:foreach(fun ({_, Dep, _, _}) ->
                                   {_, DependencyPid} = digraph:vertex(RunGraph, Dep),
-                                  SendDoneMsg(DependencyPid, TaskName, DeadPid)
+                                  is_pid(DependencyPid) andalso SendDoneMsg(DependencyPid, TaskName, DeadPid)
                           end, DepTasks);
         _Else ->
             ok
@@ -195,24 +208,26 @@ send_done(DependencyPid, _DeadName, DeadPid) ->
 send_failed(DependencyPid, DeadName, DeadPid) ->
     DependencyPid ! {self(), failed, DeadPid, DeadName}.
 
-do_shutdown(#st{rungraph = RunGraph, io_workers = IOWorkers}, FailedPid, FailedTask) ->
-    Workers = [Pid || {Name, Pid} <- digraph:vertices(RunGraph),
-                   is_list(Name), Pid /= FailedPid, Pid /= done],
+do_shutdown(#st{rungraph = RunGraph, io_workers = IOWorkers, parent = Parent}, FailedPid, FailedTask) ->
+    Vertices = [digraph:vertex(RunGraph, V) || V <- digraph:vertices(RunGraph), is_list(V)],
+    Workers = [Pid || {_, Pid} <- Vertices, is_pid(Pid), Pid /= FailedPid, Pid /= Parent],
+    ?DEBUG("shutdown: killing task workers: ~p", [Workers]),
+    lists:foreach(fun (P) -> erlang:exit(P, kill) end, Workers),
     shutdown_loop(Workers ++ IOWorkers, RunGraph, FailedTask).
 
 shutdown_loop([], _RunGraph, _FailedTask) ->
     ok;
 shutdown_loop(Workers, RunGraph, FailedTask) ->
+    ?DEBUG("shutdown: ~p", [Workers]),
     receive
         {'EXIT', Pid, normal} ->
+            ?DEBUG("shutdown EXIT normal: ~p", [Pid]),
             handle_exit(RunGraph, Pid, fun send_done/3),
             shutdown_loop(lists:delete(Pid, Workers), RunGraph, FailedTask);
         {'EXIT', Pid, _OtherReason} ->
+            ?DEBUG("shutdown EXIT ~p: ~p", [_OtherReason, Pid]),
             handle_exit(RunGraph, Pid, fun send_failed/3),
             shutdown_loop(lists:delete(Pid, Workers), RunGraph, FailedTask);
-        {request, FromPid, {wait_for, _Keys}} ->
-            reply(FromPid, {error, {failed, FailedTask}}),
-            shutdown_loop(Workers, RunGraph, FailedTask);
         {cast, FromPid, register_io_worker} ->
             shutdown_loop([FromPid | Workers], RunGraph, FailedTask);
         Other ->
@@ -239,7 +254,7 @@ start_deps(Dependencies, Caller, State = #st{rungraph = Graph}) ->
     end.
 
 add_edges([Task | Rest], Caller, Graph) ->
-    case catch digraph:add_edge(Graph, Caller, Task#task.name) of
+    case digraph:add_edge(Graph, Caller, Task#task.name) of
         {error, {bad_edge, Cycle}} ->
             {cycle, Cycle};
         ['$e' | _] ->
@@ -290,6 +305,29 @@ descending_lookup(TaskMap, Prefix, KeyRest) ->
         {[{_K, Task}], _} -> [Task]; %% required key is in output variables
         {_, [Next | KR]}  -> descending_lookup(Matches, Prefix ++ [Next], KR)
     end.
+
+import_tasks(NewTasks, TaskMap) ->
+    MergedTaskMap = lists:keymerge(1, lists:ukeysort(1, NewTasks), TaskMap),
+    lists:foldl(fun ({_, Task}, TMAcc1) ->
+                    TMAcc2 = apply_hooks(Task, #task.must_run_before, #task.pre_hooks, TMAcc1),
+                    apply_hooks(Task, #task.must_run_after, #task.post_hooks, TMAcc2)
+                end, MergedTaskMap, NewTasks).
+
+%% preprend Task's name to the ToHookField list of every task given in FromHookField
+%% this is so we don't have to write the same code twice for
+%% run_before_other_task_hooks and run_after_other_task_hooks
+apply_hooks(Task, FromHookField, ToHookField, TaskMap) ->
+    lists:foldl(fun (Hooked, TMAcc) ->
+                        HookedName = tetrapak_task:split_name(Hooked),
+                        case orddict:find(HookedName, TMAcc) of
+                            {ok, HookedTask} ->
+                                NewHookList = [Task#task.name | element(ToHookField, HookedTask)],
+                                NewHookedTask = setelement(ToHookField, HookedTask, NewHookList),
+                                orddict:store(HookedName, NewHookedTask, TMAcc);
+                            false ->
+                                TMAcc
+                        end
+                end, TaskMap, element(FromHookField, Task)).
 
 %% ------------------------------------------------------------
 %% -- micro gen_server

@@ -36,7 +36,10 @@ run(Directory, TaskCmds) ->
     case tetrapak_context:run_sequentially(Context, RunTasks) of
         ok                          -> ok;
         {error, {unknown_key, Key}} -> {unknown, Key};
-        {error, _}                  -> error
+        {error, _}                  -> error;
+        {context_exit, Reason}      ->
+            io:format("!!! context died: ~p~n", [Reason]),
+            error
     end.
 
 cli_main([_ | CliArgs]) ->

@@ -19,7 +19,7 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tpk_file).
--export([size/1, mtime/1, md5sum/1, basename/1, rebase_filename/3]).
+-export([size/1, mtime/1, md5sum/1, basename/1, relative_path/2, rebase_filename/3]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
@@ -44,6 +44,9 @@ mtime(Filename) ->
     {ok, #file_info{mtime = MTime}} = file:read_file_info(Filename),
     MTime.
 
+relative_path(Filename, Dir) ->
+    rebase_filename(Filename, Dir, "").
+
 rebase_filename(FName, FromDir, ToDir) ->
     FromDirPath = filename:split(FromDir),
     FPath = filename:split(FName),
@@ -57,7 +60,7 @@ rebase_filename(FName, FromDir, ToDir) ->
                 {_, _}  -> Joined
             end;
         false ->
-            exit(bad_filename)
+            FName
     end.
 
 temp_name() -> temp_name("/tmp").
