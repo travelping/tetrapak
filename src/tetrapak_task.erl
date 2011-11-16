@@ -159,8 +159,9 @@ handle_error(_Function, throw, {?TASK_FAIL, Message}) ->
     io:put_chars(["Error: ", Message, $\n]),
     exit(failed);
 handle_error(Function, Class, Exn) ->
-    io:format("crashed in ~s:~n~p:~p~n~p~n", [Function, Class, Exn, erlang:get_stacktrace()]),
-    erlang:raise(Class, Exn).
+    Trace = erlang:get_stacktrace(),
+    io:format("crashed in ~s:~n~p:~p~n~p~n", [Function, Class, Exn, Trace]),
+    erlang:raise(Class, Exn, Trace).
 
 do_output_variables(Fun, TaskName, Vars) when is_list(Vars) ->
     lists:foldl(fun ({Key, Value}, Acc) ->
