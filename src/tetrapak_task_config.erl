@@ -105,7 +105,7 @@ app_attr(File, Key, Attrs) ->
 
 find_app_file(Dir, Extension) ->
     OrigDir = tetrapak:dir(),
-    Candidates = filelib:wildcard(filename:join(tetrapak:subdir(Dir), "*" ++ Extension)),
+    Candidates = filelib:wildcard(filename:join(tetrapak:path(Dir), "*" ++ Extension)),
     case {Candidates, dir_to_appname(OrigDir)} of
         {[], _} ->
             {error, no_app_file};
@@ -130,7 +130,7 @@ strip_plus(String) ->
     lists:filter(fun (C) -> C /= $+ end, String).
 
 run_git(Cmd, Args) ->
-    DirArg = "--git-dir=" ++ tetrapak:subdir(".git"),
+    DirArg = "--git-dir=" ++ tetrapak:path(".git"),
     tetrapak:cmd("git", [DirArg, Cmd | Args]).
 
 run_hg(Cmd, Args) ->

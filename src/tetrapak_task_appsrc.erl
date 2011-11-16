@@ -19,6 +19,7 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tetrapak_task_appsrc).
+-behaviour(tetrapak_task).
 -export([check/1, run/2]).
 
 check("build:appfile") ->
@@ -34,7 +35,7 @@ check("clean:appfile") ->
         {error, no_app_file} ->
             done;
         {ok, AppSrc} ->
-            AppFile = filename:join(tetrapak:subdir("ebin"), filename:rootname(filename:basename(AppSrc), ".app.src") ++ ".app"),
+            AppFile = filename:join(tetrapak:path("ebin"), filename:rootname(filename:basename(AppSrc), ".app.src") ++ ".app"),
             {needs_run, AppFile}
     end.
 
@@ -118,8 +119,8 @@ build_timestamp() ->
     tpk_util:f("~4..0B~2..0B~2..0B~2..0B~2..0B~2..0B", [Y, Mo, D, H, Min, S]).
 
 get_app_modules() ->
-    [list_to_atom(filename:rootname(F, ".beam")) || F <- filelib:wildcard("*.beam", tetrapak:subdir("ebin"))].
+    [list_to_atom(filename:rootname(F, ".beam")) || F <- filelib:wildcard("*.beam", tetrapak:path("ebin"))].
 
 write_appfile(AppName, Keys) ->
-    OutputFile = filename:join(tetrapak:subdir("ebin"), atom_to_list(AppName) ++ ".app"),
+    OutputFile = filename:join(tetrapak:path("ebin"), atom_to_list(AppName) ++ ".app"),
     file:write_file(OutputFile, io_lib:fwrite("{application, ~s,~n  ~p~n}.", [AppName, Keys])).

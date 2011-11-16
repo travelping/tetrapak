@@ -42,7 +42,7 @@ run("shell", _) ->
     end;
 
 run("tetrapak:reload", _) ->
-    EbinDir = tetrapak:subdir("ebin"),
+    EbinDir = tetrapak:path("ebin"),
     Modules = lists:map(fun (F) -> {list_to_atom(filename:basename(F, ".beam")), filename:join(EbinDir, F)} end, filelib:wildcard("*.beam", EbinDir)),
     lists:foreach(fun ({Mod, Path}) ->
                           case code:is_loaded(Mod) of

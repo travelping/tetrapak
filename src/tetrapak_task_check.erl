@@ -26,7 +26,7 @@
 %% -- Task API
 run("check:xref", _) ->
     tetrapak:require("build:erlang"),
-    EbinDir = tetrapak:subdir("ebin"),
+    EbinDir = tetrapak:path("ebin"),
     case xref:d(EbinDir) of
         {error, Module, Reason} -> tetrapak:fail("xref error in ~p: ~p", [Module, Reason]);
         Result                  -> lists:foreach(fun xref_result/1, Result)
@@ -35,7 +35,7 @@ run("check:xref", _) ->
 run("check:appmodules", _) ->
     tetrapak:require("build:erlang"),
     Mods  = tetrapak:get("config:appfile:modules"),
-    Files = filelib:wildcard("*.beam", tetrapak:subdir("ebin")),
+    Files = filelib:wildcard("*.beam", tetrapak:path("ebin")),
 
     {ShouldFiles, Dupli} = duplicates(lists:map(fun (M) -> atom_to_list(M) ++ ".beam" end, Mods)),
     BeamToMod = fun (List) -> lists:map(fun (F) -> lists:sublist(F, length(F) - 5) end, List) end,

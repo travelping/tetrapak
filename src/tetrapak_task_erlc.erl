@@ -39,10 +39,10 @@
 %% ------------------------------------------------------------
 %% -- Task API
 check("build:erlang") ->
-    EbinDir             = tetrapak:subdir("ebin"),
-    SrcDir              = tetrapak:subdir("src"),
+    EbinDir             = tetrapak:path("ebin"),
+    SrcDir              = tetrapak:path("src"),
     ExtraCompileOptions = tetrapak:config("build.erlc_options", []),
-    CompileOptions      = [{outdir, EbinDir}, {i, tetrapak:subdir("include")}, return_errors, return_warnings, debug_info]
+    CompileOptions      = [{outdir, EbinDir}, {i, tetrapak:path("include")}, return_errors, return_warnings, debug_info]
                           ++ ExtraCompileOptions,
     Sources             = lists:sort(fun compile_order/2, erlang_source_files(SrcDir)),
     FileList            =
@@ -58,25 +58,25 @@ check("build:erlang") ->
     end;
 
 check("build:yecc") ->
-    SrcDir = tetrapak:subdir("src"),
+    SrcDir = tetrapak:path("src"),
     tpk_util:check_files_mtime(SrcDir, ".yrl", SrcDir, ".erl");
 
 check("build:leex") ->
-    SrcDir = tetrapak:subdir("src"),
+    SrcDir = tetrapak:path("src"),
     tpk_util:check_files_mtime(SrcDir, ".xrl", SrcDir, ".erl");
 
 check("clean:yecc") ->
-    SrcDir = tetrapak:subdir("src"),
+    SrcDir = tetrapak:path("src"),
     tpk_util:check_files_exist(SrcDir, ".yrl", SrcDir, ".erl");
 
 check("clean:leex") ->
-    SrcDir = tetrapak:subdir("src"),
+    SrcDir = tetrapak:path("src"),
     tpk_util:check_files_exist(SrcDir, ".xrl", SrcDir, ".erl").
 
 run("build:erlang", ErlFiles) ->
-    file:make_dir(tetrapak:subdir("ebin")),
+    file:make_dir(tetrapak:path("ebin")),
     compile_foreach(fun ({File, CompileOptions}) ->
-                            try_load(tetrapak:subdir("ebin"), File#erl.behaviours),
+                            try_load(tetrapak:path("ebin"), File#erl.behaviours),
                             run_compiler(compile, file, [File#erl.file, CompileOptions])
                     end, ErlFiles),
     {done, [{modules, [F#erl.module || {F, _} <- ErlFiles]}]};
@@ -92,7 +92,7 @@ run("build:leex", Files) ->
                     end, Files);
 
 run("clean:erlang", _) ->
-    tpk_file:delete("\\.beam$", tetrapak:subdir("ebin"));
+    tpk_file:delete("\\.beam$", tetrapak:path("ebin"));
 
 run("clean:yecc", Files) ->
     lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
@@ -186,8 +186,8 @@ erlang_source_files(Path) ->
     end.
 
 scan_source(Path) ->
-    IncsFromOptions = [tetrapak:subdir(I) || {i, I} <- tetrapak:config("build.erlc_options")],
-    IncPath = [tetrapak:subdir("src"), tetrapak:subdir("include") | IncsFromOptions],
+    IncsFromOptions = [tetrapak:path(I) || {i, I} <- tetrapak:config("build.erlc_options")],
+    IncPath = [tetrapak:path("src"), tetrapak:path("include") | IncsFromOptions],
     case epp:parse_file(Path, IncPath, []) of
         {ok, []} ->
             #erl{mtime = tpk_file:mtime(Path), file = Path, module = filename:basename(Path, ".erl")};

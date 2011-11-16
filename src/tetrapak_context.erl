@@ -18,6 +18,7 @@
 % FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 % DEALINGS IN THE SOFTWARE.
 
+%% @private
 -module(tetrapak_context).
 -export([new/1, run_sequentially/2, shutdown/1,
          wait_for/2, wait_shutdown/1, update_cache/2,

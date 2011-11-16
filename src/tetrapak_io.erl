@@ -18,6 +18,7 @@
 % FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 % DEALINGS IN THE SOFTWARE.
 
+%% @private
 -module(tetrapak_io).
 -export([start/0, can_start_shell/0, start_shell/0, start_shell/1]).
 -export([ioreq_output/1]).

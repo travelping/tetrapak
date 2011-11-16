@@ -36,7 +36,7 @@ run("test:ct", _) ->
                  {logdir, LogDir},
                  {suite, tetrapak:config("test.ct.suite")},
                  {auto_compile, true},
-                 {include, [tetrapak:subdir("include")]}]);
+                 {include, [tetrapak:path("include")]}]);
 
 run("clean:testlog", _) ->
     tpk_file:delete(tetrapak:config_path("test.ct.logdir")).

@@ -1,4 +1,3 @@
-
 % Copyright 2010-2011, Travelping GmbH <info@travelping.com>
 
 % Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,7 +25,8 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([context/0, directory/0, cache_table/0]).
--export([worker/4, fail/0, fail/2, get/1, get_config/1, require_all/1]).
+-export([worker/4, fail/0, fail/2, get/1, require_all/1,
+         get_config/1, get_config_object/2, get_all_config_objects/1]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
@@ -39,24 +39,28 @@
 behaviour_info(callbacks) -> [{run, 2}];
 behaviour_info(_) -> undefined.
 
+%% @private
 context() ->
     case erlang:get(?CTX) of
         Ctx when is_pid(Ctx) -> Ctx;
         _AnythingElse        -> error(not_inside_task)
     end.
 
+%% @private
 directory() ->
     case erlang:get(?DIRECTORY) of
         Ctx when is_list(Ctx) -> Ctx;
         _AnythingElse         -> error(not_inside_task)
     end.
 
+%% @private
 cache_table() ->
     case erlang:get(?CACHE_TAB) of
         undefined -> error(not_inside_task);
         Table     -> Table
     end.
 
+%% @private
 worker(Task = #task{name = TaskName, module = TaskModule}, Context, Directory, CacheTab) ->
     ?DEBUG("worker for ~s", [TaskName]),
 
@@ -173,28 +177,50 @@ do_output_variables(_Fun, TaskName, Tree = {Size, {_, _, _, _}}) when is_integer
 do_output_variables(Fun, _TaskName, _Variables) ->
     fail("~s returned an invalid key-value structure (not a proplist() | gb_tree())", [Fun]).
 
+%% @private
 fail() ->
     throw({?TASK_FAIL, undefined}).
+
+%% @private
 fail(Fmt, Args) ->
     throw({?TASK_FAIL, tpk_util:f(Fmt, Args)}).
 
+%% @private
+-spec get_config(string()) -> false | {ok, term()}.
+get_config(Key) ->
+    case ets:lookup(cache_table(), {config_value, Key}) of
+        [] -> false;
+        [{_K, Value}] -> {ok, Value}
+    end.
+
+%% @private
+-spec get_config_object(string(), string()) -> false | {ok, [{string(), term()}, ...]}.
+get_config_object(Type, Instance) ->
+    case ets:lookup(cache_table(), {config_object, Type, Instance}) of
+        [] -> false;
+        [{_K, Value}] -> {ok, Value}
+    end.
+
+%% @private
+-spec get_all_config_objects(string()) -> [{string(), [{string(), term()}, ...]}, ...].
+get_all_config_objects(Type) ->
+    Terms = ets:select(cache_table(), [{{{config_object, Type, '_'}, '_'},[],['$_']}]),
+    [{Instance, Props} || {{config_object, _, Instance}, Props} <- Terms].
+
+%% @private
+-spec get(string()) -> {error, unknown_key} | {ok, term()}.
 get(Key) ->
     case require_all([Key]) of
         ok ->
             case ets:lookup(cache_table(), {return_value, Key}) of
-                []            -> {error, unknown_key};
+                [] -> {error, unknown_key};
                 [{_K, Value}] -> {ok, Value}
             end;
         {error, {unknown_key, _}} ->
             {error, unknown_key}
     end.
 
-get_config(Key) ->
-    case ets:lookup(cache_table(), {config_value, Key}) of
-        []            -> {error, unknown_key};
-        [{_K, Value}] -> {ok, Value}
-    end.
-
+%% @private
 require_all([]) ->
     ok;
 require_all(Keys) when is_list(Keys) ->
@@ -215,9 +241,13 @@ require_all(Keys) when is_list(Keys) ->
 format_cycle(Cycle) ->
     string:join([["'", Name, "'"] || Name <- Cycle], " -> ").
 
+%% @private
+-spec normalize_name(string()) -> string().
 normalize_name(Key) ->
     string:to_lower(string:strip(str(Key))).
 
+%% @private
+-spec split_name(string()) -> [string(), ...].
 split_name(Key) ->
     SplitName = re:split(normalize_name(Key), ":", [{return, list}]),
     lists:filter(fun ([]) -> false;
@@ -232,6 +262,7 @@ str(Lis) when is_list(Lis)   -> Lis.
 %% -- Output handler
 -define(LineWidth, 30).
 
+%% @private
 output_collector(Context, TaskName, TaskProcess) ->
     ?DEBUG("output_collector for ~s", [TaskName]),
     process_flag(trap_exit, true),
@@ -285,5 +316,8 @@ handle_io({io_request, From, ReplyAs, Request}, Buffer) ->
 do_output(Buffer, Chars) ->
     <<Buffer/binary, (iolist_to_binary(Chars))/binary>>.
 
+%% @private
 print_output_header(IODev, TaskName) ->
-    io:put_chars(IODev, ["== ", TaskName, " ", lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=), $\n]).
+    io:put_chars(IODev, ["== ", TaskName, " ",
+                         lists:duplicate(max(0, ?LineWidth - length(TaskName)), $=),
+                         $\n]).

@@ -89,7 +89,7 @@ make_ipkg(PkgDir) ->
     BinDir = "usr/bin",
     tpk_file:tarball_mkdir(DataTarball, BinDir, [{owner, "root"}, {group, "root"}]),
     _PackageFiles2 = lists:foldl(fun (ScriptName, Acc) ->
-                                        Original = filename:join(tetrapak:subdir("bin"), ScriptName),
+                                        Original = filename:join(tetrapak:path("bin"), ScriptName),
                                         case filelib:is_regular(Original) and (not is_useless(Original)) of
                                             true ->
                                                 Target = "/" ++ InstallDir ++ "bin/" ++ ScriptName,
@@ -99,7 +99,7 @@ make_ipkg(PkgDir) ->
                                             false ->
                                                 Acc
                                         end
-                                end, PackageFiles1, filelib:wildcard("*", tetrapak:subdir("bin"))),
+                                end, PackageFiles1, filelib:wildcard("*", tetrapak:path("bin"))),
 
     tpk_file:tarball_close(DataTarball),
 

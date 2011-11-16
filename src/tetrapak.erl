@@ -20,15 +20,14 @@
 
 -module(tetrapak).
 -export([version/0, run/2, cli_main/1]).
--export([get/1, get/2, require/1, require_all/1, dir/0, subdir/1, fail/0, fail/1, fail/2,
+-export([get/1, get/2, require/1, require_all/1, dir/0, path/1, subdir/1, fail/0, fail/1, fail/2,
          config/1, config/2, config_path/1, config_path/2]).
 -export([cmd/2, cmd/3, outputcmd/2, outputcmd/3]).
 -compile({no_auto_import, [get/1]}).
 
 -include("tetrapak.hrl").
 
-%% ------------------------------------------------------------
-%% -- Ext API
+%% @private
 run(Directory, TaskCmds) ->
     tetrapak_iosched:ensure_started(),
     Context = tetrapak_context:new(Directory),
@@ -42,6 +41,7 @@ run(Directory, TaskCmds) ->
             error
     end.
 
+%% @private
 cli_main([_ | CliArgs]) ->
     {ok, Cwd} = file:get_cwd(),
 
@@ -82,56 +82,120 @@ cli_main([_ | CliArgs]) ->
 
 %% ------------------------------------------------------------
 %% -- Task API
+%% @doc Get the version of tetrapak currently running.
+-spec version() -> string().
 version() ->
     get("tetrapak:boot:version").
 
+%% @doc Get the current task's working directory.
+-spec dir() -> file:filename().
 dir() ->
     tetrapak_task:directory().
 
-subdir(Dir) ->
-    filename:join(tetrapak_task:directory(), Dir).
+%% @doc Make a filename absolute against the current task's working directory.
+-spec path(string()) -> file:filename().
+path(Filename) ->
+    filename:join(tetrapak:dir(), Filename).
 
+%% @private
+subdir(FN) ->
+    path(FN).
+
+%% @equiv require_all([Key])
+-spec require(string()) -> ok.
 require(Key) ->
     tetrapak_task:require_all([Key]).
 
+%% @doc Wait for completion of several tasks before continuing execution.
+-spec require_all([string(), ...]) -> ok.
 require_all(Keys) ->
     tetrapak_task:require_all(Keys).
 
+%% @doc Get a tasks return value.
+%%    This function requires the task that is expected to
+%%    contain the given return value key and then returns
+%%    it's value. <br/><br/>
+%%    Example use:
+%%    ```
+%%    tetrapak:get("config:vcs:branch")//
+%%    '''
+-spec get(string()) -> term().
 get(Key) ->
     case tetrapak_task:get(Key) of
         {ok, Value}          -> Value;
         {error, unknown_key} -> fail("get() of unknown key: ~s", [Key])
     end.
 
+%% @doc Get a tasks return value.
+%%    Works like {@link get/1}, except that ``Default'' is.
+%%    returned if ``Key'' refers to an unknown task or return value key.
+%%    <br/>
+%%    Use this function with care because it somewhat obscures dependency problems.
+-spec get(string(), term()) -> term().
 get(Key, Default) ->
     case tetrapak_task:get(Key) of
         {ok, Value} -> Value;
         {error, unknown_key} -> Default
     end.
 
+%% @doc Exit the current task.
+%%    See {@link fail/2}
+-spec fail() -> no_return().
 fail() ->
     tetrapak_task:fail().
+
+%% @doc Exit the current task.
+%%    See {@link fail/2}
+-spec fail(string()) -> no_return().
 fail(Reason) ->
     tetrapak_task:fail(Reason, []).
+
+%% @doc Exit the current task.
+%%    This function displays a message,
+%%    expanding tilde escape sequences like {@link io:format/2},
+%%    then exits the current task. The failure will propagate to
+%%    all other tasks which are currently running. If tetrapak
+%%    was executed from the command line, the Erlang VM will be halted
+%%    with a non-zero status code.
+-spec fail(string(), list(term())) -> no_return().
 fail(Fmt, Args) ->
     tetrapak_task:fail(Fmt, Args).
 
+%% @doc Read a value from the configuration.
+%%    This function will fail the current task if an unknown configuration parameter is specified.
+-spec config(string()) -> term().
 config(Key) ->
     case tetrapak_task:get_config(Key) of
         {ok, Value}          -> Value;
         {error, unknown_key} -> fail("unknown configuration parameter: ~s", [Key])
     end.
 
+%% @doc Read a value from the configuration.
+%%    This function returns Default if no value could be found for Key.
+-spec config(string(), term()) -> term().
 config(Key, Default)      ->
     case tetrapak_task:get_config(Key) of
         {ok, Value}          -> Value;
         {error, unknown_key} -> Default
     end.
 
-config_path(Key)          -> subdir(config(Key)).
-config_path(Key, Default) -> subdir(config(Key, Default)).
+%% @doc Read an absolute filename from the configuration.
+%%    If the filename is given relative in the config file
+%%    it will be resolved against the current task's working directory.
+%%    This function fails the current task if an unknown configuration parameter is specified.
+-spec config_path(string()) -> file:filename().
+config_path(Key) -> path(config(Key)).
 
-%% run and capture output to binary
+%% @doc Read an absolute filename from the configuration.
+%%    Behaves like {@link config_path/1}, except ``Default'' is returned
+%%    if the ``Key'' is unknown.
+-spec config_path(string(), string()) -> file:filename().
+config_path(Key, Default) -> path(config(Key, Default)).
+
+%% @doc Run a shell command and capture it's output.
+%%    The current task fails if the exit status of the command is non-zero.
+%%    Use {@link tpk_util:cmd/2} if you want to handle other status codes.
+-spec cmd(string(), [string()]) -> binary().
 cmd(Cmd, Args) ->
     cmd(dir(), Cmd, Args).
 cmd(Dir, Cmd, Args) ->
@@ -144,7 +208,10 @@ cmd(Dir, Cmd, Args) ->
             fail("error running command ~s: ~s", [Cmd, Mod:format_error(Error)])
     end.
 
-%% run and display output
+%% @doc Run a shell command and display it's output.
+%%    The current task fails if the exit status of the command is non-zero.
+%%    Use {@link tpk_util:outputcmd/2} if you want to handle other status codes.
+-spec outputcmd(string(), [string()]) -> ok.
 outputcmd(Cmd, Args) ->
     outputcmd(dir(), Cmd, Args).
 outputcmd(Dir, Cmd, Args) ->

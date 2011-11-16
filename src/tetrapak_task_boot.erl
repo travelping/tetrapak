@@ -46,7 +46,7 @@ run("tetrapak:boot", _) ->
 
     %% scan tasks
     tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(proplists:get_value(tasks, Env))),
-    tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:subdir("tetrapak"))),
+    tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:path("tetrapak"))),
 
     {done, [{version, Version}]};
 
@@ -56,7 +56,7 @@ run("tetrapak:info", _) ->
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
 
 run("clean:taskcache", _) ->
-    tpk_file:delete(filename:join(tetrapak:subdir("tetrapak"), ?LOCAL_CACHE)),
+    tpk_file:delete(filename:join(tetrapak:path("tetrapak"), ?LOCAL_CACHE)),
     ok.
 
 show_tmap(TMap) ->
@@ -187,7 +187,7 @@ load_local_task(File, #tmod{module = ModuleName, tasks = Tasks, hooks = Hooks, c
 compile_local_task(File) ->
     FileDisplayPath = tpk_file:relative_path(File, tetrapak:dir()),
     {PreDefMacros, ModuleName} = predef_macros(File),
-    IncludePath = [tetrapak:subdir("include")],
+    IncludePath = [tetrapak:path("include")],
     case epp:parse_file(File, IncludePath, PreDefMacros) of
         {ok, Forms} ->
             TMod = process_forms(File, ModuleName, Forms),
@@ -271,7 +271,7 @@ tcom_fail(File, Line, Fmt, Args) ->
 %% ------------------------------------------------------------
 %% -- Config files
 project_config_path(Filename) ->
-    filename:join(tetrapak:subdir("tetrapak"), Filename).
+    filename:join(tetrapak:path("tetrapak"), Filename).
 
 read_config(File, Config) ->
     case read_ini_file(File, Config) of
