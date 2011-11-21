@@ -1,0 +1,13 @@
+Source: erlang-tetrapak
+Maintainer: Felix Lange <fl@travelping.com>
+Standards-Version: 3.9.1
+Priority: optional
+Section: devel
+Build-Depends: debhelper (>= 7.0.0), erlang-base|erlang-base-hipe, erlang-dev, erlang-parsetools, erlang-tools
+
+Package: erlang-tetrapak
+Architecture: any
+Priority: optional
+Section: devel
+Depends: erlang-base|erlang-base-hipe, erlang-common-test, erlang-edoc, erlang-parsetools, erlang-tools
+Description: Erlang application packaging tool

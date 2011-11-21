@@ -1,0 +1,4 @@
+ebin usr/lib/erlang/lib/tetrapak
+include usr/lib/erlang/lib/tetrapak
+priv usr/lib/erlang/lib/tetrapak
+bin/tetrapak usr/lib/erlang/lib/tetrapak/bin 
