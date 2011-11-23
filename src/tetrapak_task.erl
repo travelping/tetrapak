@@ -68,7 +68,8 @@ worker(Task = #task{name = TaskName, module = TaskModule}, Context, Directory, C
     erlang:put(?DIRECTORY, Directory),
     erlang:put(?CACHE_TAB, CacheTab),
 
-    OutputCollector = spawn_link(?MODULE, output_collector, [Context, TaskName, self()]),
+    OutputCollector = spawn(?MODULE, output_collector, [Context, TaskName, self()]),
+    receive {OutputCollector, started} -> ok after 1000 -> exit(no_output_collector) end,
     group_leader(OutputCollector, self()),
 
     ?DEBUG("require pre hooks: ~p", [Task#task.pre_hooks]),
@@ -266,27 +267,28 @@ str(Lis) when is_list(Lis)   -> Lis.
 %% @private
 output_collector(Context, TaskName, TaskProcess) ->
     ?DEBUG("output_collector for ~s", [TaskName]),
-    process_flag(trap_exit, true),
+    TaskProcess ! {self(), started},
+    TaskMRef = erlang:monitor(process, TaskProcess),
     tetrapak_context:register_io_worker(Context),
     receive
         Req = {io_request, _, _, _} ->
             tetrapak_iosched:want_output(self()),
             Buffer = handle_io(Req, <<>>),
-            output_collector_loop(TaskName, TaskProcess, Buffer);
-        {'EXIT', TaskProcess, _Reason} ->
+            output_collector_loop(TaskName, TaskProcess, TaskMRef, Buffer);
+        {'DOWN', TaskMRef, process, TaskProcess, _Reason} ->
             exit(normal)
     end.
 
-output_collector_loop(TaskName, TaskProcess, Buffer) ->
+output_collector_loop(TaskName, TaskProcess, TaskMRef, Buffer) ->
     receive
         Req = {io_request, _, _, _} ->
             NewBuffer = handle_io(Req, Buffer),
-            output_collector_loop(TaskName, TaskProcess, NewBuffer);
+            output_collector_loop(TaskName, TaskProcess, TaskMRef, NewBuffer);
         {tetrapak_iosched, output_ok} ->
             print_output_header(group_leader(), TaskName),
             io:put_chars(Buffer),
-            output_collector_loop(TaskName, TaskProcess, console);
-        {'EXIT', TaskProcess, _Reason} ->
+            output_collector_loop(TaskName, TaskProcess, TaskMRef, console);
+        {'DOWN', TaskMRef, process, TaskProcess, _Reason} ->
             case Buffer of
                 console -> ok;
                 <<>> -> ok;
