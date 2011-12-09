@@ -166,8 +166,8 @@ fail(Fmt, Args) ->
 -spec config(string()) -> term().
 config(Key) ->
     case tetrapak_task:get_config(Key) of
-        {ok, Value}          -> Value;
-        {error, unknown_key} -> fail("unknown configuration parameter: ~s", [Key])
+        {ok, Value} -> Value;
+        false       -> fail("unknown configuration parameter: ~s", [Key])
     end.
 
 %% @doc Read a value from the configuration.
@@ -175,8 +175,8 @@ config(Key) ->
 -spec config(string(), term()) -> term().
 config(Key, Default)      ->
     case tetrapak_task:get_config(Key) of
-        {ok, Value}          -> Value;
-        {error, unknown_key} -> Default
+        {ok, Value} -> Value;
+        false       -> Default
     end.
 
 %% @doc Read an absolute filename from the configuration.
