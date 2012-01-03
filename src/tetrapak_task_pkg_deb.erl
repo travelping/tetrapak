@@ -58,8 +58,7 @@ is_useless(Filename) ->
     or tpk_util:match("^(.*/)*\\.git(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
-    or tpk_util:match("^(.*/)*\\.bzr(/.*)?$", Filename)
-    or tpk_util:match(tetrapak:config("package.exclude"), Filename).
+    or tpk_util:match("^(.*/)*\\.bzr(/.*)?$", Filename).
 
 file_mode("bin" ++ _) -> 8#755;
 file_mode(_Path)      -> 8#644.
@@ -85,6 +84,7 @@ make_deb(PkgDir) ->
                          (in_dir("src", Path)      and not tetrapak:config("package.include_src")) orelse
                          (in_dir(tetrapak:config("edoc.outdir"), Path) and not tetrapak:config("package.include_doc")) orelse
                          in_dir(tetrapak:config("package.outdir"), Path) orelse
+                         tpk_util:match(tetrapak:config("package.exclude"), Path) orelse
                          in_dir("debian", Path)
                  end,
     PackageFiles1 = copy_files(DataTarball, InstallDir, IsExcluded),
@@ -147,6 +147,7 @@ make_debsrc() ->
     copy_files(OrigTarball, ExtractDir,
                fun (Path) ->
                        is_useless(Path)
+                       orelse (in_dir("priv", Path) and tpk_util:match("\\.so", filename:basename(Path)))
                        orelse (in_dir("src", Path) and tpk_util:match("\\.app\\.src$", filename:basename(Path)))
                        orelse (in_dir("ebin", Path) and tpk_util:match("\\.beam$", filename:basename(Path)))
                        orelse in_dir("debian", Path)
@@ -272,7 +273,7 @@ no_underscores(S) -> re:replace(S, "_", "-", [global, {return, list}]).
 rfc_date({{Year, Month, Day},{Hours, Minutes, Seconds}}) ->
      DayName = lists:nth(calendar:day_of_the_week(Year, Month, Day),
                          ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]),
-     MonthNa = lists:nth(Month - 1,
+     MonthNa = lists:nth(Month,
                          ["Jan","Feb","Mar","Apr","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]),
      tpk_util:f("~s, ~2..0b ~s ~4..0b ~2..0b:~2..0b:~2..0b +0000",
                 [DayName, Day, MonthNa, Year, Hours, Minutes, Seconds]).
