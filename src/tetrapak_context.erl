@@ -61,7 +61,7 @@ run_sequentially(Context, [Task | Rest]) ->
         {error, {failed, Key}} ->
             wait_shutdown(Context),
             {error, {failed, Key}};
-        Exit = {context_exit, Reason} ->
+        Exit = {context_exit, _Reason} ->
             Exit
     end.
 
@@ -308,7 +308,11 @@ descending_lookup(TaskMap, Prefix, KeyRest) ->
     end.
 
 import_tasks(NewTasks, TaskMap) ->
-    MergedTaskMap = lists:keymerge(1, lists:ukeysort(1, NewTasks), TaskMap),
+    MergeHooks = fun (_Key, OldTask, NewTask) ->
+                         NewTask#task{must_run_before = OldTask#task.must_run_before,
+                                      must_run_after = OldTask#task.must_run_after}
+                 end,
+    MergedTaskMap = orddict:merge(MergeHooks, TaskMap, lists:keysort(1, NewTasks)),
     lists:foldl(fun ({_, Task}, TMAcc1) ->
                     TMAcc2 = apply_hooks(Task, #task.must_run_before, #task.pre_hooks, TMAcc1),
                     apply_hooks(Task, #task.must_run_after, #task.post_hooks, TMAcc2)
@@ -316,7 +320,7 @@ import_tasks(NewTasks, TaskMap) ->
 
 %% preprend Task's name to the ToHookField list of every task given in FromHookField
 %% this is so we don't have to write the same code twice for
-%% run_before_other_task_hooks and run_after_other_task_hooks
+%% must_run_before and must_run_after
 apply_hooks(Task, FromHookField, ToHookField, TaskMap) ->
     lists:foldl(fun (Hooked, TMAcc) ->
                         HookedName = tetrapak_task:split_name(Hooked),
@@ -325,7 +329,7 @@ apply_hooks(Task, FromHookField, ToHookField, TaskMap) ->
                                 NewHookList = [Task#task.name | element(ToHookField, HookedTask)],
                                 NewHookedTask = setelement(ToHookField, HookedTask, NewHookList),
                                 orddict:store(HookedName, NewHookedTask, TMAcc);
-                            false ->
+                            error ->
                                 TMAcc
                         end
                 end, TaskMap, element(FromHookField, Task)).
