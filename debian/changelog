@@ -1,3 +1,6 @@
+erlang-tetrapak (0.3.1.2) unstable; urgency=low
+  * fix overriding tasks
+ -- Felix Lange <fl@travelping.com>  Wed, 25 Jan 2012 10:20:00 +0000
 erlang-tetrapak (0.3.1.1) unstable; urgency=low
   * fix for a deadlock in task output handling
  -- Felix Lange <fl@travelping.com>  Wed, 23 Nov 2011 01:20:00 +0000
