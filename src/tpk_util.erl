@@ -154,16 +154,16 @@ fold_tree1(Fun, Acc, Iterator) ->
     end.
 
 cmd(Dir, Command, Args) ->
-    run_cmd(Dir, Command, Args, fun (Port) -> capture_output(Command, Port, <<>>) end).
+    run_cmd(Dir, Command, Args, [], fun (Port) -> capture_output(Command, Port, <<>>) end).
 outputcmd(Dir, Command, Args) ->
-    run_cmd(Dir, Command, Args, fun (Port) -> relay_output(Command, Port) end).
+    run_cmd(Dir, Command, Args, [stderr_to_stdout], fun (Port) -> relay_output(Command, Port) end).
 
-run_cmd(Dir, Command, Args, OutputHandler) ->
+run_cmd(Dir, Command, Args, Options, OutputHandler) ->
     case os:find_executable(Command) of
         false ->
             return_einfo({cmd_spawn, Command, not_found});
         Executable ->
-            PortOptions = [{cd, Dir}, {args, Args}, stream, binary, use_stdio, stderr_to_stdout, in, exit_status, hide],
+            PortOptions = [{cd, Dir}, {args, Args}, stream, binary, use_stdio, in, exit_status, hide | Options],
             case catch erlang:open_port({spawn_executable, Executable}, PortOptions) of
                 {'EXIT', Reason} ->
                     return_einfo({cmd_spawn, Command, Reason});
