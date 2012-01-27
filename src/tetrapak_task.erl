@@ -115,10 +115,10 @@ try_check(TaskModule, TaskName) ->
     catch
         error:Exn ->
             case {Exn, erlang:get_stacktrace()} of
-                {undef, [{TaskModule, check, [TaskName]} | _]} ->
+                {undef, [{TaskModule, check, [TaskName], _Location} | _]} ->
                     %% check/1 is undefined, treat it as 'needs_run'
                     {needs_run, undefined};
-                {function_clause, [{TaskModule, check, [TaskName]} | _]} ->
+                {function_clause, [{TaskModule, check, [TaskName], _Location} | _]} ->
                     %% check/1 is defined, but not for this task, treat it as 'needs_run'
                     {needs_run, undefined};
                 _ ->
