@@ -114,19 +114,32 @@ try_check(TaskModule, TaskName) ->
         end
     catch
         error:Exn ->
-            case {Exn, erlang:get_stacktrace()} of
-                {undef, [{TaskModule, check, [TaskName], _Location} | _]} ->
-                    %% check/1 is undefined, treat it as 'needs_run'
+            RightException =
+                case {Exn, erlang:get_stacktrace()} of
+                    {undef, [LastFunction | _]} ->
+                        check_exception(LastFunction, TaskModule, TaskName);
+                        %% check/1 is undefined, treat it as 'needs_run'
+                    {function_clause, [LastFunction | _]} ->
+                        %% check/1 is defined, but not for this task, treat it as 'needs_run'
+                        check_exception(LastFunction, TaskModule, TaskName);
+                    _ ->
+                        false
+            end,
+            case RightException of
+                true ->
                     {needs_run, undefined};
-                {function_clause, [{TaskModule, check, [TaskName], _Location} | _]} ->
-                    %% check/1 is defined, but not for this task, treat it as 'needs_run'
-                    {needs_run, undefined};
-                _ ->
+                false ->
                     handle_error(Function, error, Exn)
             end;
         Class:Exn ->
             handle_error(Function, Class, Exn)
     end.
+
+% Compatible with R15
+check_exception({TaskModule, check, [TaskName], _Location}, TaskModule, TaskName) -> true;
+% Compatible with R14
+check_exception({TaskModule, check, [TaskName]}, TaskModule, TaskName) -> true;
+check_exception(_LastTrace, _TaskModule, _TaskName) -> false.
 
 try_run(TaskModule, TaskName, TaskData) ->
     Function = tpk_util:f("~s:run/1", [TaskModule]),
