@@ -161,7 +161,7 @@ needs_compile(NewCOptions, Ebin, #erl{module = Mod, attributes = Attrs, includes
             BeamCOptions = proplists:get_value(options, ComInfo),
             BeamMTime    = tpk_file:mtime(Beam),
             ((BeamMTime =< ModMTime)) %% beam is older
-            orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
+            % orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
             orelse check_mtimes(BeamMTime, Inc) end.
 
 check_mtimes(FileMTime, Files) ->
