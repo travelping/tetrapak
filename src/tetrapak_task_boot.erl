@@ -138,18 +138,19 @@ scan_local_tasks(Dir) ->
                     tpk_file:delete(CachePath),
                     dets:open_file(CacheName, DetsOpts)
             end,
-            TaskRecords = compile_and_load_local_tasks(Files, CacheName),
+            CacheMTime  = tpk_file:mtime(CachePath),
+            TaskRecords = compile_and_load_local_tasks(Files, CacheMTime, CacheName),
             dets:close(CacheName),
             TaskRecords
     end.
 
-compile_and_load_local_tasks(Files, Cache) ->
+compile_and_load_local_tasks(Files, CacheMTime, Cache) ->
     lists:flatmap(fun (File) ->
                           case dets:lookup(Cache, tpk_file:rebase_filename(File, tetrapak:dir(), "")) of
                               [TMod = #tmod{includes = Includes, md5 = DetsMd5}] ->
                                   case tpk_file:md5sum(File) of
                                       {ok, DetsMd5} ->
-                                          case tetrapak_task_erlc:check_mtimes(tpk_file:mtime(File), Includes) of
+                                          case tetrapak_task_erlc:check_mtimes(CacheMTime, Includes) of
                                               false ->
                                                   load_local_task(File, TMod);
                                               true ->
