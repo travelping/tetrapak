@@ -68,8 +68,8 @@ run("tetrapak:startapp", _) ->
     case start_deps(tetrapak:get("config:appfile:name")) of
         ok ->
             done;
-        {failed, App} ->
-            tetrapak:fail("failed to start ~s", [App])
+        {failed, App, Error} ->
+            tetrapak:fail("failed to start ~s: ~p", [App, Error])
     end.
 start_deps(App) ->
     case application:start(App) of
@@ -79,10 +79,14 @@ start_deps(App) ->
         {error, {already_started, App}} ->
             ok;
         {error, {not_started, DepApp}} ->
-            start_deps(DepApp),
-            start_deps(App);
-        {error, _Error} ->
-            {failed, App}
+            case start_deps(DepApp) of
+                ok ->
+                    start_deps(App);
+                Error ->
+                    Error
+            end;
+        {error, Error} ->
+            {failed, App, Error}
     end.
 
 loaded_mtime(Mod) ->
