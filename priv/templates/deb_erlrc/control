@@ -4,7 +4,7 @@ Architecture: @@arch@@
 Section: @@section@@
 Priority: @@priority@@
 Maintainer: @@maintainer@@
-Depends: erlang-base|erlang-base-hipe, erlang-erlrc (>= 0.2.5) @@appdeps@@
+Depends: erlang-erlrc (>= 0.2.5), @@appdeps@@
 Conflicts: erlang-erlrc (>= 0.3)
 Description: @@desc@@
  Auto-generated package, no long description.

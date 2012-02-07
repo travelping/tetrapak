@@ -179,7 +179,8 @@ in_dir(Dir, Path) ->
 debian_deps() ->
     AppDeps   = tetrapak:get("config:appfile:deps") ++ tetrapak:config("package.extra_apps", []),
     OtherDeps = tetrapak:config("package.deb.dependencies", []),
-    lists:usort(OtherDeps ++ [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- AppDeps, not in_erlang_base(S)]).
+    lists:usort(["erlang-base|erlang-base-hipe"]
+                    ++ OtherDeps ++ [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- AppDeps, not in_erlang_base(S)]).
 
 debian_build_deps() ->
     DebianDeps = debian_deps(),
@@ -218,10 +219,6 @@ copy_files(Tarball, InstallDir, IsExcludedFunction) ->
 
 copy_control_template(Tarball, Template, ExtractDir, Variables) ->
     Pkg = "erlang-" ++ no_underscores(atom_to_list(tetrapak:get("config:appfile:name"))),
-    case debian_deps() of
-        []   -> DepString = "";
-        Deps -> DepString = ", " ++ string:join(Deps, ", ")
-    end,
     FileOptions = [{mode, 8#0744}, {owner, "root"}, {group, "root"}],
     TemplateDir = filename:join([code:priv_dir(tetrapak), "templates", Template]),
     tpk_file:walk(fun (CFile, _) ->
@@ -237,7 +234,8 @@ copy_control_template(Tarball, Template, ExtractDir, Variables) ->
                                                             {"version", tetrapak:get("config:appfile:vsn")},
                                                             {"arch", tetrapak:config("package.architecture")},
                                                             {"appname", tetrapak:get("config:appfile:name")},
-                                                            {"appdeps", DepString},
+                                                            {"appdeps", string:join(debian_deps(), ", ")},
+                                                            {"builddeps", string:join(debian_build_deps(), ", ")},
                                                             {"section", tetrapak:config("package.deb.section")},
                                                             {"priority", tetrapak:config("package.deb.priority")},
                                                             {"maintainer", tetrapak:config("package.maintainer")},
