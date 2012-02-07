@@ -1,4 +1,4 @@
-erlang-tetrapak (0.3.1.5) unstable; urgency=low
+erlang-tetrapak (0.3.1.6) unstable; urgency=low
   * debian packaging fixes
  -- Felix Lange <fl@travelping.com>  Thu, 07 Feb 2012 16:20:00 +0000
 erlang-tetrapak (0.3.1.3) unstable; urgency=low
@@ -11,5 +11,5 @@ erlang-tetrapak (0.3.1.1) unstable; urgency=low
   * fix for a deadlock in task output handling
  -- Felix Lange <fl@travelping.com>  Wed, 23 Nov 2011 01:20:00 +0000
 erlang-tetrapak (0.3.1) unstable; urgency=low
-  * no changes 
+  * no changes
  -- Felix Lange <fl@travelping.com>  Mon, 21 Nov 2011 18:57:13 +0000

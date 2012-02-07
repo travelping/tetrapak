@@ -289,9 +289,7 @@ pad0(Size, List) when is_list(List) ->
 
 ustar_header(Fields) ->
     FullName = proplists:get_value(name,  Fields),
-    {NamePrefix, NameSuffix} = if length(FullName) =< 100 -> {<<>>, FullName};
-                                  true                    -> lists:split(100, FullName)
-                               end,
+    {NamePrefix, NameSuffix} = ustar_split_filename(FullName),
     Header = <<(pad0(100, NameSuffix))/bytes,
                (list_to_binary(io_lib:fwrite("~6.8.0b \0", [proplists:get_value(mode,  Fields)])))/bytes,
                (list_to_binary(io_lib:fwrite("~6.8.0b \0", [0])))/bytes,
@@ -311,6 +309,33 @@ ustar_header(Fields) ->
     Checksum = list_to_binary(io_lib:fwrite("~6.8.0b\0 ", [sumbytes(Header, 0)])),
     <<BeforeChecksum:148/bytes, _DummyChecksum:8/bytes, AfterChecksum:344/bytes>> = Header,
     <<BeforeChecksum:148/bytes, Checksum:8/bytes, AfterChecksum:344/bytes, 0:96>>.
+
+ustar_split_filename(Name) when length(Name) < 100 ->
+    {<<>>, unicode:characters_to_binary(string:join(filename:split(Name), "/"))};
+ustar_split_filename(Name) ->
+    {_L, Prefix, Suffix} =
+        lists:foldr(fun (C, {Sum, Prefix, Suffix}) ->
+                            BinC = unicode:characters_to_binary(C),
+                            NewSum = Sum + byte_size(BinC) + 1,
+                            if
+                                NewSum < 100 ->
+                                    {Sum + byte_size(BinC) + 1, Prefix, [BinC | Suffix]};
+                                NewSum > 255 ->
+                                    error(ustar_filename_too_long, [Name]);
+                                true ->
+                                    {Sum + byte_size(BinC) + 1, [BinC | Prefix], Suffix}
+                            end
+                    end, {0, [], []}, filename:split(Name)),
+    {join_filename(Prefix), join_filename(Suffix)}.
+
+join_filename([<<"/">>]) ->
+    <<>>;
+join_filename([P]) ->
+    P;
+join_filename([P | R]) ->
+    <<P/binary, "/", (join_filename(R))/binary>>;
+join_filename([]) ->
+    <<>>.
 
 sumbytes(<<B1, B2, B3, B4, B5, B6, B7, B8, Rest/binary>>, Sum) ->
     sumbytes(Rest, Sum + B1 + B2 + B3 + B4 + B5 + B6 + B7 + B8);
