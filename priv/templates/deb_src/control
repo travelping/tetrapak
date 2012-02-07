@@ -3,7 +3,7 @@ Maintainer: @@maintainer@@
 Standards-Version: 3.9.1
 Priority: @@priority@@
 Section: @@section@@
-Build-Depends: @builddeps@
+Build-Depends: @@builddeps@@
 
 Package: @@name@@
 Architecture: any
