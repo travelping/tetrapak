@@ -106,6 +106,7 @@ make_deb(PkgDir) ->
 
     tpk_file:tarball_close(DataTarball),
 
+    io:format("generating control files~n"),
     %% control.tar.gz
     {ok, ControlTarball} = tpk_file:tarball_create(filename:join(PkgDir, "control.tar.gz")),
 
@@ -116,6 +117,7 @@ make_deb(PkgDir) ->
     copy_control_template(ControlTarball, Template, "./", []),
 
     %% generate md5sums
+    io:format("generating md5sums~n"),
     Md5 = lists:foldl(fun ({P, Target}, Acc) ->
                               {ok, CkSum} = tpk_file:md5sum(P),
                               PN = list_to_binary(Target),
@@ -177,7 +179,7 @@ in_dir(Dir, Path) ->
 
 debian_deps() ->
     AppDeps   = tetrapak:get("config:appfile:deps") ++ tetrapak:config("package.extra_apps", []),
-    OtherDeps = tetrapak:config("package.deb.dependencies", []),
+    OtherDeps = lists:map(fun to_s/1, tetrapak:config("package.deb.dependencies", [])),
     lists:usort(["erlang-base|erlang-base-hipe"]
                     ++ OtherDeps ++ [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- AppDeps, not in_erlang_base(S)]).
 
@@ -185,8 +187,11 @@ debian_build_deps() ->
     DebianDeps = debian_deps(),
     DebianBuildApps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
                         S <- tetrapak:config("package.extra_build_apps", []), not in_erlang_base(S)],
-    DebianBuildDeps = tetrapak:config("package.deb.build_dependencies", []),
+    DebianBuildDeps = lists:map(fun to_s/1, tetrapak:config("package.deb.build_dependencies", [])),
     lists:usort(["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ DebianBuildApps ++ DebianBuildDeps ++ DebianDeps).
+
+to_s(Atm) when is_atom(Atm) -> atom_to_list(Atm);
+to_s(L)   when is_list(L)   -> lists:flatten(L).
 
 in_erlang_base(Application) ->
     lists:member(Application, tetrapak:config("package.deb.erlang_base_apps")).
