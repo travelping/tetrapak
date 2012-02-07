@@ -57,9 +57,6 @@ is_useless(Filename) ->
     or tpk_util:match("^(.*/)*\\.bzr(/.*)?$", Filename)
     or tpk_util:match(tetrapak:config("package.exclude"), Filename).
 
-file_mode("bin" ++ _) -> 8#755;
-file_mode(_Path)      -> 8#644.
-
 make_ipkg(PkgDir) ->
     Name    = atom_to_list(tetrapak:get("config:appfile:name")),
     Vsn     = tetrapak:get("config:appfile:vsn"),
@@ -83,7 +80,7 @@ make_ipkg(PkgDir) ->
                          in_dir(tetrapak:config("package.outdir"), Path) orelse
                          in_dir("debian", Path)
                  end,
-    PackageFiles1 = copy_files(DataTarball, InstallDir, IsExcluded),
+    PackageFiles1 = tetrapak_task_pkg_deb:copy_files(DataTarball, InstallDir, IsExcluded),
 
     %% symlink binaries
     BinDir = "usr/bin",
@@ -128,31 +125,6 @@ debian_deps() ->
 
 in_erlang_base(Application) ->
     lists:member(Application, tetrapak:config("package.deb.erlang_base_apps")).
-
-copy_files(Tarball, InstallDir, IsExcludedFunction) ->
-    tpk_file:walk(fun (P, Acc) ->
-                          File = tpk_file:rebase_filename(P, tetrapak:dir(), ""),
-                          Target = InstallDir ++ File,
-                          case IsExcludedFunction(File) of
-                              true ->
-                                  Acc;
-                              false ->
-                                  case filelib:is_dir(P) of
-                                      true ->
-                                          case Target of
-                                              InstallDir -> Acc;
-                                              _ ->
-                                                  tpk_file:tarball_mkdir(Tarball, Target, [{owner, "root"}, {group, "root"}]),
-                                                  Acc
-                                          end;
-                                      false ->
-                                          io:format("add ~s~n", [File]),
-                                          Mode = file_mode(File),
-                                          tpk_file:tarball_add_file(Tarball, P, Target, [dereference, {mode, Mode}, {owner, "root"}, {group, "root"}]),
-                                          [{P, Target} | Acc]
-                                  end
-                          end
-                  end, [], tetrapak:dir(), dir_first).
 
 copy_control_template(Tarball, Template, ExtractDir, Variables) ->
     Pkg = "erlang-" ++ no_underscores(atom_to_list(tetrapak:get("config:appfile:name"))),

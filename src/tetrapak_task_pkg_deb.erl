@@ -21,7 +21,9 @@
 -module(tetrapak_task_pkg_deb).
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
+-export([copy_files/3]).
 
+-include_lib("kernel/include/file.hrl").
 -include("tetrapak.hrl").
 
 %% ------------------------------------------------------------
@@ -59,9 +61,6 @@ is_useless(Filename) ->
     or tpk_util:match("^(.*/)*\\.svn(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.hg(/.*)?$", Filename)
     or tpk_util:match("^(.*/)*\\.bzr(/.*)?$", Filename).
-
-file_mode("bin" ++ _) -> 8#755;
-file_mode(_Path)      -> 8#644.
 
 make_deb(PkgDir) ->
     Name    = atom_to_list(tetrapak:get("config:appfile:name")),
@@ -209,13 +208,22 @@ copy_files(Tarball, InstallDir, IsExcludedFunction) ->
                                                   Acc
                                           end;
                                       false ->
-                                          io:format("add ~s~n", [File]),
-                                          Mode = file_mode(File),
+                                          Mode = file_mode(P),
+                                          io:format("add ~3.8.0B ~s~n", [Mode, File]),
                                           tpk_file:tarball_add_file(Tarball, P, Target, [dereference, {mode, Mode}, {owner, "root"}, {group, "root"}]),
                                           [{P, Target} | Acc]
                                   end
                           end
                   end, [], tetrapak:dir(), dir_first).
+
+file_mode(Path) ->
+    {ok, Info} = file:read_file_info(Path),
+    case Info#file_info.mode band 8#000001 of
+        1 ->
+            8#755;
+        0 ->
+            8#644
+    end.
 
 copy_control_template(Tarball, Template, ExtractDir, Variables) ->
     Pkg = "erlang-" ++ no_underscores(atom_to_list(tetrapak:get("config:appfile:name"))),
