@@ -3,6 +3,7 @@ ERLC = erlc
 
 SRC_DIR     = $(CURDIR)/src
 EBIN_DIR    = $(CURDIR)/ebin
+DIST_DIR    = $(CURDIR)/dist
 INCLUDE_DIR = $(CURDIR)/include
 
 GRAMMAR     = $(SRC_DIR)/tetrapak_ini_parser.yrl
@@ -22,6 +23,7 @@ clean:
 	rm -f $(GRAMMAR_ERL)
 	rm -f $(LEXER_ERL)
 	rm -f $(EBIN_DIR)/*.beam
+	rm -fr $(DIST_DIR)
 
 shell: all
 	$(ERL) -pa $(EBIN_DIR)
