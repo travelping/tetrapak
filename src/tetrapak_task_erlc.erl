@@ -44,7 +44,7 @@ check("build:erlang") ->
     ExtraCompileOptions = tetrapak:config("build.erlc_options", []),
     CompileOptions      = [{outdir, EbinDir}, {i, tetrapak:path("include")}, return_errors, return_warnings, debug_info]
                           ++ ExtraCompileOptions,
-    Sources             = lists:sort(fun compile_order/2, erlang_source_files(SrcDir)),
+    Sources             = sort_dependency_order(erlang_source_files(SrcDir)),
     FileList            =
         lists:flatmap(fun (File) ->
                           case needs_compile(CompileOptions, EbinDir, File) of
@@ -53,7 +53,7 @@ check("build:erlang") ->
                           end
                       end, Sources),
     case FileList of
-        [] -> {done,      [{modules, []}]};
+        [] -> {done, [{modules, []}]};
         _  -> {needs_run, FileList}
     end;
 
@@ -76,10 +76,9 @@ check("clean:leex") ->
 run("build:erlang", ErlFiles) ->
     file:make_dir(tetrapak:path("ebin")),
     compile_foreach(fun ({File, CompileOptions}) ->
-                            try_load(tetrapak:path("ebin"), File#erl.behaviours),
                             run_compiler(compile, file, [File#erl.file, CompileOptions])
                     end, ErlFiles),
-    {done, [{modules, [F#erl.module || {F, _} <- ErlFiles]}]};
+    {done, [{modules, [atom_to_list(F#erl.module) || {F, _} <- ErlFiles]}]};
 
 run("build:yecc", Files) ->
     compile_foreach(fun ({InputFile, OutputFile}) ->
@@ -138,31 +137,41 @@ show_errors(BaseDir, Prefix, Errors) ->
                                         end, FileErrors)
                   end, Errors).
 
-compile_order(File1, _File2) ->
-    lists:member({behaviour_info, 1}, proplists:get_value(export, File1#erl.attributes, [])) or
-    lists:member({parse_transform, 2}, proplists:get_value(export, File1#erl.attributes, [])).
+sort_dependency_order(Files) ->
+    G = digraph:new(),
+    lists:foreach(fun (F) -> digraph:add_vertex(G, F#erl.module, F) end, Files),
+    lists:foreach(fun (F) ->
+                          lists:foreach(fun (B) ->
+                                                digraph:add_edge(G, B, F#erl.module)
+                                        end, F#erl.behaviours),
+                          lists:foreach(fun ({parse_transform, PT}) ->
+                                                digraph:add_edge(G, PT, F#erl.module);
+                                            (_) ->
+                                                ok
+                                        end, proplists:get_value(compile, F#erl.attributes, []))
+                  end, Files),
+    case digraph_utils:topsort(G) of
+        false ->
+            Files;
+        Mods ->
+            [element(2, digraph:vertex(G, M)) || M <- Mods]
+    end.
 
-try_load(EbinDir, ModList) ->
-    lists:foreach(fun (Mod) ->
-                          MAtom = list_to_atom(Mod),
-                          case code:is_loaded(MAtom) of
-                              false -> code:load_abs(filename:join(EbinDir, Mod ++ ".beam"));
-                              _     -> ok
-                          end
-                  end, ModList).
-
-needs_compile(NewCOptions, Ebin, #erl{module = Mod, attributes = Attrs, includes = Inc, mtime = ModMTime}) ->
-    Beam = filename:join(Ebin, tpk_util:f("~s.beam", [Mod])),
-    COptions = proplists:get_value(compile, Attrs, []) ++ NewCOptions,
+needs_compile(_NewCOptions, Ebin, #erl{module = Mod, attributes = _Attrs, includes = Inc, mtime = ModMTime}) ->
+    Beam = filename:join(Ebin, tpk_util:f("~s~s", [Mod, code:objfile_extension()])),
+    % COptions = remove_return_options(proplists:get_value(compile, Attrs, []) ++ NewCOptions),
     case filelib:is_regular(Beam) of
         false -> true;
         true  ->
-            {ok, {_, [{compile_info, ComInfo}]}} = beam_lib:chunks(Beam, [compile_info]),
-            BeamCOptions = proplists:get_value(options, ComInfo),
+            % {ok, {_, [{compile_info, ComInfo}]}} = beam_lib:chunks(Beam, [compile_info]),
+            % BeamCOptions = remove_return_options(proplists:get_value(options, ComInfo)),
             BeamMTime    = tpk_file:mtime(Beam),
             ((BeamMTime =< ModMTime)) %% beam is older
             % orelse lists:usort(BeamCOptions) /= lists:usort(COptions) %% compiler options changed
             orelse check_mtimes(BeamMTime, Inc) end.
+
+% remove_return_options(Opts) ->
+%     [O || O <- Opts, O /= return_errors, O /= return_warnings].
 
 check_mtimes(FileMTime, Files) ->
     lists:any(fun (F) ->
@@ -199,17 +208,15 @@ scan_source(Path) ->
 do_form(File, {attribute, _, file, {IncludeFile, _}}, R) when File /= IncludeFile ->
     R#erl{includes = [IncludeFile | R#erl.includes]};
 do_form(_File, {attribute, _, module, Module}, R) when is_atom(Module) ->
-    R#erl{module = atom_to_list(Module)};
+    R#erl{module = Module};
 do_form(_File, {attribute, _, module, Module}, R) when is_list(Module) ->
-    R#erl{module = string:join([atom_to_list(A) || A <- Module], ".")};
+    R#erl{module = list_to_atom(string:join([atom_to_list(A) || A <- Module], "."))};
 do_form(_File, {attribute, _, module, {Module, _}}, R) when is_atom(Module) ->
-    R#erl{module = atom_to_list(Module)};
+    R#erl{module = Module};
 do_form(_File, {attribute, _, module, {Module, _}}, R) when is_list(Module) ->
-    R#erl{module = string:join([atom_to_list(A) || A <- Module], ".")};
+    R#erl{module = list_to_atom(string:join([atom_to_list(A) || A <- Module], "."))};
 do_form(_File, {attribute, _, behaviour, Behaviour}, R) ->
-    R#erl{behaviours = [atom_to_list(Behaviour) | R#erl.behaviours]};
-do_form(_File, {attribute, _, behavior, Behaviour}, R) ->
-    R#erl{behaviours = [atom_to_list(Behaviour) | R#erl.behaviours]};
+    R#erl{behaviours = [Behaviour | R#erl.behaviours]};
 do_form(_File, {attribute, _, Attr, Value}, R) ->
     case proplists:get_value(Attr, R#erl.attributes) of
         undefined -> R#erl{attributes = [{Attr, avalue(Value)} | R#erl.attributes]};
