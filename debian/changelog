@@ -1,3 +1,6 @@
+erlang-tetrapak (0.3.1.7) unstable; urgency=low
+  * erlang build order fix for parse_transform
+ -- Felix Lange <fl@travelping.com>  Thu, 29 May 2012 20:00:00 +0000
 erlang-tetrapak (0.3.1.6) unstable; urgency=low
   * debian packaging fixes
  -- Felix Lange <fl@travelping.com>  Thu, 07 Feb 2012 16:20:00 +0000
