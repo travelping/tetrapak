@@ -24,6 +24,7 @@
             {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
             {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
             {"pkg:ipkg", tetrapak_task_pkg_ipkg, "Create a binary ipkg"},
+            {"install:copy", tetrapak_task_install_copy, "install a copy of the application into Erlang lib dir"},
             {"clean:dist", tetrapak_task_pkg_deb, "Delete packages"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
