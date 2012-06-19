@@ -81,12 +81,12 @@ install_copy() ->
 
     %% symlink binaries
     BinDir = "usr/bin",
-    tpk_file:mkdir(filename:join(prefix(), BinDir)),
 
     lists:foldl(fun (ScriptName, Acc) ->
 			Original = filename:join(tetrapak:path("bin"), ScriptName),
 			case filelib:is_regular(Original) and (not is_useless(Original)) of
 			    true ->
+				tpk_file:mkdir(filename:join(prefix(), BinDir)),
 				Target = prefix() ++ "/" ++ BinDir ++ "/" ++ ScriptName,
 				Link = RelInstallDir ++ "bin/" ++ ScriptName,
 				io:format("Link: ~s -> ~s~n", [Link, Target]),
