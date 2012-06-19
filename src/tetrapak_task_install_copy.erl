@@ -46,7 +46,7 @@ prefix() ->
     end.
 
 libdir() ->
-    prefix() ++ code:lib_dir().
+    prefix() ++ "/usr/lib/erlang/lib".
 
 is_useless(Filename) ->
     Name = tpk_file:basename(Filename),
@@ -67,7 +67,7 @@ install_copy() ->
     Vsn     = tetrapak:get("config:appfile:vsn"),
 
     InstallDir = libdir() ++ tpk_util:f("/~s-~s/", [Name, Vsn]),
-    RelInstallDir = code:lib_dir() ++ tpk_util:f("/~s-~s/", [Name, Vsn]),
+    RelInstallDir = "../lib/erlang/lib" ++ tpk_util:f("/~s-~s/", [Name, Vsn]),
     io:format("InstallDir: ~s~n", [InstallDir]),
     tpk_file:mkdir(InstallDir),
     IsExcluded = fun (Path) ->
