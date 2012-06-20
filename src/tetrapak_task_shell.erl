@@ -71,6 +71,7 @@ run("tetrapak:startapp", _) ->
         {failed, App, Error} ->
             tetrapak:fail("failed to start ~s: ~p", [App, Error])
     end.
+
 start_deps(App) ->
     case application:start(App) of
         ok ->

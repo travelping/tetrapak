@@ -19,16 +19,18 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tpk).
--export([r/1, h/0, l/0, s/0, s/1, b/0, bl/0, c/0]).
+-export([r/1, h/0, l/0, s/0, s/1, b/0, bl/0, c/0, i/2]).
 
-r(Cmd) -> run([Cmd]).
-h()    -> run(["tetrapak:info", "tetrapak:tpk-help"]).
-c()    -> r("check").
-l()    -> r("tetrapak:reload").
-b()    -> r("build").
-bl()   -> run(["build", "tetrapak:reload"]).
-s()    -> r("tetrapak:startapp").
-s(App) -> tetrapak_task_shell:start_deps(App).
+r(Cmd)        -> run([Cmd]).
+h()           -> run(["tetrapak:info", "tetrapak:tpk-help"]).
+c()           -> r("check").
+l()           -> r("tetrapak:reload").
+b()           -> r("build").
+bl()          -> run(["build", "tetrapak:reload"]).
+s()           -> r("tetrapak:startapp").
+s(App)        -> tetrapak_task_shell:start_deps(App).
+i(deps, tree) -> r("info:depsastree");
+i(deps, list) -> r("info:depsaslist").
 
 run(Tasks) ->
     {ok, Cwd} = file:get_cwd(),
