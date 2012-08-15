@@ -32,6 +32,7 @@ run("shell", _) ->
                 false -> ok
             end,
 
+            compile_user_default(),
             tetrapak:require("tetrapak:reload"),
             tetrapak_task:print_output_header(user, "shell"),
             tetrapak_io:start_shell(),
@@ -98,3 +99,55 @@ load(Mod) ->
     io:format("load ~s~n", [Mod]),
     code:purge(Mod),
     code:load_file(Mod).
+
+% --------------------------------------------------------------------------------------------------
+% -- use user_default hack
+-record(tmod, {file, md5, module, code}).
+
+compile_user_default() ->
+    File = get_source(),
+    TMod = compile_user_default(File),
+    code:purge(user_default),
+    Result = code:load_binary(user_default, File, TMod#tmod.code),
+    io:format(user, "info / load user_default: ~p~n", [Result]).
+
+get_source() ->
+    proplists:get_value(source, tetrapak_user_default:module_info(compile)).
+
+compile_user_default(PathToFile) ->
+    {PreDefMacros, ModuleName} = predef_macros(),
+    case epp:parse_file(PathToFile, [], PreDefMacros) of
+        {ok, Forms} ->
+            TMod = process_forms(PathToFile, ModuleName, Forms),
+            CompileOptions = [return, debug_info, export_all],
+            case compile:forms(TMod#tmod.code, CompileOptions) of
+                {ok, ModuleName, BeamCode, Warnings} ->
+                    tetrapak_task_erlc:show_errors(tetrapak:dir(), "Warning: ", Warnings),
+                    TMod#tmod{code = BeamCode};
+                {error, Errors, Warnings} ->
+                    tetrapak_task_erlc:show_errors(tetrapak:dir(), "Error: ", Errors),
+                    tetrapak_task_erlc:show_errors(tetrapak:dir(), "Warning: ", Warnings),
+                    tetrapak:fail("user_default compilation failed")
+            end;
+        {error, Error} ->
+            tetrapak:fail("failed to open tetrapak_user_default ~s: ~s", [PathToFile, file:format_error(Error)])
+    end.
+
+predef_macros() ->
+   PreDefMacros = [{'MODULE', user_default, redefine},
+                   {'MODULE_STRING', "user_default", redefine}],
+   {PreDefMacros, user_default}.
+
+process_forms(File, ModuleName, Forms) ->
+    {Found, TMod, Code} = lists:foldl(fun (Form, {FoundM, TMod, CodeAcc}) ->
+                                              do_form(File, Form, FoundM, TMod, CodeAcc)
+                                      end, {false, #tmod{module = ModuleName}, []}, Forms),
+    case Found of
+        true  -> TMod#tmod{code = lists:reverse(Code)};
+        false -> TMod#tmod{code = [{attribute, 1, module, ModuleName} | lists:reverse(Code)]}
+    end.
+
+do_form(_File, {attribute, L, module, _ModName}, _FoundM, TMod, Code) ->
+    {true, TMod, [{attribute, L, module, TMod#tmod.module} | Code]};
+do_form(_File, OtherForm, FoundM, TMod, Code) ->
+    {FoundM, TMod, [OtherForm | Code]}.
