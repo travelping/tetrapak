@@ -20,7 +20,7 @@
 
 -module(tetrapak_task_shell).
 -behaviour(tetrapak_task).
--export([run/2, start_deps/1]).
+-export([run/2, start_deps/1, compile_user_default/0]).
 
 run("shell", _) ->
     code:ensure_loaded(tpk),
@@ -32,7 +32,6 @@ run("shell", _) ->
                 false -> ok
             end,
 
-            compile_user_default(),
             tetrapak:require("tetrapak:reload"),
             tetrapak_task:print_output_header(user, "shell"),
             tetrapak_io:start_shell(),
@@ -41,6 +40,9 @@ run("shell", _) ->
         false ->
             tetrapak:fail("Cannot start shell")
     end;
+
+run("shell:extend", _) ->
+    compile_user_default();
 
 run("tetrapak:reload", _) ->
     EbinDir = tetrapak:path("ebin"),
@@ -105,11 +107,14 @@ load(Mod) ->
 -record(tmod, {file, md5, module, code}).
 
 compile_user_default() ->
-    File = get_source(),
-    TMod = compile_user_default(File),
-    code:purge(user_default),
-    Result = code:load_binary(user_default, File, TMod#tmod.code),
-    io:format(user, "info / load user_default: ~p~n", [Result]).
+    {_Time, _} = timer:tc(fun() ->
+                                  File = get_source(),
+                                  TMod = compile_user_default(File),
+                                  code:purge(user_default),
+                                  code:load_binary(user_default, File, TMod#tmod.code)
+                          end, []),
+    ok.
+    %io:format(user, "Compiled and loaded tetrapak extra shell commands in: ~p s.~n", [Time / 1000000]).
 
 get_source() ->
     proplists:get_value(source, tetrapak_user_default:module_info(compile)).
