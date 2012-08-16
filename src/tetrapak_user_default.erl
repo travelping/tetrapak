@@ -17,10 +17,10 @@ help() ->
      format("dbgdel(M,F)-- disable call tracer for function M:F\n"),
      format("dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information\n").
 
-load()        -> run("tetrapak:reload").
-bd()          -> run("build").
+load()        -> run(["tetrapak:reload"]).
+bd()          -> run(["build"]).
 bdl()         -> run(["build", "tetrapak:reload"]).
-start()       -> run("tetrapak:startapp").
+start()       -> run(["tetrapak:startapp"]).
 start(App)    -> tetrapak_task_shell:start_deps(App).
 
 dbg(Module) ->
@@ -57,5 +57,4 @@ dbgoff() ->
 
 run(Tasks) ->
     {ok, Cwd} = file:get_cwd(),
-    tetrapak:run(Cwd, lists:flatten([Tasks])).
-
+    tetrapak:run(Cwd, Tasks).
