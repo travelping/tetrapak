@@ -20,7 +20,7 @@
 
 -module(tetrapak_task_shell).
 -behaviour(tetrapak_task).
--export([run/2, start_deps/1, compile_user_default/0]).
+-export([run/2, start_deps/1, extended_shell_build/0]).
 
 run("shell", _) ->
     code:ensure_loaded(tpk),
@@ -42,7 +42,7 @@ run("shell", _) ->
     end;
 
 run("shell:extend", _) ->
-    compile_user_default();
+    load_user_default();
 
 run("tetrapak:reload", _) ->
     EbinDir = tetrapak:path("ebin"),
@@ -106,15 +106,22 @@ load(Mod) ->
 % -- use user_default hack
 -record(tmod, {file, md5, module, code}).
 
-compile_user_default() ->
-    {_Time, _} = timer:tc(fun() ->
-                                  File = get_source(),
-                                  TMod = compile_user_default(File),
-                                  code:purge(user_default),
-                                  code:load_binary(user_default, File, TMod#tmod.code)
-                          end, []),
+load_user_default() ->
+    case code:load_file(user_default) of
+        {module, _} ->
+            io:format("Loaded tetrapak extra shell commands~n", []);
+        _ ->
+            io:format("Cann't load tetrapak extra shell commands~n", [])
+    end.
+
+extended_shell_build() ->
+    File = get_source(),
+    TMod = compile_user_default(File),
+    code:purge(user_default),
+    code:load_binary(user_default, File, TMod#tmod.code),
+    file:write_file(tetrapak:path("ebin") ++ "/user_default.beam", TMod#tmod.code),
+    io:format("Recompile: src/tetrapak_user_default for shell extending~n"),
     ok.
-    %io:format(user, "Compiled and loaded tetrapak extra shell commands in: ~p s.~n", [Time / 1000000]).
 
 get_source() ->
     proplists:get_value(source, tetrapak_user_default:module_info(compile)).

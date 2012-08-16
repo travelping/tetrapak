@@ -288,10 +288,16 @@ task_name(RunGraph, Pid) ->
 
 resolve_keys(TaskMap, Keys) ->
     try
-        lists:foldl(fun (Key, Acc) ->
+        lists:foldl(fun (RawKey, Acc) ->
+                          Key = tetrapak_task:normalize_name(RawKey),
                           [First | Rest] = tetrapak_task:split_name(Key),
-                          NewTasks = descending_lookup(TaskMap, [First], Rest),
-                          lists:keymerge(#task.name, NewTasks, Acc)
+                          Matches = descending_lookup(TaskMap, [First], Rest),
+                          case lists:filter(fun (#task{name = TN}) -> TN == Key end, Matches) of
+                              [DirectMatch] ->
+                                  lists:keymerge(#task.name, [DirectMatch], Acc);
+                              _ ->
+                                  lists:keymerge(#task.name, Matches, Acc)
+                          end
                     end, [], Keys)
     catch
         throw:{unknown, Key} ->

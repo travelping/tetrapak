@@ -5,7 +5,7 @@
 help() ->
      shell_default:help(),
      format("** tetrapak extended commands **~n"),
-     format("load()     -- reloads changed modules\n"),
+     format("l()        -- reloads changed modules\n"),
      format("start()    -- starts the current application\n"),
      format("start(App) -- starts an application and all its dependencies\n"),
      format("bl()       -- runs \"build\"\n"),
@@ -17,7 +17,7 @@ help() ->
      format("dbgdel(M,F)-- disable call tracer for function M:F\n"),
      format("dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information\n").
 
-load()        -> run(["tetrapak:reload"]).
+l()           -> run(["tetrapak:reload"]).
 bl()          -> run(["build"]).
 bll()         -> run(["build", "tetrapak:reload"]).
 start()       -> run(["tetrapak:startapp"]).
