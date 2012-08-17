@@ -120,11 +120,11 @@ extended_shell_build() ->
     code:purge(user_default),
     code:load_binary(user_default, File, TMod#tmod.code),
     file:write_file(tetrapak:path("ebin") ++ "/user_default.beam", TMod#tmod.code),
-    io:format("Recompile: src/tetrapak_user_default for shell extending~n"),
+    io:format("Recompile: src/tetrapak_shell_extension for shell extending~n"),
     ok.
 
 get_source() ->
-    proplists:get_value(source, tetrapak_user_default:module_info(compile)).
+    proplists:get_value(source, tetrapak_shell_extension:module_info(compile)).
 
 compile_user_default(PathToFile) ->
     {PreDefMacros, ModuleName} = predef_macros(),
@@ -142,7 +142,7 @@ compile_user_default(PathToFile) ->
                     tetrapak:fail("user_default compilation failed")
             end;
         {error, Error} ->
-            tetrapak:fail("failed to open tetrapak_user_default ~s: ~s", [PathToFile, file:format_error(Error)])
+            tetrapak:fail("failed to open tetrapak_shell_extension ~s: ~s", [PathToFile, file:format_error(Error)])
     end.
 
 predef_macros() ->

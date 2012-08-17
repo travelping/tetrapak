@@ -3,6 +3,7 @@
 /tetrapak/.local.cache
 /src/tetrapak_ini_*.erl
 /dist
+*~
 
 /doc/*.html
 /doc/*.png
