@@ -23,9 +23,9 @@ help() ->
             format("dbg(S)     -- enable dbg tracer with redbug RTP(restricted trace pattern)\n"),
             format("              Please note, that not all original patterns are supported\n"),
             format("              the RTP has the form: \"<mfa> when <guards>\"\n"),
-            format("              enable dbg tracer with redbug RTP(restricted trace pattern)\n"),
-            format("              enable dbg tracer with redbug RTP(restricted trace pattern)\n"),
-            format("              enable dbg tracer with redbug RTP(restricted trace pattern)\n");
+            format("              \"mod\", \"mod:fun\", \"mod:fun/3\" or \"mod:fun('_',atom,X)\"\n"),
+            format("              <guard> is something like:\n"),
+            format("              \"X==1\" or \"is_atom(A)\" or \"(X==2) or (Y==2)\"\n");
         false ->
             ok
     end.
