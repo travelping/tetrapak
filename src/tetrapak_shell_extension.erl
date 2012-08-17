@@ -14,7 +14,7 @@ help() ->
      format("bll()      -- runs \"build\" and reloads modules\n"),
      format("dbg(M)     -- enable dbg tracer on all functions in module M\n"),
      format("dbg(M, F)  -- enable dbg tracer on M:F functions\n"),
-     format("dbgloc(M)  -- enable dbg tracer on all local functions in module M\n"),
+     format("dbgl(M)    -- enable dbg tracer on all local functions in module M\n"),
      format("dbgdel(M)  -- disable call tracer for module M\n"),
      format("dbgdel(M,F)-- disable call tracer for function M:F\n"),
      format("dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information\n"),
@@ -55,7 +55,7 @@ dbg(String) when is_list(String) ->
             format("redbug isn't installed")
     end.
 
-dbgloc(Module) when is_atom(Module) ->
+dbgl(Module) when is_atom(Module) ->
     assert_dbg_started(),
     dbg:tpl(Module, [{'_', [], ?STD_PARAMS}]),
     ok.
