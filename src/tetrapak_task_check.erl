@@ -22,6 +22,7 @@
 -behaviour(tetrapak_task).
 -export([run/2]).
 
+-define(EXTENSION, "user_default.beam").
 %% ------------------------------------------------------------
 %% -- Task API
 run("check:xref", _) ->
@@ -47,6 +48,7 @@ run("check:appmodules", _) ->
     end,
     case ShouldFiles -- Files of
         [] -> ok;
+       [?EXTENSION] -> ok;
         OnlyApp ->
             tetrapak:fail("modules listed in app file but not present in ebin/:~n   ~s", [string:join(BeamToMod(OnlyApp), ", ")])
     end,

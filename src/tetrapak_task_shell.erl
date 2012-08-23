@@ -32,6 +32,7 @@ run("shell", _) ->
                 false -> ok
             end,
 
+            tetrapak:require("tetrapak:extend:shell"),
             tetrapak:require("tetrapak:reload"),
             tetrapak_task:print_output_header(user, "shell"),
             tetrapak_io:start_shell(),
@@ -41,7 +42,7 @@ run("shell", _) ->
             tetrapak:fail("Cannot start shell")
     end;
 
-run("shell:extend", _) ->
+run("tetrapak:extend:shell", _) ->
     load_user_default();
 
 run("tetrapak:reload", _) ->
@@ -107,24 +108,33 @@ load(Mod) ->
 -record(tmod, {file, md5, module, code}).
 
 load_user_default() ->
-    case code:load_file(user_default) of
+    case code:load_file(tetrapak_user_default) of
         {module, _} ->
-            io:format("Loaded tetrapak extra shell commands~n", []);
+            io:format("Loaded tetrapak extra shell commands~n");
         _ ->
-            io:format("Cann't load tetrapak extra shell commands~n", [])
+            io:format("Cann't compile/load tetrapak extra shell commands~n", [])
     end.
 
 extended_shell_build() ->
-    File = get_source(),
-    TMod = compile_user_default(File),
-    code:purge(user_default),
-    code:load_binary(user_default, File, TMod#tmod.code),
-    file:write_file(tetrapak:path("ebin") ++ "/user_default.beam", TMod#tmod.code),
-    io:format("Recompile: src/tetrapak_shell_extension for shell extending~n"),
-    ok.
+    case get_source() of
+        error ->
+            error;
+        File ->
+            TMod = compile_user_default(File),
+            code:purge(user_default),
+            code:load_binary(user_default, File, TMod#tmod.code),
+            file:write_file(tetrapak:path("ebin") ++ "/user_default.beam", TMod#tmod.code),
+            ok
+    end.
 
 get_source() ->
-    proplists:get_value(source, tetrapak_shell_extension:module_info(compile)).
+    File = proplists:get_value(source, tetrapak_shell_extension:module_info(compile)),
+    case filelib:is_file(File) of
+        true ->
+            File;
+        false ->
+            error
+    end.
 
 compile_user_default(PathToFile) ->
     {PreDefMacros, ModuleName} = predef_macros(),

@@ -1,5 +1,10 @@
--task({"build:extendshell", "build extend shell commands"}).
+-task({"build:extend:shell", "build extend shell commands"}).
 
-run("build:extendshell", _) ->
+run("build:extend:shell", _) ->
     tetrapak:require("build:erlang"),
-    tetrapak_task_shell:extended_shell_build().
+    case tetrapak_task_shell:extended_shell_build() of
+        error ->
+            io:format("Cann't compile tetrapak shell extension~n", []);
+        _ ->
+            io:format("Recompile: tetrapak shell extensions~n", [])
+    end.
