@@ -9,6 +9,7 @@
 /doc/*.png
 /doc/*.css
 /doc/edoc-info
+!/doc/tetrapak.html
 
 /debian/*
 !/debian/rules

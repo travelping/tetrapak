@@ -4,4 +4,5 @@ Architecture: @@arch@@
 Section: @@section@@
 Priority: @@priority@@
 Maintainer: @@maintainer@@
+Depends: erlang @@appdeps@@
 Description: @@desc@@
