@@ -12,6 +12,7 @@ help() ->
      format("start(App) -- starts an application and all its dependencies\n"),
      format("bl()       -- runs \"build\"\n"),
      format("bll()      -- runs \"build\" and reloads modules\n"),
+     format("bls()      -- runs \"build\", reloads modules and starts the current application\n"),
      format("dbg(M)     -- enable dbg tracer on all functions in module M\n"),
      format("dbg(M, F)  -- enable dbg tracer on M:F functions\n"),
      format("dbgl(M)    -- enable dbg tracer on all local functions in module M\n"),
@@ -34,6 +35,7 @@ help() ->
 l()           -> run(["tetrapak:reload"]).
 bl()          -> run(["build"]).
 bll()         -> run(["build", "tetrapak:reload"]).
+bls()         -> run(["build", "tetrapak:reload", "tetrapak:startapp"]).
 start()       -> run(["tetrapak:startapp"]).
 start(App)    -> tetrapak_task_shell:start_deps(App).
 
