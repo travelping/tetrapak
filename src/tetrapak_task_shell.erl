@@ -108,7 +108,7 @@ load(Mod) ->
 -record(tmod, {file, md5, module, code}).
 
 load_user_default() ->
-    case code:load_file(tetrapak_user_default) of
+    case code:load_file(user_default) of
         {module, _} ->
             io:format("Loaded tetrapak extra shell commands~n");
         _ ->
