@@ -25,8 +25,7 @@
 -include("tetrapak.hrl").
 
 initial_tmap() ->
-    [{["clean", "taskcache"], #task{name = "clean:taskcache", module = ?MODULE, description = "Delete the local task cache"}},
-     {["tetrapak", "boot"],   #task{name = "tetrapak:boot", module = ?MODULE,   description = "The root of all evil"}},
+    [{["tetrapak", "boot"],   #task{name = "tetrapak:boot", module = ?MODULE,   description = "The root of all evil"}},
      {["tetrapak", "info"],   #task{name = "tetrapak:info", module = ?MODULE,   description = "Show version and tasks"}}].
 
 run("tetrapak:boot", _) ->
@@ -44,8 +43,25 @@ run("tetrapak:boot", _) ->
 
     tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
+    %% check, that we are in application directory
+    Dir = tetrapak:path("src"),
+    AppExists = case file:list_dir(Dir) of
+                    {ok, Files} ->
+                        lists:any(fun(FileName) ->
+                                          case string:str(FileName, ".app.src") of
+                                              0 -> false;
+                                              _ -> true
+                                          end
+                                  end, Files);
+                    {error, _} ->
+                        false
+                end,
+    Tasks = case AppExists of
+                true -> proplists:get_value(tasks, Env);
+                false -> proplists:get_value(before_app_exists_tasks, Env)
+            end,
     %% scan tasks
-    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(proplists:get_value(tasks, Env))),
+    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(Tasks)),
     tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:path("tetrapak"))),
 
     {done, [{version, Version}]};

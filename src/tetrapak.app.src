@@ -34,7 +34,11 @@
             {"info:deps", tetrapak_task_info, "Get application deps as list"},
             {"info:deps:tree", tetrapak_task_info, "Get application deps as tree"},
             {"test:ct", tetrapak_task_common_test, "Run unit tests with common_test"},
+            {"clean:taskcache", tetrapak_task_boot, "Delete the local task cache"},
             {"clean:testlog", tetrapak_task_common_test, "Delete common_test HTML logs"}
+           ]},
+    {before_app_exists_tasks, [
+            {"create:application", tetrapak_task_app, "Generate a skeleton for a new erlang application"}
            ]},
    {config, [
              {"build.erlc_options", []},
