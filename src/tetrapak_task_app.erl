@@ -3,7 +3,14 @@
 
 %% TODO: Possibility to get a new application name
 run("create:application", _) ->
-    Name = "new_erlang_app",
+    case init:get_argument(app) of
+        {ok, [[Name]]} ->
+            create_app(Name);
+        _ ->
+            io:format("no name specified, use -appname option~n", [])
+    end.
+
+create_app(Name) ->
     AtomName = list_to_atom(Name),
     Path = tetrapak:path(Name),
     assert_tuple(file:make_dir(Name)),
