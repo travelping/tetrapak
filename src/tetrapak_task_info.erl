@@ -17,13 +17,11 @@ run("info:deps:tree", _) ->
 
 start_deps_get_deps_as_tree(App) ->
     Tree = start_deps_get_deps_first(App, tree_fun()),
-    print_tree(Tree),
-    {done, []}.
+    show_tree([Tree], []).
 
 start_deps_get_deps_as_list(App) ->
     List = start_deps_get_deps_first(App, list_fun()),
-    io:format(user, "application start list: ~p~n", [List]),
-    {done, []}.
+    io:format(user, "application start list: ~p~n", [List]).
 
 start_deps_get_deps_first(App, Fun) ->
     try start_deps_get_deps(App, Fun) of
@@ -66,7 +64,7 @@ start_deps_get_deps(App, Fun, StartedApps, FunState) ->
 tree_fun() ->
     fun
         (init, App)                             -> {App, []};
-        (failed, App)                           -> {App, failed};
+        (failed, App)                           -> {App, not_found};
         ({add_dep, _Type, DepApp}, {App, Deps}) -> {App, [DepApp | Deps]};
         (ready, {_App, _Deps} = State)          -> State
     end.
@@ -81,10 +79,25 @@ list_fun() ->
         (ready, [Dep | Deps])                   -> Deps ++ [Dep]
     end.
 
-print_tree(Tree) ->
-    print_tree("*>", Tree).
-
-print_tree(Ext, {App, Deps}) ->
-    io:format("~s ~p~n", [Ext, App]),
-    [print_tree("    " ++ Ext, Dep) || Dep <- Deps].
-
+show_tree([], _Depth) ->
+    ok;
+show_tree([{App, Dependencies} | Rest], Depth) ->
+    case Depth of
+        [] -> ok;
+        _ ->
+            lists:foreach(fun (true) -> io:put_chars(" | ");
+                              (false) -> io:put_chars("  ")
+                          end, tl(lists:reverse(Depth))),
+            case Rest of
+                [] -> io:put_chars(" `-- ");
+                _ -> io:put_chars(" |-- ")
+            end
+    end,
+    case Dependencies of
+        not_found ->
+            io:format("~s [NOT INSTALLED]~n", [App]);
+        _Deps ->
+            io:format("~s~n", [App]),
+            show_tree(Dependencies, [(Rest /= []) | Depth])
+    end,
+    show_tree(Rest, Depth).
