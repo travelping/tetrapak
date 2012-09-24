@@ -57,6 +57,17 @@ dbg(String) when is_list(String) ->
             format("redbug isn't installed")
     end.
 
+spec(String) ->
+    NeededMod = redbug_msc,
+    case assert_loaded_redbug() of
+        true ->
+            assert_dbg_started(),
+            {{M, F, _}, [{Variables, Conditions, _}],_} = NeededMod:transform(String),
+            io:format("dbg:tpl(~p, ~p, ~p)~n", [M, F, [{Variables, Conditions, ?STD_PARAMS}]]);
+        false ->
+            format("redbug isn't installed")
+    end.
+
 dbgl(Module) when is_atom(Module) ->
     assert_dbg_started(),
     dbg:tpl(Module, [{'_', [], ?STD_PARAMS}]),
