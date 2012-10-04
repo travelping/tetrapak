@@ -6,7 +6,7 @@ run("create:application", _) ->
         {ok, [[Name]]} ->
             create_app(Name);
         _ ->
-            io:format("no name specified, use -appname option~n", [])
+            io:format("no name specified, use -app option~n", [])
     end.
 
 create_app(Name) ->
