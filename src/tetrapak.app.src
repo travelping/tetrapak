@@ -27,6 +27,7 @@
             {"install:copy", tetrapak_task_install_copy, "install a copy of the application into Erlang lib dir"},
             {"clean:dist", tetrapak_task_pkg_deb, "Delete packages"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
+            {"start:dev", tetrapak_task_shell, "Start the application in Erlang shell"},
             {"tetrapak:extend:shell", tetrapak_task_shell, "Extend shell with tetrapak and debug commands"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
             {"tetrapak:startapp", tetrapak_task_shell, "Start the current application"},
