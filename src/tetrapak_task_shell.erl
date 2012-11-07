@@ -23,24 +23,11 @@
 -export([run/2, start_deps/1, extended_shell_build/0]).
 
 run("shell", _) ->
-    code:ensure_loaded(tpk),
-    case tetrapak_io:can_start_shell() of
-        true ->
-            TestDir = tetrapak:config_path("test.ct.srcdir"),
-            case filelib:is_dir(TestDir) of
-                true  -> code:add_pathz(TestDir);
-                false -> ok
-            end,
+    start_shell();
 
-            tetrapak:require("tetrapak:extend:shell"),
-            tetrapak:require("tetrapak:reload"),
-            tetrapak_task:print_output_header(user, "shell"),
-            tetrapak_io:start_shell(),
-
-            timer:sleep(infinity);
-        false ->
-            tetrapak:fail("Cannot start shell")
-    end;
+run("start:dev", _) ->
+    tetrapak:require("tetrapak:startapp"),
+    start_shell();
 
 run("tetrapak:extend:shell", _) ->
     load_user_default();
@@ -74,6 +61,26 @@ run("tetrapak:startapp", _) ->
             done;
         {failed, App, Error} ->
             tetrapak:fail("failed to start ~s: ~p", [App, Error])
+    end.
+
+start_shell() ->
+    code:ensure_loaded(tpk),
+    case tetrapak_io:can_start_shell() of
+        true ->
+            TestDir = tetrapak:config_path("test.ct.srcdir"),
+            case filelib:is_dir(TestDir) of
+                true  -> code:add_pathz(TestDir);
+                false -> ok
+            end,
+
+            tetrapak:require("tetrapak:extend:shell"),
+            tetrapak:require("tetrapak:reload"),
+            tetrapak_task:print_output_header(user, "shell"),
+            tetrapak_io:start_shell(),
+
+            timer:sleep(infinity);
+        false ->
+            tetrapak:fail("Cannot start shell")
     end.
 
 start_deps(App) ->
