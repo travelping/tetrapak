@@ -92,6 +92,7 @@ appfile_info(File, {application, Name, Attrs}) ->
      {"path",    File},
      {"vsn",     app_attr(File, vsn, Attrs)},
      {"deps",    app_attr(File, applications, Attrs) -- [stdlib,kernel]},
+     {"inc_apps",proplists:get_value(included_applications, Attrs, [])},
      {"desc",    proplists:get_value(description, Attrs, "")},
      {"modules", app_attr(File, modules, Attrs)}].
 

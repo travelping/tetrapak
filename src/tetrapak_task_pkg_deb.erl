@@ -179,7 +179,7 @@ in_dir(Dir, Path) ->
     lists:prefix(filename:split(Dir), filename:split(Path)).
 
 debian_deps() ->
-    AppDeps   = tetrapak:get("config:appfile:deps") ++ tetrapak:config("package.extra_apps", []),
+    AppDeps   = tetrapak:get("config:appfile:deps") ++ tetrapak:get("config:appfile:inc_apps") ++ tetrapak:config("package.extra_apps", []),
     OtherDeps = lists:map(fun to_s/1, tetrapak:config("package.deb.dependencies", [])),
     lists:usort(["erlang-base|erlang-base-hipe"]
                     ++ OtherDeps ++ [no_underscores(tpk_util:f("erlang-~s", [S])) || S <- AppDeps, not in_erlang_base(S)]).
