@@ -44,7 +44,7 @@ run("pkg:deb", _) ->
     tpk_file:with_temp_dir(fun make_deb/1);
 
 run("pkg:debsrc", _) ->
-    tetrapak:require_all(["build", "check"]),
+    tetrapak:require_all(["clean"]),
     file:make_dir(tetrapak:config_path("package.outdir")),
     make_debsrc().
 
