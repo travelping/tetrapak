@@ -32,11 +32,24 @@ run("test:ct", _) ->
     tetrapak:require("build"),
     LogDir = tetrapak:config_path("test.ct.logdir"),
     file:make_dir(LogDir),
-    ct:run_test([{dir, tetrapak:config_path("test.ct.srcdir")},
-                 {logdir, LogDir},
-                 {suite, tetrapak:config("test.ct.suite")},
-                 {auto_compile, true},
-                 {include, [tetrapak:path("include")]}]);
+    Result = ct:run_test([{dir, tetrapak:config_path("test.ct.srcdir")},
+			  {logdir, LogDir},
+			  {suite, tetrapak:config("test.ct.suite")},
+			  {auto_compile, true},
+			  {include, [tetrapak:path("include")]}]),
+    case Result of
+	{ok, _} ->
+	    %% old format
+	    ok;
+	{error, _} ->
+	    Result;
+	{_Ok, Failed, {_UserSkipped, _AutoSkipped}}
+	  when Failed /= 0 ->
+	    tetrapak_task:fail("ct: ~p tests failed", [Failed]);
+	{_Ok, Failed, {_UserSkipped, _AutoSkipped}}
+	  when Failed == 0 ->
+	    ok
+    end;
 
 run("clean:testlog", _) ->
     tpk_file:delete(tetrapak:config_path("test.ct.logdir")).
