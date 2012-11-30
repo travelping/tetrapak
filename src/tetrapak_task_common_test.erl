@@ -26,7 +26,11 @@ check("test:ct") ->
     filelib:is_dir(tetrapak:config_path("test.ct.srcdir"));
 
 check("clean:testlog") ->
-    filelib:is_dir(tetrapak:config_path("test.ct.logdir")).
+    filelib:is_dir(tetrapak:config_path("test.ct.logdir"));
+
+check("clean:ct") ->
+    SrcDir = tetrapak:path("test"),
+    tpk_util:check_files_exist(SrcDir, ".beam", SrcDir, ".erl").
 
 run("test:ct", _) ->
     tetrapak:require("build"),
@@ -52,4 +56,7 @@ run("test:ct", _) ->
     end;
 
 run("clean:testlog", _) ->
-    tpk_file:delete(tetrapak:config_path("test.ct.logdir")).
+    tpk_file:delete(tetrapak:config_path("test.ct.logdir"));
+
+run("clean:ct", _) ->
+    tpk_file:delete("\\.beam$", tetrapak:path("test")).
