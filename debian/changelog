@@ -1,3 +1,9 @@
+erlang-tetrapak (0.3.1.17) unstable; urgency=low
+
+  * fix rfc generation, add missing month
+
+ -- Andreas Schultz <aschultz@tpip.net>  Mon, 03 Dec 2012 16:15:43 +0100
+
 erlang-tetrapak (0.3.1.16) unstable; urgency=low
 
   * run tests when running on a debian builder
