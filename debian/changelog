@@ -1,3 +1,12 @@
+erlang-tetrapak (0.3.1.16) unstable; urgency=low
+
+  * run tests when running on a debian builder
+  * fix detection of project files
+  * remove ct compile .beam files on clean
+  * fix common_test return value handling
+
+ -- Andreas Schultz <aschultz@tpip.net>  Mon, 03 Dec 2012 16:07:11 +0100
+
 erlang-tetrapak (0.3.1.15) unstable; urgency=low
 
   * clean the working tree before building the source
