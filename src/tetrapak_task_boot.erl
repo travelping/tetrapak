@@ -44,18 +44,8 @@ run("tetrapak:boot", _) ->
     tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
     %% check, that we are in application directory
-    Dir = tetrapak:path("src"),
-    AppExists = case file:list_dir(Dir) of
-                    {ok, Files} ->
-                        lists:any(fun(FileName) ->
-                                          case string:str(FileName, ".app.src") of
-                                              0 -> false;
-                                              _ -> true
-                                          end
-                                  end, Files);
-                    {error, _} ->
-                        false
-                end,
+    AppExists = length(filelib:wildcard("*.app.src", tetrapak:path("src")) ++
+			   filelib:wildcard("*.app", tetrapak:path("ebin"))) /= 0,
     Tasks = case AppExists of
                 true -> proplists:get_value(tasks, Env);
                 false -> proplists:get_value(before_app_exists_tasks, Env)
