@@ -286,6 +286,6 @@ rfc_date({{Year, Month, Day},{Hours, Minutes, Seconds}}) ->
      DayName = lists:nth(calendar:day_of_the_week(Year, Month, Day),
                          ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]),
      MonthNa = lists:nth(Month,
-                         ["Jan","Feb","Mar","Apr","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]),
+                         ["Jan","Feb","Mar","Apr","May", "Jun","Jul","Aug","Sep","Oct","Nov","Dec"]),
      tpk_util:f("~s, ~2..0b ~s ~4..0b ~2..0b:~2..0b:~2..0b +0000",
                 [DayName, Day, MonthNa, Year, Hours, Minutes, Seconds]).
