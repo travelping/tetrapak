@@ -42,8 +42,8 @@ run("test:ct", _) ->
 			  {auto_compile, true},
 			  {include, [tetrapak:path("include")]}]),
     case Result of
-	{ok, _} ->
-	    %% old format
+	ok ->
+	    %% undocumented case, seems to happen when test suite compilation fails for all suites
 	    ok;
 	{error, _} ->
 	    Result;

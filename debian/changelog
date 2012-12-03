@@ -1,3 +1,9 @@
+erlang-tetrapak (0.3.1.18) unstable; urgency=low
+
+  * fix undocumented ct_run return
+
+ -- Andreas Schultz <aschultz@tpip.net>  Mon, 03 Dec 2012 16:31:21 +0100
+
 erlang-tetrapak (0.3.1.17) unstable; urgency=low
 
   * fix rfc generation, add missing month
