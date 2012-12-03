@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 build:
-	tetrapak build
+	tetrapak build test:ct
 
 clean:
 	tetrapak clean
