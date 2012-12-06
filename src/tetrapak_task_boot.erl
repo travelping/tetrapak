@@ -140,7 +140,6 @@ plugin_scan(Env) ->
             AllPlugins = plugins(Env),
             {IsApp, FoundRunPlugins, FoundBuildPlugins} =
                 lists:foldl(fun(Plugin, {IsAppCheck, RunPlugins, BuildPlugins}) ->
-<<<<<<< HEAD
                                     try Plugin:app() of
                                         {App, ExtraBuildApp} ->
                                             {IsAppCheck orelse App,
@@ -151,18 +150,6 @@ plugin_scan(Env) ->
                                             io:format("old version plugin: ~p~n", [Plugin]),
                                             {IsAppCheck, RunPlugins, BuildApps}
                                     catch
-=======
-                                    try get_plugin_conf(Plugin) of
-                                        {App, ExtraBuildApp} ->
-                                            {IsAppCheck orelse App,
-                                             [Plugin || App] ++ RunPlugins,
-                                             [Plugin || ExtraBuildApp] ++ BuildPlugins}
-                                    catch
-                                        old_version ->
-                                        %% Possibility to support old plugin
-                                            io:format("old version plugin: ~p~n", [Plugin]),
-                                            {IsAppCheck, RunPlugins, BuildApps};
->>>>>>> Tetrapak plugin support
                                         _:_ ->
                                             io:format("can't load plugin: ~p~n", [Plugin]),
                                             {IsAppCheck, RunPlugins, BuildApps}
@@ -173,17 +160,6 @@ plugin_scan(Env) ->
             {false, BuildApps, BuildApps}
     end.
 
-<<<<<<< HEAD
-=======
-get_plugin_conf(Plugin) ->
-    case Plugin:app() of
-        {App, ExtraBuildApp} ->
-            {App, ExtraBuildApp};
-        _ ->
-            throw(old_version)
-    end.
-
->>>>>>> Tetrapak plugin support
 plugins(Env) ->
     case proplists:get_value(plugins, Env) of
         undefined ->
