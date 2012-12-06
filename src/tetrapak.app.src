@@ -5,10 +5,12 @@
   {registered, [tetrapak_io]},
   {env,
    [{debug, false},
+    {plugin_scan, false},
     {cli_options, []},
     {tasks, [
             {"doc:edoc", tetrapak_task_doc, "Generate edoc documentation"},
             {"clean:edoc", tetrapak_task_doc, "Delete generated documentation"},
+            {"check:packageable", tetrapak_task_check, "Check that application has all plugin dependencies"},
             {"check:xref", tetrapak_task_check, "Check inter-module calls"},
             {"check:appmodules", tetrapak_task_check, "Check app file module list"},
             {"config:appfile", tetrapak_task_config, "Read the application resource file"},
@@ -21,6 +23,7 @@
             {"clean:yecc", tetrapak_task_erlc, "Delete compiled yecc parsers"},
             {"clean:leex", tetrapak_task_erlc, "Delete compiled lexical analysers"},
             {"clean:appfile", tetrapak_task_appsrc, "Delete generated application resource file"},
+            {"clean:test", tetrapak_task_erlc, "Delete compiled Erlang modules in test folder"},
             {"pkg:deb", tetrapak_task_pkg_deb, "Create a binary debian package"},
             {"pkg:debsrc", tetrapak_task_pkg_deb, "Create a debian source package"},
             {"pkg:ipkg", tetrapak_task_pkg_ipkg, "Create a binary ipkg"},
@@ -40,11 +43,12 @@
             {"clean:ct", tetrapak_task_common_test, "Remove compile common_test units"}
            ]},
     {before_app_exists_tasks, [
-            {"create:application", tetrapak_task_app, "Generate a skeleton for a new erlang application"},
+            {"new", tetrapak_task_app, "Generate a skeleton for a new Erlang application"},
             {"shell", tetrapak_task_shell, "Start the Erlang shell"},
             {"tetrapak:extend:shell", tetrapak_task_shell, "Extend shell with tetrapak and debug commands"}
            ]},
-   {config, [
+    {config, [
+             {"tetrapak.plugins", []},
              {"build.erlc_options", []},
              {"build.vcs_type", git},
              {"build.version", undefined},
@@ -72,5 +76,6 @@
              {"test.ct.logdir", "test-log"},
              {"test.ct.suite", "all"},
              {"xref.ignore_undef", []}
-            ]}]}
+             ]}
+    ]}
 ]}.

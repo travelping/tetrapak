@@ -23,7 +23,7 @@
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
--export([copy/2, delete/1, delete/2, walk/3, walk/4]).
+-export([copy/2, delete/1, delete/2, walk/3, walk/4, exists_in/2]).
 -export([tarball_create/1, tarball_add_file/4, tarball_add_binary/4, tarball_add_link/4, tarball_mkdir/3,
          tarball_mkdir_parents/3, tarball_close/1]).
 
@@ -127,6 +127,16 @@ delete_if_match(Mask, Path) ->
                     file:delete(Path), ok
             end;
         false -> ok
+    end.
+
+exists_in([H | _] = Path, Wildcard) when H =/= $/ ->
+    exists_in(tetrapak:path(Path), Wildcard);
+exists_in(Dir, Wildcard) ->
+    case wildcard(Dir, Wildcard) of
+        [] ->
+            false;
+        _Files ->
+            true
     end.
 
 walk(Fun, AccIn, Path) -> walk(Fun, AccIn, Path, no_dir).

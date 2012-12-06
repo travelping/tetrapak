@@ -97,7 +97,10 @@ run("clean:yecc", Files) ->
     lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
 
 run("clean:leex", Files) ->
-    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files).
+    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
+
+run("clean:test", _) ->
+    tpk_file:delete("\\.beam$", tetrapak:path("test")).
 
 %% ------------------------------------------------------------
 %% -- Helpers

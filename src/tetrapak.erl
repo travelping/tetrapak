@@ -21,7 +21,7 @@
 -module(tetrapak).
 -export([version/0, run/2, cli_main/1]).
 -export([get/1, get/2, require/1, require_all/1, dir/0, path/1, subdir/1, fail/0, fail/1, fail/2,
-         config/1, config/2, config_path/1, config_path/2]).
+         config/1, config/2, config_path/1, config_path/2, extract_app_name/1, extract_app_name/2]).
 -export([cmd/2, cmd/3, outputcmd/2, outputcmd/3]).
 -compile({no_auto_import, [get/1]}).
 
@@ -82,6 +82,18 @@ cli_main([_ | CliArgs]) ->
 
 %% ------------------------------------------------------------
 %% -- Task API
+
+%% @doc Get the app name from a app specified in configuration
+-spec extract_app_name(string()) -> atom().
+extract_app_name(App) ->
+    extract_app_name(App, "").
+
+%% @doc Get the app name from a app specified in configuration with adding of specifical prefix
+-spec extract_app_name(string(), string()) -> atom().
+extract_app_name(App, Prefix) ->
+    [AppString | _] = string:tokens(App, " "),
+    list_to_atom(Prefix ++ AppString).
+
 %% @doc Get the version of tetrapak currently running.
 -spec version() -> string().
 version() ->

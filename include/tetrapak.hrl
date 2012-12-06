@@ -14,6 +14,10 @@
     values  = [] :: [{string(), term()}]
 }).
 
+-define(CHECK_LOADED(Result), (Result == ok) orelse (is_tuple(Result) andalso
+                                                     element(1, Result) == error andalso
+                                                     is_tuple(element(2, Result)) andalso
+                                                     element(1, element(2, Result)) == already_loaded)).
 -define(TASK_FAIL, '$__tetrapak_task_fail').
 -define(TASK_DONE, '$__tetrapak_task_done').
 -define(LOCAL_CACHE, ".local.cache").

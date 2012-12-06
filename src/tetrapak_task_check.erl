@@ -56,8 +56,17 @@ run("check:appmodules", _) ->
         [] -> ok;
         OnlyEbin ->
             tetrapak:fail("modules present in ebin/ but not listed in app file:~n   ~s", [string:join(BeamToMod(OnlyEbin), ", ")])
-    end.
+    end;
 
+run("check:packageable", _) ->
+    %IgnorePlugin = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.ignore_plugins", [])],
+    ExtraBuildApps = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.plugins", [])],
+    io:format(user, "info: ~p ~p~n", [tetrapak:get("tetrapak:boot:sbplugins"), ExtraBuildApps]),
+    case (tetrapak:get("tetrapak:boot:sbplugins") -- ExtraBuildApps) of
+        [] -> ok;
+        Deps ->
+            tetrapak:fail("needed plugins are not included in tetrapak.plugins~n   ~p", [[string:sub_string(atom_to_list(Dep), 10) || Dep <- Deps]])
+    end.
 %% ------------------------------------------------------------
 %% -- Implementation
 duplicates(List) -> duplicates(List, sets:new(), sets:new()).

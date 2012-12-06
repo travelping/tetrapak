@@ -1,12 +1,12 @@
 -module(tetrapak_task_app).
 -export([run/2]).
 
-run("create:application", _) ->
+run("new", _) ->
     case init:get_argument(app) of
         {ok, [[Name]]} ->
             create_app(Name);
         _ ->
-            io:format("no name specified, use -app option~n", [])
+            io:format("No name specified, use -app option~n", [])
     end.
 
 create_app(Name) ->

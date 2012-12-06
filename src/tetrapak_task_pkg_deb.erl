@@ -186,10 +186,12 @@ debian_deps() ->
 
 debian_build_deps() ->
     DebianDeps = debian_deps(),
+    PluginBuildApps = [no_underscores(tpk_util:f("erlang-tetrapak-~s", [S])) ||
+                        S <- tetrapak:config("tetrapak.plugins", [])],
     DebianBuildApps = [no_underscores(tpk_util:f("erlang-~s", [S])) ||
                         S <- tetrapak:config("package.extra_build_apps", []), not in_erlang_base(S)],
     DebianBuildDeps = lists:map(fun to_s/1, tetrapak:config("package.deb.build_dependencies", [])),
-    lists:usort(["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ DebianBuildApps ++ DebianBuildDeps ++ DebianDeps).
+    lists:usort(["erlang-tetrapak (>= 0.3.0)", "erlang-dev"] ++ PluginBuildApps ++ DebianBuildApps ++ DebianBuildDeps ++ DebianDeps).
 
 to_s(Atm) when is_atom(Atm) -> atom_to_list(Atm);
 to_s(L)   when is_list(L)   -> lists:flatten(L).

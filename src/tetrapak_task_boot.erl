@@ -20,7 +20,10 @@
 
 -module(tetrapak_task_boot).
 -behaviour(tetrapak_task).
--export([initial_tmap/0, run/2]).
+-export([initial_tmap/0, run/2, behaviour_info/1]).
+
+behaviour_info(callbacks) -> [{app, 0}, {tasks, 1}];
+behaviour_info(_) -> undefined.
 
 -include("tetrapak.hrl").
 
@@ -44,17 +47,21 @@ run("tetrapak:boot", _) ->
     tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
     %% check, that we are in application directory
-    AppExists = length(filelib:wildcard("*.app.src", tetrapak:path("src")) ++
-			   filelib:wildcard("*.app", tetrapak:path("ebin"))) /= 0,
-    Tasks = case AppExists of
-                true -> proplists:get_value(tasks, Env);
-                false -> proplists:get_value(before_app_exists_tasks, Env)
-            end,
+    ErlangApp = tpk_file:exists_in("src", "*.app.src") orelse
+                tpk_file:exists_in("ebin", "*.app") orelse
+                filelib:is_file(filename:join([tetrapak:path("tetrapak"), "config.ini"])),
+    {IsPluginApp, Plugins, BuildNeeded} = plugin_scan(Env),
+    TaskConfigEnv = case (ErlangApp orelse IsPluginApp) of
+                        true -> tasks;
+                        false -> before_app_exists_tasks
+                    end,
     %% scan tasks
-    tetrapak_context:register_tasks(tetrapak_task:context(), builtin_tasks(Tasks)),
-    tetrapak_context:register_tasks(tetrapak_task:context(), scan_local_tasks(tetrapak:path("tetrapak"))),
-
-    {done, [{version, Version}]};
+    Tasks = proplists:get_value(TaskConfigEnv, Env),
+    [tetrapak_context:register_tasks(tetrapak_task:context(), RegTasks) || RegTasks <-
+        [builtin_tasks(Tasks),
+         plugin_tasks(Plugins, TaskConfigEnv, Env),
+         scan_local_tasks(tetrapak:path("tetrapak"))]],
+    {done, [{version, Version}, {sbplugins, BuildNeeded}]};
 
 run("tetrapak:info", _) ->
     io:format("** version ~s~n~n", [tetrapak:get("tetrapak:boot:version")]),
@@ -82,18 +89,13 @@ ostr(library) -> "+".
 builtin_tasks(Tasks) ->
     lists:foldl(fun add_builtin_task/2, [], Tasks).
 
-add_builtin_task({TaskName, Module, Desc}, Acc) ->
-    add_builtin_task({TaskName, Module, Desc, []}, Acc);
-add_builtin_task({TaskName, Module, Desc, Options}, Acc) ->
-    NewTask1 = #task{name = tetrapak_task:normalize_name(TaskName),
-                     module = Module,
-                     description = Desc,
-                     origin = builtin},
-    NewTask2 = apply_hook_options(Options, NewTask1),
-    AddModule = fun (_) -> NewTask2 end,
-    pl_update(tetrapak_task:split_name(TaskName), AddModule, NewTask2, Acc);
-add_builtin_task(TaskTuple, _Acc) ->
-    tetrapak:fail("bad task definition tuple in application environment: ~n  ~p", [TaskTuple]).
+add_builtin_task(TaskTuple, Acc) ->
+    {TaskName, NewTask} = new_task(TaskTuple, builtin),
+    AddModule = fun (_) -> NewTask end,
+    pl_update(TaskName, AddModule, NewTask, Acc).
+% TODO: add bad tuple error
+%add_builtin_task(TaskTuple, _Acc) ->
+%    tetrapak:fail("bad task definition tuple in application environment: ~n  ~p", [TaskTuple]).
 
 apply_hook_options([{run_before, HookList} | Rest], Task) ->
     apply_hook_options(Rest, Task#task{must_run_before = HookList});
@@ -104,6 +106,15 @@ apply_hook_options([Option | _], Task) ->
 apply_hook_options([], Task) ->
     Task.
 
+new_task({TaskName, Module, Desc}, Origin) ->
+    new_task({TaskName, Module, Desc, []}, Origin);
+new_task({TaskName, Module, Desc, Options}, Origin) ->
+    NewTask = #task{name = tetrapak_task:normalize_name(TaskName),
+                    module = Module,
+                    description = Desc,
+                    origin = Origin},
+    {tetrapak_task:split_name(TaskName), apply_hook_options(Options, NewTask)}.
+
 pl_update(Key, AddItem, NewItem, Proplist) ->
     case proplists:get_value(Key, Proplist) of
         undefined -> [{Key, NewItem} | Proplist];
@@ -112,9 +123,7 @@ pl_update(Key, AddItem, NewItem, Proplist) ->
 
 load_appdata() ->
     case application:load(tetrapak) of
-        {error, {already_loaded, tetrapak}} ->
-            {ok, Props} = application:get_all_key(tetrapak);
-        ok ->
+        Ok when ?CHECK_LOADED(Ok) ->
             {ok, Props} = application:get_all_key(tetrapak);
         {error, _} ->
             %% fallback to .app.src
@@ -123,6 +132,106 @@ load_appdata() ->
             {ok, [{application, tetrapak, Props}]} = file:consult(AppSrcPath)
     end,
     Props.
+
+plugin_scan(Env) ->
+    BuildApps = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.plugins", [])],
+    case proplists:get_value(plugin_scan, Env) of
+        true ->
+            AllPlugins = plugins(Env),
+            {IsApp, FoundRunPlugins, FoundBuildPlugins} =
+                lists:foldl(fun(Plugin, {IsAppCheck, RunPlugins, BuildPlugins}) ->
+<<<<<<< HEAD
+                                    try Plugin:app() of
+                                        {App, ExtraBuildApp} ->
+                                            {IsAppCheck orelse App,
+                                             [Plugin || App] ++ RunPlugins,
+                                             [Plugin || ExtraBuildApp] ++ BuildPlugins};
+                                        _ ->
+                                        %% Possibility to support old plugin
+                                            io:format("old version plugin: ~p~n", [Plugin]),
+                                            {IsAppCheck, RunPlugins, BuildApps}
+                                    catch
+=======
+                                    try get_plugin_conf(Plugin) of
+                                        {App, ExtraBuildApp} ->
+                                            {IsAppCheck orelse App,
+                                             [Plugin || App] ++ RunPlugins,
+                                             [Plugin || ExtraBuildApp] ++ BuildPlugins}
+                                    catch
+                                        old_version ->
+                                        %% Possibility to support old plugin
+                                            io:format("old version plugin: ~p~n", [Plugin]),
+                                            {IsAppCheck, RunPlugins, BuildApps};
+>>>>>>> Tetrapak plugin support
+                                        _:_ ->
+                                            io:format("can't load plugin: ~p~n", [Plugin]),
+                                            {IsAppCheck, RunPlugins, BuildApps}
+                                    end
+                            end, {false, [], []}, AllPlugins),
+            {IsApp, lists:usort(FoundRunPlugins ++ BuildApps), FoundBuildPlugins};
+        _ ->
+            {false, BuildApps, BuildApps}
+    end.
+
+<<<<<<< HEAD
+=======
+get_plugin_conf(Plugin) ->
+    case Plugin:app() of
+        {App, ExtraBuildApp} ->
+            {App, ExtraBuildApp};
+        _ ->
+            throw(old_version)
+    end.
+
+>>>>>>> Tetrapak plugin support
+plugins(Env) ->
+    case proplists:get_value(plugins, Env) of
+        undefined ->
+            scan_tetrapak_plugins();
+        Found ->
+            Found
+    end.
+
+plugin_tasks(RunPlugins, TaskType, Env) ->
+    Plugins = case TaskType of
+                  before_app_exists_tasks -> plugins(Env);
+                  _                       -> RunPlugins
+              end,
+    lists:flatmap(fun(Plugin) ->
+                          load_add_plugin_tasks(TaskType, Plugin)
+                  end, Plugins).
+
+load_add_plugin_tasks(TaskType, Plugin) ->
+    case application:load(Plugin) of
+        Ok when ?CHECK_LOADED(Ok) ->
+            try [new_task(Task, library) || Task <- Plugin:tasks(TaskType)] of
+                List when is_list(List) ->
+                    List
+            catch
+                Class:Error ->
+                    ?DEBUG("~p:~p:~p", [Class, Error, erlang:get_stacktrace()]),
+                    BuildApps = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.plugins", [])],
+                    case lists:member(Plugin, BuildApps) of
+                        false ->
+                            [];
+                        true ->
+                            tetrapak:fail("can't load required plugin: ~s", [Plugin])
+                    end
+            end;
+        _ ->
+            []
+    end.
+
+scan_tetrapak_plugins() ->
+    ListOfEbinPathes = code:get_path(),
+    lists:flatmap(fun(Path) ->
+                          [app_name_from_app_file(File) || File <- tpk_file:wildcard(Path, "tetrapak_*.app")]
+                  end, ListOfEbinPathes).
+
+app_name_from_app_file(File) ->
+    {ok, [{application, AppName, _}]} = file:consult(File),
+    AppName.
+
 
 %% --------------------------------------------------------------------------------
 %% -- LOCAL TASKS
@@ -170,7 +279,7 @@ compile_and_load_local_tasks(Files, CacheMTime, Cache) ->
                               [] ->
                                   compile_and_load(File, Cache)
                           end
-               end, Files).
+                  end, Files).
 
 compile_and_load(File, Cache) ->
     NewTMod = compile_local_task(File),

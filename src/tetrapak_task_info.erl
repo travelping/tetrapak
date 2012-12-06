@@ -1,7 +1,7 @@
 -module(tetrapak_task_info).
 -export([run/2]).
 -define(STDLIBS, [kernel, stdlib]).
-
+-include("tetrapak.hrl").
 % --------------------------------------------------------------------------------------------------
 % -- Runs
 
@@ -37,9 +37,7 @@ start_deps_get_deps(App, Fun) ->
 
 start_deps_get_deps(App, Fun, StartedApps) ->
     case application:load(App) of
-        ok ->
-            start_deps_get_deps(App, Fun, StartedApps, Fun(init, App));
-        {error, {already_loaded, _}} ->
+        Ok when ?CHECK_LOADED(Ok) == true ->
             start_deps_get_deps(App, Fun, StartedApps, Fun(init, App));
         _Error ->
             {Fun(failed, App), StartedApps}
