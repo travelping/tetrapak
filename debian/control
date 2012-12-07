@@ -9,5 +9,5 @@ Package: erlang-tetrapak
 Architecture: any
 Priority: optional
 Section: devel
-Depends: erlang-base|erlang-base-hipe, erlang-common-test, erlang-edoc, erlang-parsetools, erlang-tools
+Depends: ${misc:Depends}, erlang-base|erlang-base-hipe, erlang-common-test, erlang-edoc, erlang-parsetools, erlang-tools
 Description: Erlang application packaging tool
