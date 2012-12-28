@@ -36,11 +36,18 @@ run("test:ct", _) ->
     tetrapak:require("build"),
     LogDir = tetrapak:config_path("test.ct.logdir"),
     file:make_dir(LogDir),
+    CoverSpec = case tetrapak:config("test.ct.coverspec") of
+		    none -> [];
+		    Spec when is_list(Spec) ->
+			[{cover, tetrapak:path(Spec)}];
+		    Spec ->
+			tetrapak:fail("invalid cover spec file: ~s", [Spec])
+		end,
     Result = ct:run_test([{dir, tetrapak:config_path("test.ct.srcdir")},
 			  {logdir, LogDir},
 			  {suite, tetrapak:config("test.ct.suite")},
 			  {auto_compile, true},
-			  {include, [tetrapak:path("include")]}]),
+			  {include, [tetrapak:path("include")]}|CoverSpec]),
     case Result of
 	ok ->
 	    %% undocumented case, seems to happen when test suite compilation fails for all suites

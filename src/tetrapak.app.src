@@ -74,6 +74,7 @@
              {"test.ct.srcdir", "test"},
              {"test.ct.logdir", "test-log"},
              {"test.ct.suite", "all"},
+             {"test.ct.coverspec", none},
              {"xref.ignore_undef", []}
              ]}
     ]}
