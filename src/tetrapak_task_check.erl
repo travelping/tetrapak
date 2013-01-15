@@ -61,7 +61,6 @@ run("check:appmodules", _) ->
 run("check:packageable", _) ->
     %IgnorePlugin = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.ignore_plugins", [])],
     ExtraBuildApps = [tetrapak:extract_app_name(App, "tetrapak_") || App <- tetrapak:config("tetrapak.plugins", [])],
-    io:format(user, "info: ~p ~p~n", [tetrapak:get("tetrapak:boot:sbplugins"), ExtraBuildApps]),
     case (tetrapak:get("tetrapak:boot:sbplugins") -- ExtraBuildApps) of
         [] -> ok;
         Deps ->

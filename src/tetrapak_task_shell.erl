@@ -56,6 +56,14 @@ run("tetrapak:tpk-help", _) ->
               "tpk:bl()     -- runs \"build\" and reloads modules\n");
 
 run("tetrapak:startapp", _) ->
+    Config = case file:consult(filename:join(tetrapak:path("tetrapak"), "dev.config")) of
+                 {ok, RawConfig} ->
+                     lists:flatten(RawConfig);
+                 {error, enoent} ->
+                     []
+             end,
+    [[application:set_env(App, ConfOption, ConfValue) || {ConfOption, ConfValue} <- Configuration]
+                                                      || {App, Configuration} <- Config],
     case start_deps(tetrapak:get("config:appfile:name")) of
         ok ->
             done;
