@@ -1,3 +1,9 @@
+erlang-tetrapak (0.3.1.21) unstable; urgency=low
+
+  * add test.ct.coverspec config option
+
+ -- Dmitry Russ <druss@tpip.net>  Thu, 21 Mar 2013 11:30:00 +0100
+
 erlang-tetrapak (0.3.1.20) unstable; urgency=low
 
   * add test.ct.coverspec config option
