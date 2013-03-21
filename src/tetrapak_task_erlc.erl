@@ -75,6 +75,7 @@ check("clean:leex") ->
 
 run("build:erlang", ErlFiles) ->
     file:make_dir(tetrapak:path("ebin")),
+    code:add_patha(tetrapak:path("ebin")),
     compile_foreach(fun ({File, CompileOptions}) ->
                             run_compiler(compile, file, [File#erl.file, CompileOptions])
                     end, ErlFiles),
