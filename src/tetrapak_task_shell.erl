@@ -62,14 +62,17 @@ run("tetrapak:startapp", _) ->
                  {error, enoent} ->
                      []
              end,
-    [[application:set_env(App, ConfOption, ConfValue) || {ConfOption, ConfValue} <- Configuration]
-                                                      || {App, Configuration} <- Config],
+    [set_configuration(App, Configuration) || {App, Configuration} <- Config],
     case start_deps(tetrapak:get("config:appfile:name")) of
         ok ->
             done;
         {failed, App, Error} ->
             tetrapak:fail("failed to start ~s: ~p", [App, Error])
     end.
+
+set_configuration(App, Configuration) ->
+    application:load(App),
+    [application:set_env(App, ConfOption, ConfValue) || {ConfOption, ConfValue} <- Configuration].
 
 start_shell() ->
     code:ensure_loaded(tpk),
