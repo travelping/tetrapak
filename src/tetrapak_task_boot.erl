@@ -28,8 +28,23 @@ behaviour_info(_) -> undefined.
 -include("tetrapak.hrl").
 
 initial_tmap() ->
-    [{["tetrapak", "boot"],   #task{name = "tetrapak:boot", module = ?MODULE,   description = "The root of all evil"}},
-     {["tetrapak", "info"],   #task{name = "tetrapak:info", module = ?MODULE,   description = "Show version and tasks"}}].
+    [{["tetrapak", "debug_setup"], #task{name = "tetrapak:debug_setup", module = ?MODULE,
+                                         description = "The root of the next tetrapak evil"}},
+     {["tetrapak", "boot"], #task{name = "tetrapak:boot", module = ?MODULE,
+                                  description = "The root of all evil"}},
+     {["tetrapak", "info"],         #task{name = "tetrapak:info", module = ?MODULE,
+                                          description = "Show version and tasks"}}].
+
+run("tetrapak:debug_setup", _) ->
+    io:format(user, "debug setup: ~p~n", [ok]),
+    EnvSpec = os:getenv("DEBUG_SPEC"),
+    ArgSpecs = case init:get_argument(debug_spec) of
+                   {ok, [ListOfSpecs]} -> ListOfSpecs;
+                   _ -> []
+               end,
+    io:format(user, "debug specs: ~p~n", [[EnvSpec|ArgSpecs]]),
+    [tetrapak_shell_extension:dbg(Spec) || Spec <- [EnvSpec|ArgSpecs], Spec =/= false],
+    ok;
 
 run("tetrapak:boot", _) ->
     Props   = load_appdata(),

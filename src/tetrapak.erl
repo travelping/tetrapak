@@ -31,7 +31,7 @@
 run(Directory, TaskCmds) ->
     tetrapak_iosched:ensure_started(),
     Context = tetrapak_context:new(Directory),
-    RunTasks = ["tetrapak:boot" | TaskCmds],
+    RunTasks = ["tetrapak:debug_setup", "tetrapak:boot" | TaskCmds],
     case tetrapak_context:run_sequentially(Context, RunTasks) of
         ok                          -> ok;
         {error, {unknown_key, Key}} -> {unknown, Key};
