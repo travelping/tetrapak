@@ -195,7 +195,7 @@ load_add_plugin_tasks(TaskType, Plugin) ->
                     end
             end;
         _ ->
-            []
+            tetrapak:fail("can't load required plugin: ~s", [Plugin])
     end.
 
 scan_tetrapak_plugins() ->
