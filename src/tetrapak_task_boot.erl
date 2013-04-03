@@ -36,13 +36,11 @@ initial_tmap() ->
                                           description = "Show version and tasks"}}].
 
 run("tetrapak:debug_setup", _) ->
-    io:format(user, "debug setup: ~p~n", [ok]),
     EnvSpec = os:getenv("DEBUG_SPEC"),
     ArgSpecs = case init:get_argument(debug_spec) of
                    {ok, [ListOfSpecs]} -> ListOfSpecs;
                    _ -> []
                end,
-    io:format(user, "debug specs: ~p~n", [[EnvSpec|ArgSpecs]]),
     [tetrapak_shell_extension:dbg(Spec) || Spec <- [EnvSpec|ArgSpecs], Spec =/= false],
     ok;
 
