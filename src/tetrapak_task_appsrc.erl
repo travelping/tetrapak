@@ -21,6 +21,7 @@
 -module(tetrapak_task_appsrc).
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
+-export([build_app_file/2]).
 
 check("build:appfile") ->
     case tetrapak_task_config:find_app_file("src", ".app.src") of
@@ -41,6 +42,13 @@ check("clean:appfile") ->
 
 run("build:appfile", AppSrc) ->
     tetrapak:require("build:erlang"),
+    build_app_file(AppSrc, fun(_AppName, Keys) -> Keys end);
+
+run("clean:appfile", AppFile) ->
+    tpk_file:delete(AppFile),
+    ok.
+
+build_app_file(AppSrc, FunModifiedKeys) ->
     AppSrcDisplayPath = tpk_file:rebase_filename(AppSrc, tetrapak:dir(), ""),
     case file:consult(AppSrc) of
         {ok, [{application, AppName, Keys}]} ->
@@ -53,7 +61,7 @@ run("build:appfile", AppSrc) ->
             Vsn = get_app_vsn(AppSrcDisplayPath, proplists:get_value(vsn, Keys), tetrapak:config("build.version")),
             NewKeys1 = lists:keystore(vsn, 1, Keys, {vsn, Vsn}),
             NewKeys2 = lists:keystore(modules, 1, NewKeys1, {modules, get_app_modules()}),
-            write_appfile(AppName, NewKeys2);
+            write_appfile(AppName, FunModifiedKeys(AppName, NewKeys2));
         {ok, _} ->
             tetrapak:fail("~s has invalid term structure", [AppSrcDisplayPath]);
         {error, Error} when is_atom(Error) ->
@@ -61,11 +69,7 @@ run("build:appfile", AppSrc) ->
         {error, Error = {_Line, _Mod, _EInfo}} ->
             tpk_util:show_error_info(AppSrcDisplayPath, Error),
             tetrapak:fail()
-    end;
-
-run("clean:appfile", AppFile) ->
-    tpk_file:delete(AppFile),
-    ok.
+    end.
 
 get_app_vsn(_AppSrc, _AppVsn, CfgVsn) when is_list(CfgVsn) ->
     expand_vsn(CfgVsn);
