@@ -21,7 +21,7 @@
 -module(tetrapak_task_erlc).
 -behaviour(tetrapak_task).
 -export([check/1, run/2]).
--export([check_mtimes/2, show_errors/3]).
+-export([check_mtimes/2, show_errors/3, compile_escript/2]).
 
 -include("tetrapak.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -65,13 +65,23 @@ check("build:leex") ->
     SrcDir = tetrapak:path("src"),
     tpk_util:check_files_mtime(SrcDir, ".xrl", SrcDir, ".erl");
 
+check("build:escript") ->
+    SrcBin = tetrapak:path("src"),
+    BinDir = tetrapak:path("bin"),
+    tpk_util:check_files_mtime(SrcBin, ".escript", BinDir, "");
+
 check("clean:yecc") ->
     SrcDir = tetrapak:path("src"),
     tpk_util:check_files_exist(SrcDir, ".yrl", SrcDir, ".erl");
 
 check("clean:leex") ->
     SrcDir = tetrapak:path("src"),
-    tpk_util:check_files_exist(SrcDir, ".xrl", SrcDir, ".erl").
+    tpk_util:check_files_exist(SrcDir, ".xrl", SrcDir, ".erl");
+
+check("clean:escript") ->
+    BinDir = tetrapak:path("bin"),
+    SrcDir = tetrapak:path("src"),
+    tpk_util:check_files_exist(SrcDir, ".escript", BinDir, "").
 
 run("build:erlang", ErlFiles) ->
     file:make_dir(tetrapak:path("ebin")),
@@ -91,6 +101,12 @@ run("build:leex", Files) ->
                             run_compiler(leex, file, [InputFile, [{scannerfile, OutputFile}, {return, true}, {report, false}]])
                     end, Files);
 
+run("build:escript", Files) ->
+    file:make_dir(tetrapak:path("bin")),
+    compile_foreach(fun ({InputFile, OutputFile}) ->
+                        run_compiler(?MODULE, compile_escript, [InputFile, OutputFile])
+                    end, Files);
+
 run("clean:erlang", _) ->
     tpk_file:delete("\\.beam$", tetrapak:path("ebin"));
 
@@ -98,7 +114,10 @@ run("clean:yecc", Files) ->
     lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
 
 run("clean:leex", Files) ->
-    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files).
+    lists:foreach(fun ({_, ErlFile}) -> tpk_file:delete(ErlFile) end, Files);
+
+run("clean:escript", Files) ->
+    lists:foreach(fun ({_, File}) -> tpk_file:delete(File) end, Files).
 
 %% ------------------------------------------------------------
 %% -- Helpers
@@ -111,6 +130,18 @@ compile_foreach(Function, List) ->
                       end, false, List),
     if Res  -> tetrapak:fail("compilation failed");
        true -> ok
+    end.
+
+compile_escript(InputFile, OutputFile) ->
+    case escript:extract(InputFile, [compile_source]) of
+        {ok, Options} ->
+            {source, BeamCode} = lists:keyfind(source, 1, Options),
+            NewOptions = lists:keyreplace(source, 1, Options, {beam, BeamCode}),
+            escript:create(OutputFile, NewOptions),
+            file:change_mode(OutputFile, 8#0755),
+            {ok, escript};
+        {error, _Error} ->
+            {error, [], []}
     end.
 
 run_compiler(M, F, A = [File | _]) ->
