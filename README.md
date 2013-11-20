@@ -1,6 +1,158 @@
-# ~~ tetrapak
+===========
+~~ tetrapak
+===========
 
 tetrapak is an extensible build system for Erlang/OTP applications.
+
+
+Developing with tetrapak
+========================
+
+-------------------------------------------------------------------------
+
+There are default tasks, that are availible in every dir
+
+    tetrapak
+    == tetrapak:info =================
+    ** version your_tetrapak_version
+
+    Available Tasks
+      new      - Generate a skeleton for a new Erlang application
+      shell    - Start the Erlang shell
+
+-------------------------------------------------------------------------
+
+To start a new project with a simple sceleton.
+
+    tetrapak new -app new_app
+    == new ===========================
+    create: your_path/new_app
+    create: your_path/new_app/src
+    create: your_path/new_app/tetrapak
+    create: your_path/new_app/src/new_app.app.src
+    create: your_path/new_app/src/new_app.erl
+
+-------------------------------------------------------------------------
+
+Now, there are more available tasks in a project directory.
+
+    tetrapak
+    == tetrapak:info =================
+    ** version your_tetrapak_version
+
+    Available Tasks
+      build:appfile        - Generate the application resource file
+      build:erlang         - Compile Erlang modules
+      build:leex           - Compile lexical analysers (.xrl) to Erlang
+      build:yecc           - Compile yecc parsers (.yrl) to Erlang
+      check:appmodules     - Check app file module list
+      check:packageable    - Check that application has all plugin dependencies
+      check:xref           - Check inter-module calls
+      clean:appfile        - Delete generated application resource file
+      clean:ct             - Remove compile common_test units
+      clean:dist           - Delete packages
+      clean:edoc           - Delete generated documentation
+      clean:erlang         - Delete compiled Erlang modules
+      clean:leex           - Delete compiled lexical analysers
+      clean:taskcache      - Delete the local task cache
+      clean:testlog        - Delete common_test HTML logs
+      clean:yecc           - Delete compiled yecc parsers
+      config:appfile       - Read the application resource file
+      config:vcs           - Gather information from the VCS
+      doc:edoc             - Generate edoc documentation
+      info:deps            - Get application deps as list
+      info:deps:tree       - Get application deps as tree
+      install:copy         - install a copy of the application into Erlang lib dir
+      pkg:deb              - Create a binary debian package
+      pkg:debsrc           - Create a debian source package
+      pkg:ipkg             - Create a binary ipkg
+      shell                - Start the Erlang shell
+      start:dev            - Start the application in Erlang shell
+      test:ct              - Run unit tests with common_test
+
+-------------------------------------------------------------------------
+
+Tasks have this structure build:appfile, that means, that tetrapak
+tries to execute build task, if it cann't find a build tasks, then it tries to execute
+all build:* tasks
+
+Example is: tetrapak info:deps, but your will get output from both tasks, if you execute only info.
+
+All tasks has own tasks dependency.
+
+Example: tetrapak build:appfile execute build:erlang tasks
+
+-------------------------------------------------------------------------
+
+Sometimes you need extra config for development with applications enviroments.
+It is possible to specify in a folder:
+
+tetrapak/dev.config:
+
+    [
+     {app1,
+        [{env1, value1}]
+     },
+     {app2,
+        [{env1, value1}]
+     }
+    ].
+
+or
+
+    {app1,
+        [{env1, value1}]
+    }.
+
+    {app2,
+        [{env1, value1}]
+    }.
+
+both styles are working.
+
+Config would be read, if you start tetrapak start:dev (or tetrapak start, that invokes start:dev)
+
+## tetrapak's shell
+
+-------------------------------------------------------------------------
+
+There are extra functions in shell available
+
+    1> help().
+    ...
+    l()        -- reloads changed modules
+    start()    -- starts the current application
+    start(App) -- starts an application and all its dependencies
+    bl()       -- runs "build"
+    bll()      -- runs "build" and reloads modules
+    bls()      -- runs "build", reloads modules and starts the current application
+    dbg(M)     -- enable dbg tracer on all functions in module M
+    dbg(M, F)  -- enable dbg tracer on M:F functions
+    dbgl(M)    -- enable dbg tracer on all local functions in module M
+    dbgdel(M)  -- disable call tracer for module M
+    dbgdel(M,F)-- disable call tracer for function M:F
+    dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information
+
+If you have installed OTP application redbug( https://github.com/liveforeverx/redbug )
+in your ERL_LIBS pathes, then for a dbg/1 command your can use:
+
+    dbg(S)     -- enable dbg tracer with redbug RTP(restricted trace pattern)
+                  Please note, that not all original patterns are supported
+                  the RTP has the form: "<mfa> when <guards>"
+                  "mod", "mod:fun", "mod:fun/3" or "mod:fun('_',atom,X)"
+                  <guard> is something like:
+                  "X==1" or "is_atom(A)" or "(X==2) or (Y==2)"
+
+If your want to debug some function by tetrapak yourself or by a tetrapak tasks (or for example: if your
+application have different behaviour in a test cases):
+
+It is possible invoke redbug-like RTP pattern with a tetrapak start:
+
+    DEBUG_SPEC="tetrapak_task"
+
+Or throw command option, where it possible to define more than one debug spec:
+
+    -debug_spec "lists:seq(1,20)" "tetrapak"
 
 ## Config Options
 
@@ -211,3 +363,6 @@ The entries of this list specify functions ({Module, Function, Arity}).
 The 'check:xref' task will fail if there are any calls to undefined
 functions that are not a member of this list.
 Defaults to `[]`.
+
+Extensibility
+=============
