@@ -63,9 +63,8 @@ server_loop(Port) ->
             put(?MODULE, false),
             unregister(user),
             user_drv:start('tty_sl -c -e', Shell),
-            timer:sleep(20),
+            NewUser = await_registration(user, 20, 20),
             From ! {io_reply, ReplyAs, ok_shell_started},
-            NewUser = whereis(user),
             forwarder_loop(NewUser);
         {io_request, From, ReplyAs, Request} when is_pid(From) ->
             {Reply, Chars} = ioreq_output(Request),
@@ -76,6 +75,16 @@ server_loop(Port) ->
             ?DEBUG("io other: ~p", [_Other]),
             server_loop(Port)
     end.
+
+await_registration(RegName, Wait, Count) ->
+    await_registration(RegName, whereis(RegName), Wait, Count).
+
+await_registration(_RegName, Actual, _Wait, Count)
+  when Actual =/= undefined orelse Count =:= 0 ->
+    Actual;
+await_registration(RegName, undefined, Wait, Count) ->
+    timer:sleep(Wait),
+    await_registration(RegName, whereis(RegName), Wait, Count - 1).
 
 forwarder_loop(User) ->
     receive
