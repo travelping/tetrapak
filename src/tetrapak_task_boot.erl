@@ -20,7 +20,7 @@
 
 -module(tetrapak_task_boot).
 -behaviour(tetrapak_task).
--export([initial_tmap/0, run/2, behaviour_info/1]).
+-export([initial_tmap/0, run/2, behaviour_info/1, read_config/2, tetrapak_config/2, load_appdata/0, project_config_path/2]).
 
 behaviour_info(callbacks) -> [{app, 0}, {tasks, 1}];
 behaviour_info(_) -> undefined.
@@ -35,6 +35,13 @@ initial_tmap() ->
      {["tetrapak", "info"],         #task{name = "tetrapak:info", module = ?MODULE,
                                           description = "Show version and tasks"}}].
 
+tetrapak_config(BaseConfig) ->
+    tetrapak_config(tetrapak:dir(), BaseConfig).
+tetrapak_config(Dir, BaseConfig) ->
+    ProjectConfig = read_config(project_config_path(Dir, "config.ini"), BaseConfig),
+    read_config(project_config_path(Dir, "local.ini"), ProjectConfig).
+
+
 run("tetrapak:debug_setup", _) ->
     EnvSpec = os:getenv("DEBUG_SPEC"),
     ArgSpecs = case init:get_argument(debug_spec) of
@@ -48,14 +55,12 @@ run("tetrapak:boot", _) ->
     Props   = load_appdata(),
     Version = proplists:get_value(vsn, Props, "UNKNOWN"),
     Env     = proplists:get_value(env, Props),
-
     %% configuration
     BaseConfig     = #config{values = proplists:get_value(config, Env)},
-    ProjectConfig1 = read_config(project_config_path("config.ini"), BaseConfig),
-    ProjectConfig2 = read_config(project_config_path("local.ini"), ProjectConfig1),
+    ProjectConfig = tetrapak_config(BaseConfig),
 
     CliOptions = getopt(config, o, 2),
-    TheConfig  = add_cli_config(CliOptions, ProjectConfig2),
+    TheConfig  = add_cli_config(CliOptions, ProjectConfig),
 
     tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
 
@@ -84,6 +89,9 @@ run("tetrapak:info", _) ->
 run("clean:taskcache", _) ->
     tpk_file:delete(filename:join(tetrapak:path("tetrapak"), ?LOCAL_CACHE)),
     ok.
+
+% --------------------------------------------------------------------------------------------------
+% --
 
 show_tmap(TMap) ->
     Lis = [{Task#task.name, Task#task.description, Task#task.origin} ||
@@ -375,8 +383,8 @@ tcom_fail(File, Line, Fmt, Args) ->
 
 %% ------------------------------------------------------------
 %% -- Config files
-project_config_path(Filename) ->
-    filename:join(tetrapak:path("tetrapak"), Filename).
+project_config_path(Dir, Filename) ->
+    filename:join([Dir, "tetrapak", Filename]).
 
 read_config(File, Config) ->
     case read_ini_file(File, Config) of
