@@ -45,8 +45,17 @@ prefix() ->
 	_ -> ""
     end.
 
+erlanglib_dir() ->
+    case is_local() of
+        true -> code:lib_dir();
+        _    -> "/usr/lib/erlang/lib"
+    end.
+
 libdir() ->
-    prefix() ++ "/usr/lib/erlang/lib".
+    prefix() ++ erlanglib_dir().
+
+is_local() ->
+    (error =/= init:get_argument(local)).
 
 is_useless(Filename) ->
     Name = tpk_file:basename(Filename),
@@ -66,8 +75,8 @@ install_copy() ->
     Name    = atom_to_list(tetrapak:get("config:appfile:name")),
     Vsn     = tetrapak:get("config:appfile:vsn"),
 
-    InstallDir = libdir() ++ tpk_util:f("/~s-~s/", [Name, Vsn]),
-    RelInstallDir = "../lib/erlang/lib" ++ tpk_util:f("/~s-~s/", [Name, Vsn]),
+    AppErlangDir = tpk_util:f("/~s-~s/", [Name, Vsn]),
+    InstallDir = libdir() ++ AppErlangDir,
     io:format("InstallDir: ~s~n", [InstallDir]),
     tpk_file:mkdir(InstallDir),
     IsExcluded = fun (Path) ->
@@ -79,8 +88,12 @@ install_copy() ->
                  end,
     PackageFiles1 = copy_files(InstallDir, IsExcluded),
 
-    %% symlink binaries
-    BinDir = "usr/bin",
+    %% BinDir is symlink binaries
+    {RelInstallDir, BinDir} =
+        case is_local() of
+            false -> {"../lib/erlang/lib", "usr/bin"};
+            true  -> {"../lib", filename:join(code:root_dir(), "bin")}
+        end,
 
     lists:foldl(fun (ScriptName, Acc) ->
 			Original = filename:join(tetrapak:path("bin"), ScriptName),
@@ -88,7 +101,7 @@ install_copy() ->
 			    true ->
 				tpk_file:mkdir(filename:join(prefix(), BinDir)),
 				Target = prefix() ++ "/" ++ BinDir ++ "/" ++ ScriptName,
-				Link = RelInstallDir ++ "bin/" ++ ScriptName,
+				Link = RelInstallDir ++ AppErlangDir ++ "bin/" ++ ScriptName,
 				io:format("Link: ~s -> ~s~n", [Link, Target]),
 				file:make_symlink(Link, Target),
 				[{Original, Link} | Acc];

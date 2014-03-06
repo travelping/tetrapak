@@ -12,12 +12,15 @@ GRAMMAR_ERL = $(SRC_DIR)/tetrapak_ini_parser.erl
 LEXER       = $(SRC_DIR)/tetrapak_ini_lexer.xrl
 LEXER_ERL   = $(SRC_DIR)/tetrapak_ini_lexer.erl
 
-.PHONY: all clean doc shell 
+.PHONY: all clean doc shell
 
 all: $(LEXER_ERL) $(GRAMMAR_ERL)
 	mkdir -p $(EBIN_DIR)
 	$(ERL) -pa $(EBIN_DIR) -noinput -eval "case make:all() of up_to_date -> halt(0); error -> halt(1) end."
 	bin/tetrapak build
+
+install: all
+	bin/tetrapak install:copy -local
 
 clean:
 	rm -f $(GRAMMAR_ERL)

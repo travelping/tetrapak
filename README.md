@@ -4,6 +4,10 @@
 
 tetrapak is an extensible build system for Erlang/OTP applications.
 
+Installation
+============
+
+    make install
 
 Developing with tetrapak
 ========================
