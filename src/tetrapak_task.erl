@@ -25,8 +25,9 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([context/0, directory/0, cache_table/0]).
--export([worker/4, fail/0, fail/2, get/1, require_all/1, require_all/2,
-         get_config/1, get_config_object/2, get_all_config_objects/1]).
+-export([worker/4, fail/0, fail/2, get/1, get/2, require_all/1, require_all/2,
+         get_config/1, get_config/2, get_config_object/2, get_config_object/3,
+         get_all_config_objects/1, get_all_config_objects/2]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
 -export([normalize_name/1, split_name/1]).
@@ -78,14 +79,14 @@ worker(Task = #task{name = TaskName, module = TaskModule}, Context, Directory, C
     case try_check(TaskModule, TaskName) of
         {done, Variables} ->
             ?DEBUG("worker: check/1 -> done"),
-            tetrapak_context:update_cache(Context, Variables),
+            tetrapak_context:update_cache(Context, Directory, Variables),
             ?DEBUG("require post hooks: ~p", [Task#task.post_hooks]),
             run_hooks(Task#task.post_hooks);
         {needs_run, TaskData} ->
             case try_run(TaskModule, TaskName, TaskData) of
                 {done, Variables} ->
                     ?DEBUG("worker: run/2 -> done"),
-                    tetrapak_context:update_cache(Context, Variables),
+                    tetrapak_context:update_cache(Context, Directory, Variables),
                     ?DEBUG("require post hooks: ~p", [Task#task.post_hooks]),
                     run_hooks(Task#task.post_hooks)
             end
@@ -203,7 +204,10 @@ fail(Fmt, Args) ->
 %% @private
 -spec get_config(string()) -> false | {ok, term()}.
 get_config(Key) ->
-    case ets:lookup(cache_table(), {config_value, Key}) of
+    get_config(directory(), Key).
+-spec get_config(string(), string()) -> false | {ok, term()}.
+get_config(Dir, Key) ->
+    case ets:lookup(cache_table(), {config_value, Dir, Key}) of
         [] -> false;
         [{_K, Value}] -> {ok, Value}
     end.
@@ -211,7 +215,10 @@ get_config(Key) ->
 %% @private
 -spec get_config_object(string(), string()) -> false | {ok, [{string(), term()}, ...]}.
 get_config_object(Type, Instance) ->
-    case ets:lookup(cache_table(), {config_object, Type, Instance}) of
+    get_config_object(directory(), Type, Instance).
+-spec get_config_object(string(), string(), string()) -> false | {ok, [{string(), term()}, ...]}.
+get_config_object(Dir, Type, Instance) ->
+    case ets:lookup(cache_table(), {config_object, Dir, Type, Instance}) of
         [] -> false;
         [{_K, Value}] -> {ok, Value}
     end.
@@ -219,15 +226,21 @@ get_config_object(Type, Instance) ->
 %% @private
 -spec get_all_config_objects(string()) -> [{string(), [{string(), term()}, ...]}, ...].
 get_all_config_objects(Type) ->
-    Terms = ets:select(cache_table(), [{{{config_object, Type, '_'}, '_'},[],['$_']}]),
-    [{Instance, Props} || {{config_object, _, Instance}, Props} <- Terms].
+    get_all_config_objects(directory(), Type).
+-spec get_all_config_objects(string(), string()) -> [{string(), [{string(), term()}, ...]}, ...].
+get_all_config_objects(Dir, Type) ->
+    Terms = ets:select(cache_table(), [{{{config_object, Dir, Type, '_'}, '_'},[],['$_']}]),
+    [{Instance, Props} || {{config_object, _, _, Instance}, Props} <- Terms].
 
 %% @private
 -spec get(string()) -> {error, unknown_key} | {ok, term()}.
 get(Key) ->
-    case require_all([Key]) of
+    get(directory(), Key).
+-spec get(string(), string()) -> {error, unknown_key} | {ok, term()}.
+get(Dir, Key) ->
+    case require_all(Dir, [Key]) of
         ok ->
-            case ets:lookup(cache_table(), {return_value, Key}) of
+            case ets:lookup(cache_table(), {return_value, Dir, Key}) of
                 [] -> {error, unknown_key};
                 [{_K, Value}] -> {ok, Value}
             end;

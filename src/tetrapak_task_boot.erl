@@ -62,7 +62,7 @@ run("tetrapak:boot", _) ->
     CliOptions = getopt(config, o, 2),
     TheConfig  = add_cli_config(CliOptions, ProjectConfig),
 
-    tetrapak_context:import_config(tetrapak_task:context(), TheConfig),
+    tetrapak_context:import_config(tetrapak_task:context(), tetrapak_task:directory(), TheConfig),
 
     %% check, that we are in application directory
     ErlangApp = tpk_file:exists_in("src", "*.app.src") orelse

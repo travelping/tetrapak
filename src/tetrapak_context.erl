@@ -21,16 +21,16 @@
 %% @private
 -module(tetrapak_context).
 -export([new/1, add_directory/2, run_sequentially/3, shutdown/1,
-         wait_for/3, wait_shutdown/1, update_cache/2,
+         wait_for/3, wait_shutdown/1, update_cache/3,
          register_io_worker/1, register_tasks/3, get_tasks/2,
-         import_config/2]).
+         import_config/3]).
 -export([init/2, loop/1]).
 
 -include("tetrapak.hrl").
 -define(TIMEOUT, 10000).
 
-update_cache(Ctx, Result) ->
-    call(Ctx, {update_cache, Result}).
+update_cache(Ctx, Dir, Result) ->
+    call(Ctx, {update_cache, Dir, Result}).
 
 register_io_worker(Ctx) ->
     link(Ctx),
@@ -42,8 +42,8 @@ register_tasks(Ctx, Dir, TList) ->
 get_tasks(Ctx, Dir) ->
     call(Ctx, {get_tasks, Dir}).
 
-import_config(Ctx, Config = #config{}) ->
-    call(Ctx, {import_config, Config}).
+import_config(Ctx, Dir, Config = #config{}) ->
+    call(Ctx, {import_config, Dir, Config}).
 
 -spec run_sequentially(pid(), string(), [Key, ...]) -> ok | {error, Error} | CtxExit when
     Error   :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
@@ -141,12 +141,12 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
             NewTasks = import_tasks(TList, fetch(Dir, TaskMap)),
             loop(LoopState#st{tasks = orddict:store(Dir, NewTasks, TaskMap)});
 
-        {request, FromPid, {import_config, Config}} ->
+        {request, FromPid, {import_config, Dir, Config}} ->
             lists:foreach(fun ({Key, Value}) ->
-                                  ets:insert(CacheTable, {{config_value, Key}, Value})
+                                  ets:insert(CacheTable, {{config_value, Dir, Key}, Value})
                           end, Config#config.values),
             lists:foreach(fun ({{Type, Instance}, ObjValues}) ->
-                                  ets:insert(CacheTable, {{config_object, Type, Instance}, ObjValues})
+                                  ets:insert(CacheTable, {{config_object, Dir, Type, Instance}, ObjValues})
                           end, Config#config.objects),
             reply(FromPid, ok),
             loop(LoopState);
@@ -169,9 +169,9 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
             end,
             loop(LoopState);
 
-        {request, FromPid, {update_cache, Variables}} ->
+        {request, FromPid, {update_cache, Dir, Variables}} ->
             lists:foreach(fun ({Key, Value}) ->
-                                  ets:insert(CacheTable, {{return_value, Key}, Value})
+                                  ets:insert(CacheTable, {{return_value, Dir, Key}, Value})
                           end, Variables),
             reply(FromPid, ok),
             loop(LoopState);
