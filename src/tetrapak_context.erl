@@ -20,9 +20,9 @@
 
 %% @private
 -module(tetrapak_context).
--export([new/1, run_sequentially/2, shutdown/1,
-         wait_for/2, wait_shutdown/1, update_cache/2,
-         register_io_worker/1, register_tasks/2, get_tasks/1,
+-export([new/1, add_directory/2, run_sequentially/3, shutdown/1,
+         wait_for/3, wait_shutdown/1, update_cache/2,
+         register_io_worker/1, register_tasks/3, get_tasks/2,
          import_config/2]).
 -export([init/2, loop/1]).
 
@@ -36,25 +36,25 @@ register_io_worker(Ctx) ->
     link(Ctx),
     cast(Ctx, register_io_worker).
 
-register_tasks(Ctx, TList) ->
-    call(Ctx, {register_tasks, TList}).
+register_tasks(Ctx, Dir, TList) ->
+    call(Ctx, {register_tasks, Dir, TList}).
 
-get_tasks(Ctx) ->
-    call(Ctx, get_tasks).
+get_tasks(Ctx, Dir) ->
+    call(Ctx, {get_tasks, Dir}).
 
 import_config(Ctx, Config = #config{}) ->
     call(Ctx, {import_config, Config}).
 
--spec run_sequentially(pid(), [Key, ...]) -> ok | {error, Error} | CtxExit when
+-spec run_sequentially(pid(), string(), [Key, ...]) -> ok | {error, Error} | CtxExit when
     Error   :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
     Key     :: string(),
     CtxExit :: {context_exit, term()}.
-run_sequentially(Context, []) ->
-    shutdown(Context);
-run_sequentially(Context, [Task | Rest]) ->
-    case wait_for(Context, [Task]) of
+run_sequentially(_Context, _Dir, []) ->
+    ok;
+run_sequentially(Context, Dir, [Task | Rest]) ->
+    case wait_for(Context, Dir, [Task]) of
         ok ->
-            run_sequentially(Context, Rest);
+            run_sequentially(Context, Dir, Rest);
         {error, {unknown_key, Key}} ->
             shutdown(Context),
             {error, {unknown_key, Key}};
@@ -70,17 +70,21 @@ shutdown(Context) ->
     cast(Context, shutdown),
     wait_shutdown(Context).
 
--spec wait_for(pid(), [Key, ...]) -> ok | {error, Error} | CtxExit when
+-spec wait_for(pid(), string(), [Key, ...]) -> ok | {error, Error} | CtxExit when
     Error   :: {failed, Key} | {cycle, [Key, ...]} | {unknown_key, Key},
     Key     :: string(),
     CtxExit :: {context_exit, term()}.
-wait_for(Ctx, Keys) ->
-    case call(Ctx, {wait_for, Keys}) of
+wait_for(Ctx, Dir, Keys) ->
+    case call(Ctx, {wait_for, Dir, Keys}) of
         {error, Error} ->
             {error, Error};
         {wait, WaitPids} ->
             wait_tasks_down(Ctx, ordsets:from_list(WaitPids))
     end.
+
+-spec add_directory(pid(), string()) -> ok.
+add_directory(Ctx, Dir) ->
+    cast(Ctx, {add_dir, Dir}).
 
 wait_tasks_down(Ctx, WaitPids) ->
     CtxMRef = monitor(process, Ctx),
@@ -112,7 +116,7 @@ wait_shutdown(Process) ->
 -record(st, {
     directory                  :: string(),
     parent                     :: pid(),
-    tasks                      :: [{string(), #task{}}],
+    tasks                      :: [{string(), [{string(), #task{}}]}],
     cache                      :: ets:tid(),
     rungraph                   :: digraph(),
     io_workers = ordsets:new() :: list(pid())
@@ -124,7 +128,7 @@ new(Directory) ->
 init(Parent, Directory) ->
     process_flag(trap_exit, true),
     InitialState = #st{directory = Directory, parent = Parent,
-                       tasks = tetrapak_task_boot:initial_tmap(),
+                       tasks = orddict:new(),
                        cache = ets:new(?MODULE, [protected, ordered_set]),
                        rungraph = digraph:new([acyclic])},
     digraph:add_vertex(InitialState#st.rungraph, pid_to_list(Parent), Parent),
@@ -132,10 +136,10 @@ init(Parent, Directory) ->
 
 loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) ->
     receive
-        {request, FromPid, {register_tasks, TList}} ->
+        {request, FromPid, {register_tasks, Dir, TList}} ->
             reply(FromPid, ok),
-            NewTasks = import_tasks(TList, TaskMap),
-            loop(LoopState#st{tasks = NewTasks});
+            NewTasks = import_tasks(TList, fetch(Dir, TaskMap)),
+            loop(LoopState#st{tasks = orddict:store(Dir, NewTasks, TaskMap)});
 
         {request, FromPid, {import_config, Config}} ->
             lists:foreach(fun ({Key, Value}) ->
@@ -147,16 +151,16 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
             reply(FromPid, ok),
             loop(LoopState);
 
-        {request, FromPid, get_tasks} ->
-            reply(FromPid, TaskMap),
+        {request, FromPid, {get_tasks, Dir}} ->
+            reply(FromPid, fetch(Dir, TaskMap)),
             loop(LoopState);
 
-        {request, FromPid, {wait_for, Keys}} ->
-            case resolve_keys(TaskMap, Keys) of
+        {request, FromPid, {wait_for, Dir, Keys}} ->
+            case resolve_keys(fetch(Dir, TaskMap), Keys) of
                 {unknown_key, Key} ->
                     reply(FromPid, {error, {unknown_key, Key}});
                 TaskDeps ->
-                    case start_deps(TaskDeps, task_name(RunGraph, FromPid), LoopState) of
+                    case start_deps(TaskDeps, Dir, task_name(RunGraph, FromPid), LoopState) of
                         {cycle, Cycle} ->
                             reply(FromPid, {error, {cycle, Cycle}});
                         ReplyWait ->
@@ -171,6 +175,9 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
                           end, Variables),
             reply(FromPid, ok),
             loop(LoopState);
+
+        {cast, _FromPid, {add_dir, Dir}} ->
+            loop(LoopState#st{tasks = orddict:store(Dir, tetrapak_task_boot:initial_tmap(), TaskMap)});
 
         {cast, FromPid, register_io_worker} ->
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
@@ -193,7 +200,7 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
 
 handle_exit(RunGraph, DeadPid, SendDoneMsg) ->
     case digraph:vertex(RunGraph, DeadPid) of
-        {_, TaskName} when is_list(TaskName) ->
+        {_, TaskName} when is_tuple(TaskName) ->
             digraph:add_vertex(RunGraph, TaskName, done),
             DepTasks = [digraph:edge(RunGraph, E) || E <- digraph:in_edges(RunGraph, TaskName)],
             lists:foreach(fun ({_, Dep, _, _}) ->
@@ -206,7 +213,7 @@ handle_exit(RunGraph, DeadPid, SendDoneMsg) ->
 
 send_done(DependencyPid, _DeadName, DeadPid) ->
     DependencyPid ! {self(), done, DeadPid}.
-send_failed(DependencyPid, DeadName, DeadPid) ->
+send_failed(DependencyPid, {_, DeadName}, DeadPid) ->
     DependencyPid ! {self(), failed, DeadPid, DeadName}.
 
 do_shutdown(#st{rungraph = RunGraph, io_workers = IOWorkers, parent = Parent}, FailedPid, FailedTask) ->
@@ -236,53 +243,53 @@ shutdown_loop(Workers, RunGraph, FailedTask) ->
             shutdown_loop(Workers, RunGraph, FailedTask)
     end.
 
-start_deps(Dependencies, Caller, State = #st{rungraph = Graph}) ->
+start_deps(Dependencies, Dir, Caller, State = #st{rungraph = Graph}) ->
     lists:foreach(fun (Task) ->
-                          case digraph:vertex(Graph, Task#task.name) of
+                          case digraph:vertex(Graph, {Dir, Task#task.name}) of
                               false ->
-                                  digraph:add_vertex(Graph, Task#task.name, not_yet_running);
+                                  digraph:add_vertex(Graph, {Dir, Task#task.name}, not_yet_running);
                               _ ->
                                   ok
                           end
                   end, Dependencies),
-    case add_edges(Dependencies, Caller, Graph) of
+    case add_edges(Dependencies, Dir, Caller, Graph) of
         {cycle, Cycle} ->
             {cycle, Cycle};
         ok ->
             lists:foldl(fun (Task, WaitAcc) ->
-                                maybe_start_task(Task, State, WaitAcc)
+                                maybe_start_task(Task, Dir, State, WaitAcc)
                         end, [], Dependencies)
     end.
 
-add_edges([Task | Rest], Caller, Graph) ->
-    case digraph:add_edge(Graph, Caller, Task#task.name) of
+add_edges([Task | Rest], Dir, Caller, Graph) ->
+    case digraph:add_edge(Graph, Caller, {Dir, Task#task.name}) of
         {error, {bad_edge, Cycle}} ->
             {cycle, Cycle};
         ['$e' | _] ->
-            add_edges(Rest, Caller, Graph)
+            add_edges(Rest, Dir, Caller, Graph)
     end;
-add_edges([], _Caller, _Graph) ->
+add_edges([], _Dir, _Caller, _Graph) ->
     ok.
 
-maybe_start_task(Task = #task{name = TaskName}, State, WaitAcc) ->
-    case digraph:vertex(State#st.rungraph, TaskName) of
+maybe_start_task(Task = #task{name = TaskName}, Dir, State, WaitAcc) ->
+    case digraph:vertex(State#st.rungraph, {Dir, TaskName}) of
         {_, done} ->
             WaitAcc;
         {_, not_yet_running} ->
-            Pid = spawn_worker(self(), Task, State),
-            digraph:add_vertex(State#st.rungraph, TaskName, Pid),
-            digraph:add_vertex(State#st.rungraph, Pid, TaskName),
+            Pid = spawn_worker(self(), Task, Dir, State),
+            digraph:add_vertex(State#st.rungraph, {Dir, TaskName}, Pid),
+            digraph:add_vertex(State#st.rungraph, Pid, {Dir, TaskName}),
             [Pid | WaitAcc];
         {_, Pid} when is_pid(Pid) ->
             [Pid | WaitAcc]
     end.
 
-spawn_worker(Ctx, Task, State) ->
-    spawn_link(tetrapak_task, worker, [Task, Ctx, State#st.directory, State#st.cache]).
+spawn_worker(Ctx, Task, Dir, State) ->
+    spawn_link(tetrapak_task, worker, [Task, Ctx, Dir, State#st.cache]).
 
 task_name(RunGraph, Pid) ->
     case digraph:vertex(RunGraph, Pid) of
-        {_Pid, Name} when is_list(Name) -> Name;
+        {_Pid, Name} when is_tuple(Name) -> Name;
         _            when is_pid(Pid)   -> pid_to_list(Pid)
     end.
 
@@ -357,3 +364,9 @@ cast(Ctx, Cast) ->
 
 reply(Pid, Reply) ->
     Pid ! {reply, self(), Reply}.
+
+%% -------------------------------------------------------------
+%% -- helpers
+
+fetch(Key, List) ->
+    proplists:get_value(Key, List, []).

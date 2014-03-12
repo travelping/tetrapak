@@ -75,7 +75,7 @@ run("tetrapak:boot", _) ->
                     end,
     %% scan tasks
     Tasks = proplists:get_value(TaskConfigEnv, Env),
-    [tetrapak_context:register_tasks(tetrapak_task:context(), RegTasks) || RegTasks <-
+    [tetrapak_context:register_tasks(tetrapak_task:context(), tetrapak_task:directory(), RegTasks) || RegTasks <-
         [builtin_tasks(Tasks),
          plugin_tasks(Plugins, TaskConfigEnv, Env),
          scan_local_tasks(tetrapak:path("tetrapak"))]],
@@ -83,7 +83,7 @@ run("tetrapak:boot", _) ->
 
 run("tetrapak:info", _) ->
     io:format("** version ~s~n~n", [tetrapak:get("tetrapak:boot:version")]),
-    Tasks = tetrapak_context:get_tasks(tetrapak_task:context()),
+    Tasks = tetrapak_context:get_tasks(tetrapak_task:context(), tetrapak_task:directory()),
     io:format("Available Tasks~n~s", [show_tmap(Tasks)]);
 
 run("clean:taskcache", _) ->

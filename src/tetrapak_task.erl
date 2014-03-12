@@ -25,7 +25,7 @@
 %% task behaviour functions
 -export([behaviour_info/1]).
 -export([context/0, directory/0, cache_table/0]).
--export([worker/4, fail/0, fail/2, get/1, require_all/1,
+-export([worker/4, fail/0, fail/2, get/1, require_all/1, require_all/2,
          get_config/1, get_config_object/2, get_all_config_objects/1]).
 -export([output_collector/3, print_output_header/2]).
 %% misc
@@ -236,11 +236,14 @@ get(Key) ->
     end.
 
 %% @private
-require_all([]) ->
+require_all(Keys) ->
+    require_all(directory(), Keys).
+
+require_all(_Dir, []) ->
     ok;
-require_all(Keys) when is_list(Keys) ->
+require_all(Dir, Keys) when is_list(Keys) ->
     KList = lists:map(fun str/1, Keys),
-    case tetrapak_context:wait_for(context(), KList) of
+    case tetrapak_context:wait_for(context(), Dir, KList) of
         ok ->
             ok;
         {context_exit, _Reason} ->
