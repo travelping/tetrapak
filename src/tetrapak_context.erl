@@ -84,7 +84,7 @@ wait_for(Ctx, Dir, Keys) ->
 
 -spec add_directory(pid(), string()) -> ok.
 add_directory(Ctx, Dir) ->
-    cast(Ctx, {add_dir, Dir}).
+    call(Ctx, {register_tasks, Dir, tetrapak_task_boot:initial_tmap()}).
 
 wait_tasks_down(Ctx, WaitPids) ->
     CtxMRef = monitor(process, Ctx),
@@ -175,9 +175,6 @@ loop(LoopState = #st{cache = CacheTable, tasks = TaskMap, rungraph = RunGraph}) 
                           end, Variables),
             reply(FromPid, ok),
             loop(LoopState);
-
-        {cast, _FromPid, {add_dir, Dir}} ->
-            loop(LoopState#st{tasks = orddict:store(Dir, tetrapak_task_boot:initial_tmap(), TaskMap)});
 
         {cast, FromPid, register_io_worker} ->
             loop(LoopState#st{io_workers = ordsets:add_element(FromPid, LoopState#st.io_workers)});
