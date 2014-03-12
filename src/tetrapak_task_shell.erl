@@ -23,6 +23,7 @@
 -export([run/2, start_deps/1, extended_shell_build/0]).
 
 run("shell", _) ->
+    tetrapak:require("tetrapak:load"),
     start_shell();
 
 run("start:dev", _) ->
@@ -55,7 +56,12 @@ run("tetrapak:tpk-help", _) ->
               "tpk:b()      -- runs \"build\"\n"
               "tpk:bl()     -- runs \"build\" and reloads modules\n");
 
+run("tetrapak:load:app", _) ->
+    application:load(tetrapak:get("config:appfile:name")),
+    done;
+
 run("tetrapak:startapp", _) ->
+    tetrapak:require("tetrapak:load"),
     Config = case file:consult(filename:join(tetrapak:path("tetrapak"), "dev.config")) of
                  {ok, RawConfig} ->
                      lists:flatten(RawConfig);

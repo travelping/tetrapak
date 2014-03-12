@@ -33,7 +33,7 @@ check("clean:ct") ->
     tpk_util:check_files_exist(SrcDir, ".beam", SrcDir, ".erl").
 
 run("test:ct", _) ->
-    tetrapak:require("build"),
+    tetrapak:require_all(["build", "tetrapak:load"]),
     LogDir = tetrapak:config_path("test.ct.logdir"),
     file:make_dir(LogDir),
     CoverSpec = case tetrapak:config("test.ct.coverspec") of

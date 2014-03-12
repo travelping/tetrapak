@@ -26,7 +26,7 @@
 %% ------------------------------------------------------------
 %% -- Task API
 run("check:xref", _) ->
-    tetrapak:require("build:erlang"),
+    tetrapak:require_all(["build:erlang", "tetrapak:load"]),
     EbinDir = tetrapak:path("ebin"),
     case xref:d(EbinDir) of
         {error, Module, Reason} -> tetrapak:fail("xref error in ~p: ~p", [Module, Reason]);

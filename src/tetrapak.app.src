@@ -34,6 +34,7 @@
             {"start:dev", tetrapak_task_shell, "Start the application in Erlang shell"},
             {"tetrapak:extend:shell", tetrapak_task_shell, "Extend shell with tetrapak and debug commands"},
             {"tetrapak:reload", tetrapak_task_shell, "Reload changed modules"},
+            {"tetrapak:load:app", tetrapak_task_shell, "Load the current application"},
             {"tetrapak:startapp", tetrapak_task_shell, "Start the current application"},
             {"tetrapak:tpk-help", tetrapak_task_shell, "Show help for the tpk module"},
             {"info:deps", tetrapak_task_info, "Get application deps as list"},

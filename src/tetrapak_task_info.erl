@@ -6,11 +6,11 @@
 % -- Runs
 
 run("info:deps", _) ->
-    tetrapak:require("build:erlang"),
+    tetrapak:require_all(["build:erlang", "tetrapak:load"]),
     start_deps_get_deps_as_list(tetrapak:get("config:appfile:name"));
 
 run("info:deps:tree", _) ->
-    tetrapak:require("build:erlang"),
+    tetrapak:require_all(["build:erlang", "tetrapak:load"]),
     start_deps_get_deps_as_tree(tetrapak:get("config:appfile:name")).
 % --------------------------------------------------------------------------------------------------
 % -- Implementation
