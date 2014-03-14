@@ -270,7 +270,7 @@ require_all(Dir, Keys) when is_list(Keys) ->
     end.
 
 format_cycle(Cycle) ->
-    string:join([["'", Name, "'"] || Name <- Cycle], " -> ").
+    string:join([["'", Name, "' in ", Dir] || {Dir, Name} <- Cycle], " -> ").
 
 %% @private
 -spec normalize_name(string()) -> string().
