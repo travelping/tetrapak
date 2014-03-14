@@ -1,6 +1,11 @@
 Tetrapak
 ==========
 
+Changes with 0.4.24 - 13 Mar 2014
+---------------------------------
+
+* make tetrapak_context multi app capable
+* use plugin_scan true per default
 
 Changes with 0.4.23 - 24 Feb 2014
 ---------------------------------

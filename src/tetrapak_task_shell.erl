@@ -57,7 +57,7 @@ run("tetrapak:tpk-help", _) ->
               "tpk:bl()     -- runs \"build\" and reloads modules\n");
 
 run("tetrapak:load:app", _) ->
-    application:load(tetrapak:get("config:appfile:name")),
+    application:load(tetrapak:get("info:application:name")),
     done;
 
 run("tetrapak:startapp", _) ->

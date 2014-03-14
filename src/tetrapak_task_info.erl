@@ -1,85 +1,80 @@
 -module(tetrapak_task_info).
 -export([run/2]).
--define(STDLIBS, [kernel, stdlib]).
+-define(DEFAULT, [kernel, stdlib]).
 -include("tetrapak.hrl").
 % --------------------------------------------------------------------------------------------------
 % -- Runs
+run("info:application", _) ->
+    {done, [{name, appname([{"src/", ".app.src"}, {"ebin/", ".app"}])}]};
+
+run("info:deps:list", _) ->
+    tetrapak:require_all(["build:erlang", "tetrapak:load"]),
+    io:format("application list: ~p~n", [lists:reverse(deps([tetrapak:get("config:appfile:name")], [], ?DEFAULT))]);
 
 run("info:deps", _) ->
     tetrapak:require_all(["build:erlang", "tetrapak:load"]),
-    start_deps_get_deps_as_list(tetrapak:get("config:appfile:name"));
+    Tree = deps_tree(tetrapak:get("config:appfile:name"), normal, default()),
+    show_tree([Tree], [], error =/= init:get_argument(path)).
 
-run("info:deps:tree", _) ->
-    tetrapak:require_all(["build:erlang", "tetrapak:load"]),
-    start_deps_get_deps_as_tree(tetrapak:get("config:appfile:name")).
 % --------------------------------------------------------------------------------------------------
 % -- Implementation
+default() ->
+    tetrapak:config("info:deps:default").
 
-start_deps_get_deps_as_tree(App) ->
-    Tree = start_deps_get_deps_first(App, tree_fun()),
-    show_tree([Tree], []).
 
-start_deps_get_deps_as_list(App) ->
-    List = start_deps_get_deps_first(App, list_fun()),
-    io:format(user, "application start list: ~p~n", [List]).
-
-start_deps_get_deps_first(App, Fun) ->
-    try start_deps_get_deps(App, Fun) of
-        {Result, _StartedApps} ->
-            Result
-    catch
-        throw:{failed, Error} ->
-            Error
+appname([]) ->
+    tetrapak:fail("no application name found for the application directory~s~n", [tetrapak:dir()]);
+appname([{Dir, Ext} | Rest]) ->
+    case filelib:wildcard(filename:join(tetrapak:path(Dir), "*" ++ Ext)) of
+        [AppFile] ->
+            Name = filename:basename(AppFile, Ext),
+            list_to_atom(Name);
+        _ ->
+            appname(Rest)
     end.
 
-start_deps_get_deps(App, Fun) ->
-    start_deps_get_deps(App, Fun, ?STDLIBS).
+deps_tree(App, Type, Default) ->
+    case load(App) of
+        error ->
+            {App, Type, not_found};
+        [Apps, InlcudedApps] ->
+            {App, Type, [deps_tree(AppDep, normal, Default) || AppDep <- (Apps -- Default)]
+                        ++ [deps_tree(AppDep, include, Default) || AppDep <- InlcudedApps]}
+    end.
 
-start_deps_get_deps(App, Fun, StartedApps) ->
+deps([], Started, _Default) ->
+    Started;
+deps([App | ToStart], Started, Default) ->
+    case lists:member(App, Started) of
+        true ->
+            deps(ToStart, Started, Default);
+        false ->
+            NewStarted = dep_start(App, Started, Default),
+            deps(ToStart, [App | NewStarted], Default)
+    end.
+
+dep_start(App, Started, Default) ->
+    case load(App) of
+        error ->
+            tetrapak:fail("Dependency ~s is not installed.~n", [App]);
+        [Apps, _] ->
+            deps(Apps -- Default, Started, Default)
+    end.
+
+load(App) ->
     case application:load(App) of
         Ok when ?CHECK_LOADED(Ok) == true ->
-            start_deps_get_deps(App, Fun, StartedApps, Fun(init, App));
+            [begin
+                {ok, Apps} = application:get_key(App, Key),
+                Apps
+             end || Key <- [applications, included_applications]];
         _Error ->
-            {Fun(failed, App), StartedApps}
-    end.
-start_deps_get_deps(App, Fun, StartedApps, FunState) ->
-    {ok, Deps} = application:get_key(App, applications),
-    {NewFunState, NewStartedApps2} =
-        lists:foldl(fun(DepApp, {State, OldStartedApps}) ->
-                            {NewDepApp, NewStartedApps1} =
-                                start_deps_get_deps(DepApp, Fun, OldStartedApps),
-                            case lists:member(DepApp, OldStartedApps) of
-                                false ->
-                                    {Fun({add_dep, started, NewDepApp}, State), NewStartedApps1};
-                                true ->
-                                    {Fun({add_dep, not_started, NewDepApp}, State), OldStartedApps}
-                            end
-                    end, {FunState, StartedApps}, Deps -- ?STDLIBS),
-    %% This is not a same function, because it can be a recursion function, that doesn't
-    %% try to start a depencies at the same time
-    {Fun(ready, NewFunState), [App | NewStartedApps2]}.
-
-tree_fun() ->
-    fun
-        (init, App)                             -> {App, []};
-        (failed, App)                           -> {App, not_found};
-        ({add_dep, _Type, DepApp}, {App, Deps}) -> {App, [DepApp | Deps]};
-        (ready, {_App, _Deps} = State)          -> State
+            error
     end.
 
-list_fun() ->
-    fun
-        (init, App)                             -> [App];
-        (failed, App)                           ->
-            tetrapak:fail("Dependency ~s is not installed.~n", [App]);
-        ({add_dep, not_started, _DepApp}, Deps) -> Deps;
-        ({add_dep, started, DepApp}, Deps)      -> lists:flatten(Deps ++ [DepApp]);
-        (ready, [Dep | Deps])                   -> Deps ++ [Dep]
-    end.
-
-show_tree([], _Depth) ->
+show_tree([], _Depth, _Path) ->
     ok;
-show_tree([{App, Dependencies} | Rest], Depth) ->
+show_tree([{App, Type, Dependencies} | Rest], Depth, Path) ->
     case Depth of
         [] -> ok;
         _ ->
@@ -93,9 +88,12 @@ show_tree([{App, Dependencies} | Rest], Depth) ->
     end,
     case Dependencies of
         not_found ->
-            io:format("~s [NOT INSTALLED]~n", [App]);
+            io:format("~s [ NOT INSTALLED ]~n", [App]);
         _Deps ->
-            io:format("~s~n", [App]),
-            show_tree(Dependencies, [(Rest /= []) | Depth])
+            io:format("~s~s~n", [App, type(Type)]),
+            show_tree(Dependencies, [(Rest /= []) | Depth], Path)
     end,
-    show_tree(Rest, Depth).
+    show_tree(Rest, Depth, Path).
+
+type(normal) -> "";
+type(include) -> " (included)".
