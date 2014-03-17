@@ -19,7 +19,7 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tpk_file).
--export([size/1, mtime/1, md5sum/1, basename/1, relative_path/2, rebase_filename/3]).
+-export([size/1, mtime/1, md5sum/1, basename/1, relative_path/2, rebase_filename/3, is_writable/1]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
@@ -353,3 +353,18 @@ sumbytes(<<B1, Rest/binary>>, Sum) ->
     sumbytes(Rest, Sum + B1);
 sumbytes(<<>>, Sum) ->
     Sum.
+
+is_writable(Target) ->
+    case file:read_file_info(Target) of
+        {ok, FileInfo} ->
+            case FileInfo#file_info.access of
+                read_write ->
+                    true;
+                write ->
+                    true;
+                _ ->
+                    false
+            end;
+        {error, _Reason} ->
+            false
+    end.

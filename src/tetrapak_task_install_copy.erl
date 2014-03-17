@@ -27,22 +27,25 @@
 %% ------------------------------------------------------------
 %% -- Task API
 run("install:copy", _) ->
-    case tetrapak:config("package.include_doc") of
-        true  -> ReqDoc = ["doc"];
-        false -> ReqDoc = []
-    end,
-    tetrapak:require_all(["build", "check" | ReqDoc]),
-    tpk_file:mkdir(libdir()),
-    install_copy().
+    LibDir = libdir(),
+    case tpk_file:is_writable(LibDir) of
+        true ->
+            ReqDoc = ["doc" || tetrapak:config("package.include_doc")],
+            tetrapak:require_all(["build", "check" | ReqDoc]),
+            tpk_file:mkdir(LibDir),
+            install_copy();
+        false ->
+            tetrapak:fail("Installation failed, permission denied: ~s~n", [LibDir])
+    end.
 
 %% ------------------------------------------------------------
 %% -- Implementation
 
 prefix() ->
     case init:get_argument(prefix) of
-	{ok, [[Prefix]]} when is_list(Prefix) ->
-	    Prefix;
-	_ -> ""
+        {ok, [[Prefix]]} when is_list(Prefix) ->
+            Prefix;
+        _ -> ""
     end.
 
 erlanglib_dir() ->
@@ -82,9 +85,9 @@ install_copy() ->
     IsExcluded = fun (Path) ->
                          is_useless(Path) orelse
                          in_dir("tetrapak", Path) orelse
-			 (in_dir(tetrapak:config("edoc.outdir"), Path) and not tetrapak:config("package.include_doc")) orelse
-			 in_dir(tetrapak:config("package.outdir"), Path) orelse
-			 in_dir("debian", Path)
+             (in_dir(tetrapak:config("edoc.outdir"), Path) and not tetrapak:config("package.include_doc")) orelse
+             in_dir(tetrapak:config("package.outdir"), Path) orelse
+             in_dir("debian", Path)
                  end,
     PackageFiles1 = copy_files(InstallDir, IsExcluded),
 
@@ -96,19 +99,27 @@ install_copy() ->
         end,
 
     lists:foldl(fun (ScriptName, Acc) ->
-			Original = filename:join(tetrapak:path("bin"), ScriptName),
-			case filelib:is_regular(Original) and (not is_useless(Original)) of
-			    true ->
-				tpk_file:mkdir(filename:join(prefix(), BinDir)),
-				Target = prefix() ++ "/" ++ BinDir ++ "/" ++ ScriptName,
-				Link = RelInstallDir ++ AppErlangDir ++ "bin/" ++ ScriptName,
-				io:format("Link: ~s -> ~s~n", [Link, Target]),
-				file:make_symlink(Link, Target),
-				[{Original, Link} | Acc];
-			    false ->
-				Acc
-			end
-		end, PackageFiles1, filelib:wildcard("*", tetrapak:path("bin"))),
+        Original = filename:join(tetrapak:path("bin"), ScriptName),
+        case filelib:is_regular(Original) and (not is_useless(Original)) of
+            true ->
+                tpk_file:mkdir(filename:join(prefix(), BinDir)),
+                Target = prefix() ++ "/" ++ BinDir ++ "/" ++ ScriptName,
+                Link = RelInstallDir ++ AppErlangDir ++ "bin/" ++ ScriptName,
+                case file:make_symlink(Link, Target) of
+                    ok ->
+                        io:format("Link created: ~s -> ~s~n", [Link, Target]);
+                    {error, eexist} ->
+                        file:delete(Target),
+                        file:make_symlink(Link, Target),
+                        io:format("Link exists, new created: ~s -> ~s~n", [Link, Target]);
+                    {error, eacces} ->
+                        tetrapak:fail("Create link error, permission denied: ~s -> ~s~n", [Link, Target])
+                end,
+                [{Original, Link} | Acc];
+            false ->
+                Acc
+        end
+        end, PackageFiles1, filelib:wildcard("*", tetrapak:path("bin"))),
     ok.
 
 in_dir(Dir, Path) ->
