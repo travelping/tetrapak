@@ -334,15 +334,33 @@ import_tasks(NewTasks, TaskMap) ->
 apply_hooks(Task, FromHookField, ToHookField, TaskMap) ->
     lists:foldl(fun (Hooked, TMAcc) ->
                         HookedName = tetrapak_task:split_name(Hooked),
-                        case orddict:find(HookedName, TMAcc) of
-                            {ok, HookedTask} ->
-                                NewHookList = [Task#task.name | element(ToHookField, HookedTask)],
-                                NewHookedTask = setelement(ToHookField, HookedTask, NewHookList),
-                                orddict:store(HookedName, NewHookedTask, TMAcc);
-                            error ->
-                                TMAcc
-                        end
+                        HookedTasks = hook_find(HookedName, TMAcc, []),
+                        lists:foldl(fun({Name, HookedTask}, TMAccIn) ->
+                                            NewHookList = [Task#task.name | element(ToHookField, HookedTask)],
+                                            NewHookedTask = setelement(ToHookField, HookedTask, NewHookList),
+                                            orddict:store(Name, NewHookedTask, TMAccIn)
+                                    end, TMAcc, HookedTasks)
                 end, TaskMap, element(FromHookField, Task)).
+
+%% Extended the orddict:find for a subkeys. Example, run_before, ["build"] will find all build:* tasks
+hook_find([Key | _], [{[K | _], _} | _], Acc) when Key < K -> Acc;
+hook_find([Key | _], [{[K | _], _} | D], Acc) when Key > K -> hook_find(Key, D, Acc);
+hook_find(Key, [{K,Value} | D], Acc) ->
+    KeyLength = length(Key),
+    KLength = length(K),
+    NewAcc = if
+                 KeyLength < KLength ->
+                     case element(1, lists:split(KeyLength, K)) of
+                         Key -> [{K, Value} | Acc];
+                         _   -> Acc
+                     end;
+                 Key == K ->
+                     [{K, Value} | Acc];
+                 true ->
+                     Acc
+             end,
+    hook_find(Key, D, NewAcc);
+hook_find(_, [], Acc) -> Acc.
 
 %% ------------------------------------------------------------
 %% -- micro gen_server

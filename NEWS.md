@@ -1,6 +1,11 @@
 Tetrapak
 ==========
 
+Changes with 0.4.25 - 20 Mar 2014
+---------------------------------
+
+* extend hooks to be not a precise task, but a general
+
 Changes with 0.4.24 - 13 Mar 2014
 ---------------------------------
 

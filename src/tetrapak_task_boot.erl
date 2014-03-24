@@ -75,10 +75,13 @@ run("tetrapak:boot", _) ->
                     end,
     %% scan tasks
     Tasks = proplists:get_value(TaskConfigEnv, Env),
-    [tetrapak_context:register_tasks(tetrapak_task:context(), tetrapak_task:directory(), RegTasks) || RegTasks <-
-        [builtin_tasks(Tasks),
-         plugin_tasks(Plugins, TaskConfigEnv, Env),
-         scan_local_tasks(tetrapak:path("tetrapak"))]],
+    RegTasks =
+        lists:foldl(fun(AddTasks, AccTasks) ->
+                            orddict:merge(fun(_K, _F, S) -> S end, AccTasks, lists:keysort(1, AddTasks))
+                    end, [], [builtin_tasks(Tasks),
+                              plugin_tasks(Plugins, TaskConfigEnv, Env),
+                              scan_local_tasks(tetrapak:path("tetrapak"))]),
+    tetrapak_context:register_tasks(tetrapak_task:context(), tetrapak_task:directory(), RegTasks),
     {done, [{version, Version}, {sbplugins, BuildNeeded}]};
 
 run("tetrapak:info", _) ->
