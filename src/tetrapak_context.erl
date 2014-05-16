@@ -344,7 +344,7 @@ apply_hooks(Task, FromHookField, ToHookField, TaskMap) ->
 
 %% Extended the orddict:find for a subkeys. Example, run_before, ["build"] will find all build:* tasks
 hook_find([Key | _], [{[K | _], _} | _], Acc) when Key < K -> Acc;
-hook_find([Key | _], [{[K | _], _} | D], Acc) when Key > K -> hook_find(Key, D, Acc);
+hook_find([Key | _] = AllKey, [{[K | _], _} | D], Acc) when Key > K -> hook_find(AllKey, D, Acc);
 hook_find(Key, [{K,Value} | D], Acc) ->
     KeyLength = length(Key),
     KLength = length(K),
