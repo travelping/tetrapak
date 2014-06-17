@@ -28,11 +28,11 @@
 %% -- Task API
 run("install:copy", _) ->
     LibDir = libdir(),
+    ReqDoc = ["doc" || tetrapak:config("package.include_doc")],
+    tetrapak:require_all(["build", "check" | ReqDoc]),
+    tpk_file:mkdir(LibDir),
     case tpk_file:is_writable(LibDir) of
         true ->
-            ReqDoc = ["doc" || tetrapak:config("package.include_doc")],
-            tetrapak:require_all(["build", "check" | ReqDoc]),
-            tpk_file:mkdir(LibDir),
             install_copy();
         false ->
             tetrapak:fail("Installation failed, permission denied: ~s~n", [LibDir])
