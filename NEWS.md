@@ -1,6 +1,11 @@
 Tetrapak
 ==========
 
+Changes with 0.4.26 - 09 Jul 2014
+---------------------------------
+
+* rework the shell script started and fix arguments with spaces in them
+
 Changes with 0.4.25 - 20 Mar 2014
 ---------------------------------
 
