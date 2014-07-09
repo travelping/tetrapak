@@ -1,6 +1,6 @@
 % vim: filetype=erlang
 {application, tetrapak,
- [{description, "Erlang application packaging tool"},
+ [{description, "tetrapak is an extensible build system for Erlang/OTP applications"},
   {applications, [kernel, stdlib, compiler, edoc, tools, parsetools, common_test]},
   {registered, [tetrapak_io]},
   {env,
