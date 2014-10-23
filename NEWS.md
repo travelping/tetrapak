@@ -1,6 +1,11 @@
 Tetrapak
 ==========
 
+Changes with 0.4.27 - 23 Oct 2014
+---------------------------------
+
+* fix hanging on throwed tasks
+
 Changes with 0.4.26 - 09 Jul 2014
 ---------------------------------
 

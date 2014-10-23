@@ -118,7 +118,7 @@ wait_shutdown(Process) ->
     parent                     :: pid(),
     tasks                      :: [{string(), [{string(), #task{}}]}],
     cache                      :: ets:tid(),
-    rungraph                   :: digraph(),
+    rungraph                   :: digraph:graph(),
     io_workers = ordsets:new() :: list(pid())
 }).
 
@@ -214,7 +214,7 @@ send_failed(DependencyPid, {_, DeadName}, DeadPid) ->
     DependencyPid ! {self(), failed, DeadPid, DeadName}.
 
 do_shutdown(#st{rungraph = RunGraph, io_workers = IOWorkers, parent = Parent}, FailedPid, FailedTask) ->
-    Vertices = [digraph:vertex(RunGraph, V) || V <- digraph:vertices(RunGraph), is_list(V)],
+    Vertices = [digraph:vertex(RunGraph, V) || {_Dir, _TaskName} = V <- digraph:vertices(RunGraph)],
     Workers = [Pid || {_, Pid} <- Vertices, is_pid(Pid), Pid /= FailedPid, Pid /= Parent],
     ?DEBUG("shutdown: killing task workers: ~p", [Workers]),
     lists:foreach(fun (P) -> erlang:exit(P, kill) end, Workers),
