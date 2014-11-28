@@ -158,6 +158,14 @@ Or throw command option, where it possible to define more than one debug spec:
 
     -debug_spec "lists:seq(1,20)" "tetrapak"
 
+There is a debug command for tetrapak self
+
+    DEBUG=1 tetrapak
+
+Or
+
+    DEBUG=true tetrapak
+
 ## Config Options
 
     build.erlc_options :: [atom() | {atom(), term()}]
