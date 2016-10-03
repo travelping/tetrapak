@@ -1,6 +1,6 @@
 Source: @@name@@
 Maintainer: @@maintainer@@
-Standards-Version: 3.9.1
+Standards-Version: 3.9.6.1
 Priority: @@priority@@
 Section: @@section@@
 Build-Depends: @@builddeps@@
