@@ -67,6 +67,8 @@
              {"package.use_erlrc", false},
              {"package.deb.section", "misc"},
              {"package.deb.priority", "optional"},
+             {"package.deb.distribution", "unstable"},
+             {"package.deb.urgency", "normal"},
              {"package.deb.erlang_base_apps", [kernel, stdlib, compiler, sasl]},
              {"package.deb.dependencies", []},
              {"package.deb.build_dependencies", []},

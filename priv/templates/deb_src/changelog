@@ -1,4 +1,4 @@
-@@name@@ (@@version@@) unstable; urgency=normal
+@@name@@ (@@version@@) @@distribution@@; urgency=@@urgency@@
 
   * this changelog is auto-generated and does not contain useful information
 
