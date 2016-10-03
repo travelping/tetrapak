@@ -19,7 +19,8 @@
 % DEALINGS IN THE SOFTWARE.
 
 -module(tpk_file).
--export([size/1, mtime/1, md5sum/1, basename/1, relative_path/2, rebase_filename/3, is_writable/1]).
+-export([size/1, mtime/1, md5sum/1, sha1sum/1, sha256sum/1,
+	 basename/1, relative_path/2, rebase_filename/3, is_writable/1]).
 -export([temp_name/0, temp_name/1, mkdir/1, with_temp_dir/1,
          dir_contents/1, dir_contents/2, dir_contents/3,
          wildcard/2]).
@@ -166,24 +167,51 @@ walk(Fun, {Walk, Path}, Acc, Queue, DirOpt) ->
     end.
 
 %% ---------------------------------------------------------
-%% -- MD5
-md5sum(File) ->
+%% -- Hash file content
+hash_loop(UpdateFun, P, C) ->
+    case file:read(P, 4096) of
+        {ok, Bin} ->
+            hash_loop(UpdateFun, P, UpdateFun(C, Bin));
+        eof ->
+            file:close(P),
+	    {ok, C}
+    end.
+
+hash_file(UpdateFun, File, C) ->
     case file:open(File, [binary, raw, read_ahead]) of
         {ok, P} ->
-            Digest = md5_loop(P, erlang:md5_init()),
+            hash_loop(UpdateFun, P, C);
+        {error, Error} ->
+            {error, Error}
+    end.
+
+%% -- use crypto to hash the file
+crypto_hash_file(Hash, File) ->
+    case hash_file(fun crypto:hash_update/2, File, crypto:hash_init(Hash)) of
+	{ok, C} ->
+            Digest = crypto:hash_final(C),
             {ok, tpk_util:to_hex(Digest)};
         {error, Error} ->
             {error, Error}
     end.
 
-md5_loop(P, C) ->
-    case file:read(P, 4096) of
-        {ok, Bin} ->
-            md5_loop(P, erlang:md5_update(C, Bin));
-        eof ->
-            file:close(P),
-            erlang:md5_final(C)
+%% -- MD5
+md5sum(File) ->
+    case hash_file(fun erlang:md5_update/2, File, erlang:md5_init()) of
+	{ok, C} ->
+            Digest = erlang:md5_final(C),
+            {ok, tpk_util:to_hex(Digest)};
+        {error, Error} ->
+            {error, Error}
     end.
+
+%% -- SHA1
+sha1sum(File) ->
+    crypto_hash_file(sha, File).
+
+%% -- SHA256
+sha256sum(File) ->
+    crypto_hash_file(sha256, File).
 
 %% ----------------------------------------------------------
 %% Tarballs (erl_tar doesn't cut it...)
