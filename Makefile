@@ -20,7 +20,7 @@ all: $(LEXER_ERL) $(GRAMMAR_ERL)
 	bin/tetrapak build
 
 install: all
-	bin/tetrapak install:copy -local
+	bin/tetrapak install:copy -local -prefix "${DESTDIR}"
 
 clean:
 	rm -f $(GRAMMAR_ERL)

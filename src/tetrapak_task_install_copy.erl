@@ -102,7 +102,7 @@ install_copy() ->
         Original = filename:join(tetrapak:path("bin"), ScriptName),
         case filelib:is_regular(Original) and (not is_useless(Original)) of
             true ->
-                tpk_file:mkdir(filename:join(prefix(), BinDir)),
+                tpk_file:mkdir(prefix() ++ "/" ++ BinDir),
                 Target = prefix() ++ "/" ++ BinDir ++ "/" ++ ScriptName,
                 Link = RelInstallDir ++ AppErlangDir ++ "bin/" ++ ScriptName,
                 case file:make_symlink(Link, Target) of
