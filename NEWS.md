@@ -1,6 +1,13 @@
 Tetrapak
 ==========
 
+Changes with 0.4.28 - 03 Oct 2016
+---------------------------------
+
+* add debian .changes file to enable ppa uploads
+* use config maintainer for debian changelog
+* add DESTDIR support to Makefile
+
 Changes with 0.4.27 - 23 Oct 2014
 ---------------------------------
 

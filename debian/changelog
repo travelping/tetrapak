@@ -1,3 +1,9 @@
+erlang-tetrapak (0.4.28-0ppa1) yakkety; urgency=medium
+
+  * new release
+
+ -- Andreas Schultz <aschultz@warp10.net>  Mon, 03 Oct 2016 17:56:38 +0200
+
 erlang-tetrapak (0.3.1.21) unstable; urgency=low
 
   * add test.ct.coverspec config option
