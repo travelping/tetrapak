@@ -119,8 +119,13 @@ start_deps(App) ->
     end.
 
 loaded_mtime(Mod) ->
-    {Y,Mon,D,H,Min,S} = proplists:get_value(time, Mod:module_info(compile)),
-    calendar:universal_time_to_local_time({{Y,Mon,D},{H,Min,S}}).
+    case proplists:get_value(time, Mod:module_info(compile)) of
+	{Y,Mon,D,H,Min,S} ->
+	    calendar:universal_time_to_local_time({{Y,Mon,D},{H,Min,S}});
+	_ ->
+	    {file, Loaded} = code:is_loaded(Mod),
+	    filelib:last_modified(Loaded)
+    end.
 
 load(Mod) ->
     io:format("load ~s~n", [Mod]),
