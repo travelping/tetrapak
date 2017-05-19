@@ -79,14 +79,18 @@ duplicates([Head|Tail], Seen, Dupli) ->
 xref_result({_, []}) ->
     ok;
 xref_result({undefined, Functions}) ->
-    io:format("Undefined Functions called:~n"),
-    fmt_functions(Functions),
-
     UndefAllowed = tetrapak:config("xref.ignore_undef"),
-    DontFail     = lists:all(fun ({_, {M, F, A}}) -> lists:member({M, F, A}, UndefAllowed);
-                                 ({M, F, A})      -> lists:member({M, F, A}, UndefAllowed)
-                             end, Functions),
-    DontFail orelse tetrapak:fail("xref error");
+    UndefFuncs   = lists:filter(fun ({{M, F, A}, _}) -> lists:member({M, F, A}, UndefAllowed);
+				    ({M, F, A})      -> lists:member({M, F, A}, UndefAllowed)
+				end, Functions),
+    case UndefFuncs of
+	[] ->
+	    ok;
+	_->
+	    io:format("Undefined Functions called:~n"),
+	    fmt_functions(UndefFuncs),
+	    tetrapak:fail("xref error")
+    end;
 xref_result({deprecated, Functions}) ->
     io:format("Deprecated Functions called:~n"),
     fmt_functions(Functions);
