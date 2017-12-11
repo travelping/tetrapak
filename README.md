@@ -1,4 +1,4 @@
-# tetrapak
+tetrapak
 ===========
 
 tetrapak is an extensible build system for Erlang/OTP applications.
@@ -25,7 +25,7 @@ There are default tasks that are available in every directory.
 
 -------------------------------------------------------------------------
 
-You can start a new project with a simple sceleton.
+You can start a new project with a simple skeleton.
 
     tetrapak new -app new_app
     == new ===========================
@@ -37,7 +37,7 @@ You can start a new project with a simple sceleton.
 
 -------------------------------------------------------------------------
 
-Now, there are more available tasks in a project directory.
+Now, there are more available tasks in a projects directory.
 
     tetrapak
     == tetrapak:info =================
@@ -75,7 +75,7 @@ Now, there are more available tasks in a project directory.
 
 -------------------------------------------------------------------------
 
-Tasks have this structure: 'build:appfile'. This means that tetrapak tries to execute a build task. If it fails find atleast one build task, it tries to execute all 'build:*' tasks
+Tasks have this structure: 'build:appfile'. This means that tetrapak tries to execute a build task. If it fails find atleast one, it will execute all 'build:*' tasks.
 
 An example is: tetrapak info:deps. Note that you will get output from both tasks, even if you execute only info.
 
@@ -85,7 +85,7 @@ Example: tetrapak build:appfile execute build:erlang tasks
 
 -------------------------------------------------------------------------
 
-Sometimes you might need an extra configuration file while development in application environments.
+Sometimes you might need an extra configuration file while developing in application environments.
 It is possible to specify this in a folder:
 
 tetrapak/dev.config:
@@ -99,7 +99,7 @@ tetrapak/dev.config:
      }
     ].
 
-or
+Or:
 
     {app1,
         [{env1, value1}]
@@ -133,7 +133,7 @@ There are extra functions available in shell such as:
     dbgdel(M,F)-- disable call tracer for function M:F
     dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information
 
-If you have installed the OTP application [redbug] (https://github.com/liveforeverx/redbug) in your ERL_LIBS pathes for a dbg/1 command you can use:
+If you have installed the OTP application [redbug](https://github.com/liveforeverx/redbug) in your ERL_LIBS pathes for a dbg/1 command you can use:
 
     dbg(S)     -- enable dbg tracer with redbug RTP(restricted trace pattern)
                   Please note, that not all original patterns are supported
@@ -143,9 +143,7 @@ If you have installed the OTP application [redbug] (https://github.com/liveforev
                   "X==1" or "is_atom(A)" or "(X==2) or (Y==2)"
 
 If you want to debug some function by tetrapak or tetrapak tasks yourself (or if your
-application shows different behaviour in a test case for example):
-
-It is possible invoke a redbug-like RTP pattern with a tetrapak start:
+application shows different behaviour in a test case for example), it is possible invoke a redbug-like RTP pattern with a 'tetrapak start':
 
     DEBUG_SPEC="tetrapak_task"
 
