@@ -1,5 +1,4 @@
-===========
-~~ tetrapak
+# tetrapak
 ===========
 
 tetrapak is an extensible build system for Erlang/OTP applications.
@@ -14,7 +13,7 @@ Developing with tetrapak
 
 -------------------------------------------------------------------------
 
-There are default tasks, that are availible in every dir
+There are default tasks that are available in every directory.
 
     tetrapak
     == tetrapak:info =================
@@ -26,7 +25,7 @@ There are default tasks, that are availible in every dir
 
 -------------------------------------------------------------------------
 
-To start a new project with a simple sceleton.
+You can start a new project with a simple sceleton.
 
     tetrapak new -app new_app
     == new ===========================
@@ -76,20 +75,18 @@ Now, there are more available tasks in a project directory.
 
 -------------------------------------------------------------------------
 
-Tasks have this structure build:appfile, that means, that tetrapak
-tries to execute build task, if it cann't find a build tasks, then it tries to execute
-all build:* tasks
+Tasks have this structure: 'build:appfile'. This means that tetrapak tries to execute a build task. If it fails find atleast one build task, it tries to execute all 'build:*' tasks
 
-Example is: tetrapak info:deps, but your will get output from both tasks, if you execute only info.
+An example is: tetrapak info:deps. Note that you will get output from both tasks, even if you execute only info.
 
-All tasks has own tasks dependency.
+All tasks have their own tasks dependency.
 
 Example: tetrapak build:appfile execute build:erlang tasks
 
 -------------------------------------------------------------------------
 
-Sometimes you need extra config for development with applications enviroments.
-It is possible to specify in a folder:
+Sometimes you might need an extra configuration file while development in application environments.
+It is possible to specify this in a folder:
 
 tetrapak/dev.config:
 
@@ -112,15 +109,14 @@ or
         [{env1, value1}]
     }.
 
-both styles are working.
-
-Config would be read, if you start tetrapak start:dev (or tetrapak start, that invokes start:dev)
+Both styles are working.
+Config would be read if you start tetrapak start:dev (or tetrapak start, which invokes start:dev).
 
 ## tetrapak's shell
 
 -------------------------------------------------------------------------
 
-There are extra functions in shell available
+There are extra functions available in shell such as:
 
     1> help().
     ...
@@ -137,8 +133,7 @@ There are extra functions in shell available
     dbgdel(M,F)-- disable call tracer for function M:F
     dbgoff()   -- disable dbg tracer (calls dbg:stop_clear/0) to delete all debug information
 
-If you have installed OTP application redbug( https://github.com/liveforeverx/redbug )
-in your ERL_LIBS pathes, then for a dbg/1 command your can use:
+If you have installed the OTP application [redbug] (https://github.com/liveforeverx/redbug) in your ERL_LIBS pathes for a dbg/1 command you can use:
 
     dbg(S)     -- enable dbg tracer with redbug RTP(restricted trace pattern)
                   Please note, that not all original patterns are supported
@@ -147,22 +142,22 @@ in your ERL_LIBS pathes, then for a dbg/1 command your can use:
                   <guard> is something like:
                   "X==1" or "is_atom(A)" or "(X==2) or (Y==2)"
 
-If your want to debug some function by tetrapak yourself or by a tetrapak tasks (or for example: if your
-application have different behaviour in a test cases):
+If you want to debug some function by tetrapak or tetrapak tasks yourself (or if your
+application shows different behaviour in a test case for example):
 
-It is possible invoke redbug-like RTP pattern with a tetrapak start:
+It is possible invoke a redbug-like RTP pattern with a tetrapak start:
 
     DEBUG_SPEC="tetrapak_task"
 
-Or throw command option, where it possible to define more than one debug spec:
+Or a throw command option, where it possible to define more than one debug spec:
 
     -debug_spec "lists:seq(1,20)" "tetrapak"
 
-There is a debug command for tetrapak self
+There is a debug command for tetrapak itself.
 
     DEBUG=1 tetrapak
 
-Or
+Or:
 
     DEBUG=true tetrapak
 
@@ -170,7 +165,7 @@ Or
 
     build.erlc_options :: [atom() | {atom(), term()}]
 
-Options passed to the erlang compiler. Please note that there is
+Options are passed to the erlang compiler. Please note that there is
 no support for rebar-like platform defines at the moment.
 
 -------------------------------------------------------------------------
@@ -178,7 +173,7 @@ no support for rebar-like platform defines at the moment.
     build.version :: string()
 
 This option describes what goes into the `vsn` field of the application
-resource file. A format-string like syntax is used to pull information
+resource file. A format-string-like syntax is used to pull information
 from the VCS (like git). The directives are:
 
     ~~       -- a literal ~
@@ -188,7 +183,7 @@ from the VCS (like git). The directives are:
     ~b       -- the current branch
     ~d       -- a timestamp (YYYYMMDDhhmmss)
 
-In addition to the directives above, the version string may also include
+In addition to the directives above the version string may also include
 the following conditional directives:
 
     ~O{...}  -- expands to ... if the offset from the latest tag is non-zero
@@ -215,7 +210,7 @@ Defaults to `false`.
 
     edoc.hidden :: boolean()
 
-Whether documentation for hidden functions shall be generated.
+Whether documentation for hidden functions should be generated.
 Defaults to `false`.
 
 -------------------------------------------------------------------------
@@ -251,7 +246,7 @@ want to keep. Defaults to `"dist"`.
 
     package.maintainer :: string()
 
-This goes into the Maintainer field of generated packages.
+This goes into the Maintainer Field of generated packages.
 Defaults to `"Joe User <joe@example.com>"`.
 
 -------------------------------------------------------------------------
@@ -278,7 +273,7 @@ in addition to the applications specified in the application resource file and
 through the `package.extra_apps` option.
 Defaults to `[]`.
 
-One case where this might be useful is when your application uses eunit
+One case where this might be useful is when your application uses 'eunit'
 for testing and some of the application's runtime modules include the eunit header.
 You obviously don't want to depend on eunit on the target system, but the build will
 fail when eunit is not installed. In that case, adding
@@ -293,7 +288,7 @@ to the configuration file will make the build work.
     package.include_src :: boolean()
 
 Whether the source code of the application shall be included in the package.
-If true, the `tetrapak/` directory is also included.
+If true the `tetrapak/` directory is also included.
 Defaults to `false`.
 
 -------------------------------------------------------------------------
@@ -317,8 +312,7 @@ The debian section in which the package is placed. Defaults to `"misc"`.
 The priority of the package. Valid values are `"required"`, `"important"`,
 `"standard"`, `"optional"`, `"extra"`.
 Please consult the [Debian Policy](http://www.debian.org/doc/debian-policy/ch-archive.html#s-priorities)
-to learn more about the meaning of those.
-Defaults to `"optional"`.
+to learn more about the definition of those terms. Defaults to `"optional"`.
 
 -------------------------------------------------------------------------
 
@@ -361,7 +355,7 @@ Defaults to `"test"`.
 
 The common test suite that should be run. The main purpose of this
 config option is running a specific suite from the command line,
-as in
+as in:
 
     $ tetrapak test -o 'test.ct.suite' 'my_SUITE'
 
